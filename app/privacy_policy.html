@@ -66,7 +66,7 @@
     </div>
 
     <div class="container">
-        <p class="last-updated">Last updated: February 9, 2026</p>
+        <p class="last-updated">Last updated: February 10, 2026</p>
 
         <div class="section">
             <h2>1. Introduction</h2>
@@ -87,7 +87,7 @@
             <ul>
                 <li><strong>Device Information:</strong> Device type, operating system version, and unique device identifiers.</li>
                 <li><strong>Usage Data:</strong> How you interact with the app, including features used and time spent.</li>
-                <li><strong>Crash Reports:</strong> Technical information about app crashes to help us improve stability.</li>
+                <li><strong>Crash Reports:</strong> Technical information about app crashes, including device state, stack traces, and app version, collected via Firebase Crashlytics to help us improve stability.</li>
             </ul>
         </div>
 
@@ -120,7 +120,7 @@
             <h2>5. Data Sharing and Disclosure</h2>
             <p>We do not sell, trade, or rent your personal information to third parties. We may share your information only in the following circumstances:</p>
             <ul>
-                <li><strong>Service Providers:</strong> We may share data with trusted service providers who assist in operating our app (e.g., cloud hosting, crash reporting).</li>
+                <li><strong>Service Providers:</strong> We may share data with trusted service providers who assist in operating our app (e.g., cloud hosting, Firebase Crashlytics for crash reporting).</li>
                 <li><strong>Legal Requirements:</strong> We may disclose information if required by law or in response to valid legal requests.</li>
                 <li><strong>Business Transfers:</strong> In the event of a merger, acquisition, or sale of assets, your information may be transferred as part of that transaction.</li>
             </ul>
@@ -128,6 +128,19 @@
 
         <div class="section">
             <h2>6. Third-Party Services</h2>
+
+            <h3>6.1 Firebase Crashlytics</h3>
+            <p>We use Firebase Crashlytics, a service provided by Google, to collect crash reports and diagnostic information. This helps us identify and fix issues to improve app stability. Crashlytics collects:</p>
+            <ul>
+                <li>Crash stack traces and exception information</li>
+                <li>Device model, OS version, and orientation</li>
+                <li>Available RAM and disk space at time of crash</li>
+                <li>A Crashlytics Installation UUID to identify unique app installations</li>
+                <li>App version and build number</li>
+            </ul>
+            <p>Crashlytics does not collect personally identifiable information such as names, email addresses, or financial data. For more information, see <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Firebase Privacy Policy</a>.</p>
+
+            <h3>6.2 Financial Integrations</h3>
             <p>Our app integrates with third-party financial services to sync your account data:</p>
             <ul>
                 <li><strong>Banking Integrations:</strong> We connect to banks via FinTS/HBCI protocols (for German banks) or direct API integrations.</li>
