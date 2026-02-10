@@ -877,13 +877,33 @@ class WealthHistoryView(APIView):
 
         # Aggregate to monthly if requested
         if granularity == 'monthly':
+            import calendar
+            # Use today's day-of-month as the reference day for each month
+            reference_day = end_date.day
+
             monthly_totals = {}
             for date_str, total in daily_totals.items():
-                # Use first of month as the key
-                month_key = date_str[:7] + '-01'
-                # Keep the latest daily value for each month (most recent date)
-                if month_key not in monthly_totals or date_str > monthly_totals[month_key][0]:
+                d = date.fromisoformat(date_str)
+                year, month = d.year, d.month
+
+                # Calculate target day for this month (handle months with fewer days)
+                last_day_of_month = calendar.monthrange(year, month)[1]
+                target_day = min(reference_day, last_day_of_month)
+                target_date = date(year, month, target_day)
+                month_key = target_date.isoformat()
+
+                # Keep the value closest to (but not after) target_day
+                # Prefer exact match, otherwise take the closest earlier date
+                if month_key not in monthly_totals:
                     monthly_totals[month_key] = (date_str, total)
+                else:
+                    existing_date_str = monthly_totals[month_key][0]
+                    existing_date = date.fromisoformat(existing_date_str)
+
+                    # If this date is closer to target (but not after), use it
+                    if d <= target_date and (existing_date > target_date or d > existing_date):
+                        monthly_totals[month_key] = (date_str, total)
+
             history = [
                 {'date': month_key, 'total_wealth': float(data[1])}
                 for month_key, data in sorted(monthly_totals.items())
