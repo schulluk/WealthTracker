@@ -8,16 +8,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from core.encryption import decrypt_credentials as legacy_decrypt_credentials
 from core.user_encryption import (
     decrypt_user_key,
-    encrypt_credentials,
     encrypt_user_key,
     generate_salt,
     generate_user_key,
     pad_kek_for_fernet,
 )
-from portfolio.models import FinancialAccount
 
 from .models import UserProfile
 from .serializers import (
@@ -263,31 +260,7 @@ class SetupEncryptionView(APIView):
         user_key = generate_user_key()
         encrypted_user_key = encrypt_user_key(user_key, kek)
 
-        # Re-encrypt all existing account credentials with the new user_key
-        accounts_migrated = 0
-        accounts_failed = []
-
-        user_accounts = FinancialAccount.objects.filter(user=request.user)
-        for account in user_accounts:
-            if account.encrypted_credentials:
-                try:
-                    # Decrypt with legacy server-side key
-                    credentials = legacy_decrypt_credentials(
-                        account.encrypted_credentials
-                    )
-                    # Re-encrypt with new user key
-                    account.encrypted_credentials = encrypt_credentials(
-                        credentials, user_key
-                    )
-                    account.save(update_fields=['encrypted_credentials'])
-                    accounts_migrated += 1
-                except Exception as e:
-                    accounts_failed.append({
-                        'account': account.name,
-                        'error': str(e)
-                    })
-
-        # Update profile (only after credentials are migrated)
+        # Update profile
         profile.encrypted_user_key = encrypted_user_key
         profile.auth_hash = auth_hash
         profile.auth_salt = auth_salt
@@ -295,16 +268,10 @@ class SetupEncryptionView(APIView):
         profile.encryption_migrated = True
         profile.save()
 
-        response_data = {
+        return Response({
             'status': 'success',
             'encrypted_user_key': base64.b64encode(encrypted_user_key).decode(),
-            'accounts_migrated': accounts_migrated,
-        }
-
-        if accounts_failed:
-            response_data['accounts_failed'] = accounts_failed
-
-        return Response(response_data)
+        })
 
 
 class KEKPasswordChangeView(APIView):

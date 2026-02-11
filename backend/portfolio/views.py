@@ -1178,13 +1178,12 @@ class BrokerDiscoverCompleteAuthView(APIView):
             )
 
 
-class BulkAccountCreateView(APIView):
+class BulkAccountCreateView(KEKAuthenticationMixin, APIView):
     """Create multiple accounts for a broker with shared credentials."""
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         from brokers.models import Broker
-        from core.encryption import encrypt_credentials
 
         broker_code = request.data.get('broker_code')
         credentials = request.data.get('credentials')
@@ -1209,7 +1208,9 @@ class BulkAccountCreateView(APIView):
         one_time_fields = ('token', 'totp_token', 'otp', 'tan', 'sms_code')
         stored_credentials = {k: v for k, v in (credentials or {}).items()
                              if k not in one_time_fields}
-        encrypted = encrypt_credentials(stored_credentials) if stored_credentials else None
+        encrypted = self.encrypt_account_credentials(
+            request, stored_credentials
+        ) if stored_credentials else None
 
         user_profile = request.user.profile
         base_currency = user_profile.base_currency

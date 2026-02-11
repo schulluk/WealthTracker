@@ -60,7 +60,5 @@ Thumbs.db
 *.key
 credentials.json
 
-# Data imports
-data/import/
-data/documents/
-data/curl-requests/
+# Data directory
+data/

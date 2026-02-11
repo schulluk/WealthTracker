@@ -5,11 +5,11 @@ A personal wealth tracking application that aggregates account balances from mul
 ## Features
 
 - **Multi-broker support**: Connect to German banks via FinTS (DKB, Commerzbank), Interactive Brokers, and other brokers
-- **Automated sync**: Fetch account balances automatically with 2FA support
+- **Account sync**: Fetch account balances with 2FA support (user-initiated)
 - **Currency conversion**: Automatic conversion to your base currency using Frankfurter API
 - **Historical tracking**: Store balance snapshots over time for growth visualization
 - **Portfolio breakdown**: View wealth by broker, currency, or account type
-- **Secure credential storage**: Fernet encryption for stored credentials
+- **Secure credential storage**: Per-user encryption with client-side key derivation
 
 ## Project Structure
 
@@ -259,22 +259,12 @@ DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
 # Database (optional, defaults to SQLite)
 DATABASE_URL=postgres://user:pass@localhost/wealth
 
-# Credential encryption key (generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
-CREDENTIAL_ENCRYPTION_KEY=your-fernet-key-here
-
 # CORS
 CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
 
 # FinTS Product ID for German bank integrations (DKB, Commerzbank)
 # Required for FinTS/HBCI protocol - register at https://www.hbci-zka.de/
 FINTS_PRODUCT_ID=your-fints-product-id
-```
-
-### Generate Encryption Key
-
-```python
-from cryptography.fernet import Fernet
-print(Fernet.generate_key().decode())
 ```
 
 ## Development
@@ -297,10 +287,11 @@ Access the admin interface at `http://localhost:8000/admin/` after creating a su
 
 ## Security Notes
 
-- Credentials are encrypted using Fernet symmetric encryption
+- Credentials are encrypted with per-user keys (derived from password via Argon2id)
+- Password is never sent to the server - only a client-derived auth hash
 - JWT tokens expire after 60 minutes (refresh tokens last 7 days)
 - Never commit `.env` files or credentials to version control
-- The encryption key must be kept secure and backed up
+- If you forget your password, credentials are lost (no server-side recovery)
 
 ---
 
@@ -353,9 +344,6 @@ DJANGO_SECRET_KEY=<generate-secret-key>
 DJANGO_DEBUG=False
 DJANGO_ALLOWED_HOSTS=wealth.example.com,localhost
 
-# Encryption (for stored credentials)
-CREDENTIAL_ENCRYPTION_KEY=<generate-fernet-key>
-
 # CORS
 CORS_ALLOWED_ORIGINS=https://wealth.example.com
 
@@ -382,9 +370,6 @@ ADMIN_EMAIL=admin@example.com
 ```bash
 # Django Secret Key (random 50 chars)
 python -c "import secrets; print(secrets.token_urlsafe(50))"
-
-# Fernet Encryption Key (for credential storage)
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 
 # Database Password (random 32 chars)
 python -c "import secrets; print(secrets.token_urlsafe(32))"
@@ -478,12 +463,11 @@ Set up cron jobs for automated tasks:
 # Fetch daily exchange rates (6 AM)
 0 6 * * * cd /var/www/app && python manage.py fetch_exchange_rates
 
-# Sync all enabled accounts daily (7 PM)
-0 19 * * * cd /var/www/app && python manage.py sync_accounts
-
 # Send weekly wealth reports (Mondays at 8 AM)
 0 8 * * 1 cd /var/www/app && python manage.py send_wealth_report
 ```
+
+Note: Account syncing requires user interaction (KEK from client) and cannot be automated server-side.
 
 ### Management Commands
 
@@ -496,9 +480,6 @@ python manage.py fetch_exchange_rates --date 2024-01-15
 
 # Backfill historical rates
 python manage.py fetch_exchange_rates --backfill --start 2024-01-01 --end 2024-01-31
-
-# Sync all enabled accounts (for accounts that support auto-sync)
-python manage.py sync_accounts
 
 # Send weekly email reports
 python manage.py send_wealth_report

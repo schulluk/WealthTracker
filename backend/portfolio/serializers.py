@@ -78,10 +78,18 @@ class FinancialAccountCreateSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data):
+        # Remove credentials - they will be encrypted by the view using KEK
         credentials = validated_data.pop('credentials', None)
         account = FinancialAccount.objects.create(**validated_data)
+
+        # If credentials provided, encrypt them using KEK from request context
         if credentials:
-            from core.encryption import encrypt_credentials
-            account.encrypted_credentials = encrypt_credentials(credentials)
-            account.save()
+            request = self.context.get('request')
+            if request:
+                from core.kek_auth import KEKAuthenticationMixin
+                mixin = KEKAuthenticationMixin()
+                account.encrypted_credentials = mixin.encrypt_account_credentials(
+                    request, credentials
+                )
+                account.save()
         return account

@@ -34,17 +34,24 @@ Currency conversion service.
 
 ### Core Utilities
 
-#### `core/encryption.py`
-Fernet-based encryption for storing broker credentials securely.
+#### `core/user_encryption.py`
+Per-user encryption for broker credentials using Argon2id key derivation.
+
+Credentials are encrypted with a per-user key, which is itself encrypted with a KEK
+(Key Encryption Key) derived from the user's password. The password never leaves the
+client device - only a derived auth_hash is sent for authentication.
 
 ```python
-from core.encryption import encrypt_credentials, decrypt_credentials
+from core.kek_auth import KEKAuthenticationMixin
 
-# Encrypt
-encrypted = encrypt_credentials({'username': 'user', 'pin': '1234'})
+# In views that need to handle credentials
+class MyView(KEKAuthenticationMixin, APIView):
+    def post(self, request):
+        # Encrypt credentials using user's KEK from request header
+        encrypted = self.encrypt_account_credentials(request, credentials_dict)
 
-# Decrypt
-credentials = decrypt_credentials(encrypted)
+        # Decrypt credentials
+        credentials = self.decrypt_account_credentials(request, account)
 ```
 
 ## Data Models

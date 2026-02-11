@@ -4,8 +4,5 @@
 # Fetch exchange rates daily at 6:00 AM (fetch past week to catch any missed days)
 0 6 * * * . /etc/cron.env && cd /var/www/app && /venv-python/bin/python manage.py fetch_exchange_rates --backfill --start $(date -d "7 days ago" +\%Y-\%m-\%d) >> /var/log/cron.log 2>&1
 
-# Sync enabled accounts daily at 18:49
-49 18 * * * . /etc/cron.env && cd /var/www/app && /venv-python/bin/python manage.py sync_accounts >> /var/log/cron.log 2>&1
-
 # Send weekly wealth report emails on Mondays at 19:54
 54 19 * * 1 . /etc/cron.env && cd /var/www/app && /venv-python/bin/python manage.py send_wealth_report >> /var/log/cron.log 2>&1

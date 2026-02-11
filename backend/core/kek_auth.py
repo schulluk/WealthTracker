@@ -9,8 +9,6 @@ import logging
 
 from rest_framework.exceptions import PermissionDenied
 
-from .encryption import decrypt_credentials as legacy_decrypt_credentials
-from .encryption import encrypt_credentials as legacy_encrypt_credentials
 from .user_encryption import (
     decrypt_credentials,
     decrypt_user_key,
@@ -46,8 +44,6 @@ class KEKAuthenticationMixin:
         """
         Decrypt credentials for a specific account.
 
-        Supports both legacy (server-key) and new (per-user KEK) encryption.
-
         Args:
             request: The HTTP request (to extract KEK header)
             account: The Account object with encrypted_credentials
@@ -56,52 +52,42 @@ class KEKAuthenticationMixin:
             Decrypted credentials dictionary
 
         Raises:
-            PermissionDenied: If decryption fails or KEK is required but missing
+            PermissionDenied: If decryption fails or KEK is missing
         """
         user = request.user
         profile = user.profile
 
-        # Check if user has migrated to per-user encryption
-        if profile.encryption_migrated:
-            kek = self.get_kek(request)
-            if not kek:
-                raise PermissionDenied("KEK required for encrypted operations")
+        kek = self.get_kek(request)
+        if not kek:
+            raise PermissionDenied("KEK required for encrypted operations")
 
-            if not profile.encrypted_user_key:
-                raise PermissionDenied("User encryption not set up")
+        if not profile.encrypted_user_key:
+            raise PermissionDenied("User encryption not set up")
 
-            try:
-                # Ensure KEK is properly formatted for Fernet
-                kek = pad_kek_for_fernet(kek)
-                user_key = decrypt_user_key(profile.encrypted_user_key, kek)
-                return decrypt_credentials(account.encrypted_credentials, user_key)
-            except Exception as e:
-                logger.warning(f"Failed to decrypt credentials for user {user.id}: {e}")
-                raise PermissionDenied("Failed to decrypt credentials")
-        else:
-            # Legacy decryption using server-side key
-            return legacy_decrypt_credentials(account.encrypted_credentials)
+        try:
+            kek = pad_kek_for_fernet(kek)
+            user_key = decrypt_user_key(profile.encrypted_user_key, kek)
+            return decrypt_credentials(account.encrypted_credentials, user_key)
+        except Exception as e:
+            logger.warning(f"Failed to decrypt credentials for user {user.id}: {e}")
+            raise PermissionDenied("Failed to decrypt credentials")
 
-    def require_kek_for_migrated_user(self, request):
+    def require_kek(self, request):
         """
-        Check that KEK is present for migrated users.
+        Check that KEK is present.
 
         Call this at the start of views that need to decrypt credentials.
 
         Raises:
-            PermissionDenied: If user is migrated but KEK is missing
+            PermissionDenied: If KEK is missing
         """
-        profile = request.user.profile
-        if profile.encryption_migrated:
-            kek = self.get_kek(request)
-            if not kek:
-                raise PermissionDenied("KEK required for encrypted operations")
+        kek = self.get_kek(request)
+        if not kek:
+            raise PermissionDenied("KEK required for encrypted operations")
 
     def encrypt_account_credentials(self, request, credentials: dict) -> bytes:
         """
         Encrypt credentials for storage.
-
-        Supports both legacy (server-key) and new (per-user KEK) encryption.
 
         Args:
             request: The HTTP request (to extract KEK header and user)
@@ -111,26 +97,22 @@ class KEKAuthenticationMixin:
             Encrypted credentials bytes
 
         Raises:
-            PermissionDenied: If encryption fails or KEK is required but missing
+            PermissionDenied: If encryption fails or KEK is missing
         """
         user = request.user
         profile = user.profile
 
-        if profile.encryption_migrated:
-            kek = self.get_kek(request)
-            if not kek:
-                raise PermissionDenied("KEK required for encrypted operations")
+        kek = self.get_kek(request)
+        if not kek:
+            raise PermissionDenied("KEK required for encrypted operations")
 
-            if not profile.encrypted_user_key:
-                raise PermissionDenied("User encryption not set up")
+        if not profile.encrypted_user_key:
+            raise PermissionDenied("User encryption not set up")
 
-            try:
-                kek = pad_kek_for_fernet(kek)
-                user_key = decrypt_user_key(profile.encrypted_user_key, kek)
-                return encrypt_credentials(credentials, user_key)
-            except Exception as e:
-                logger.warning(f"Failed to encrypt credentials for user {user.id}: {e}")
-                raise PermissionDenied("Failed to encrypt credentials")
-        else:
-            # Legacy encryption using server-side key
-            return legacy_encrypt_credentials(credentials)
+        try:
+            kek = pad_kek_for_fernet(kek)
+            user_key = decrypt_user_key(profile.encrypted_user_key, kek)
+            return encrypt_credentials(credentials, user_key)
+        except Exception as e:
+            logger.warning(f"Failed to encrypt credentials for user {user.id}: {e}")
+            raise PermissionDenied("Failed to encrypt credentials")
