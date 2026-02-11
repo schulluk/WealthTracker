@@ -58,6 +58,55 @@ class UserProfile(models.Model):
         default='daily',
         help_text='Default granularity for wealth chart'
     )
+
+    # KEK-based encryption fields
+    encrypted_user_key = models.BinaryField(
+        null=True,
+        blank=True,
+        help_text='Per-user encryption key, encrypted with KEK derived from password'
+    )
+    auth_salt = models.CharField(
+        max_length=32,
+        blank=True,
+        help_text='Salt for authentication hash (base64, 16 bytes)'
+    )
+    auth_hash = models.CharField(
+        max_length=128,
+        blank=True,
+        help_text='Client-derived authentication hash'
+    )
+    kek_salt = models.CharField(
+        max_length=32,
+        blank=True,
+        help_text='Salt for KEK derivation (base64, 16 bytes)'
+    )
+    key_version = models.PositiveIntegerField(
+        default=1,
+        help_text='Key version for rotation support'
+    )
+    encryption_migrated = models.BooleanField(
+        default=False,
+        help_text='Whether user has migrated to per-user encryption'
+    )
+
+    # Sync reminder settings
+    sync_reminder_enabled = models.BooleanField(
+        default=True,
+        help_text='Enable daily sync reminder notification'
+    )
+    sync_reminder_hour = models.PositiveSmallIntegerField(
+        default=9,
+        help_text='Hour for sync reminder (0-23)'
+    )
+    sync_reminder_minute = models.PositiveSmallIntegerField(
+        default=0,
+        help_text='Minute for sync reminder (0-59)'
+    )
+    sync_on_app_open = models.BooleanField(
+        default=False,
+        help_text='Automatically sync when opening app'
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

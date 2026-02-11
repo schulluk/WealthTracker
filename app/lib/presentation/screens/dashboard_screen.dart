@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../data/models/account.dart';
 import '../providers/accounts_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/sync_provider.dart';
 import '../providers/wealth_provider.dart';
 import '../widgets/account_card.dart';
 import '../widgets/quick_snapshot_sheet.dart';
@@ -18,17 +19,55 @@ class DashboardScreen extends ConsumerStatefulWidget {
   ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+class _DashboardScreenState extends ConsumerState<DashboardScreen>
+    with WidgetsBindingObserver {
   bool _checkedQuickSnapshot = false;
   final Set<int> _syncingAccounts = {};
   bool _syncingAll = false;
+  bool _initialSyncChecked = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkQuickSnapshotPrompt();
+      _initializeSyncReminders();
+      _checkSyncOnAppOpen();
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // App came to foreground, check if we should sync
+      _checkSyncOnAppOpen();
+    }
+  }
+
+  Future<void> _initializeSyncReminders() async {
+    try {
+      await ref.read(syncSettingsProvider).initializeSyncReminders();
+    } catch (e) {
+      debugPrint('Failed to initialize sync reminders: $e');
+    }
+  }
+
+  Future<void> _checkSyncOnAppOpen() async {
+    if (_initialSyncChecked && !mounted) return;
+    _initialSyncChecked = true;
+
+    try {
+      await ref.read(syncAllProvider.notifier).trySyncOnAppOpen();
+    } catch (e) {
+      debugPrint('Auto-sync on app open failed: $e');
+    }
   }
 
   Future<void> _checkQuickSnapshotPrompt() async {
@@ -179,7 +218,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 child: ListView.separated(
                   shrinkWrap: true,
                   itemCount: errors.length,
-                  separatorBuilder: (_, __) => const Divider(),
+                  separatorBuilder: (_, _) => const Divider(),
                   itemBuilder: (context, index) {
                     final error = errors[index] as Map<String, dynamic>;
                     final name = error['name'] as String? ?? 'Unknown Account';

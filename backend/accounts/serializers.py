@@ -18,8 +18,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
         model = UserProfile
         fields = ['id', 'user', 'base_currency', 'auto_sync_enabled',
                   'send_weekly_report', 'default_chart_range', 'default_chart_granularity',
-                  'last_sync_at', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'last_sync_at', 'created_at', 'updated_at']
+                  'last_sync_at', 'created_at', 'updated_at',
+                  # Sync reminder settings
+                  'sync_reminder_enabled', 'sync_reminder_hour', 'sync_reminder_minute',
+                  'sync_on_app_open',
+                  # Encryption status (read-only)
+                  'encryption_migrated']
+        read_only_fields = ['id', 'last_sync_at', 'created_at', 'updated_at', 'encryption_migrated']
 
 
 class UserUpdateSerializer(serializers.ModelSerializer):

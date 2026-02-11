@@ -61,6 +61,12 @@ class ApiClient {
             options.headers['X-Auth-Token'] = 'Bearer $token';
           }
 
+          // Add KEK header if available (for migrated users)
+          final kek = await _storage.getKEK();
+          if (kek != null) {
+            options.headers['X-KEK'] = kek;
+          }
+
           return handler.next(options);
         },
         onError: (error, handler) async {

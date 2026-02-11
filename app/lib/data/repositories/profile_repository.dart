@@ -22,6 +22,10 @@ class ProfileRepository {
     String? defaultChartGranularity,
     bool? pushNotificationsEnabled,
     bool? pushWeeklyReport,
+    bool? syncReminderEnabled,
+    int? syncReminderHour,
+    int? syncReminderMinute,
+    bool? syncOnAppOpen,
   }) async {
     final data = <String, dynamic>{};
 
@@ -38,6 +42,14 @@ class ProfileRepository {
       data['push_notifications_enabled'] = pushNotificationsEnabled;
     }
     if (pushWeeklyReport != null) data['push_weekly_report'] = pushWeeklyReport;
+    if (syncReminderEnabled != null) {
+      data['sync_reminder_enabled'] = syncReminderEnabled;
+    }
+    if (syncReminderHour != null) data['sync_reminder_hour'] = syncReminderHour;
+    if (syncReminderMinute != null) {
+      data['sync_reminder_minute'] = syncReminderMinute;
+    }
+    if (syncOnAppOpen != null) data['sync_on_app_open'] = syncOnAppOpen;
 
     final response = await _apiClient.patch(ApiConfig.profilePath, data: data);
     return Profile.fromJson(response.data as Map<String, dynamic>);

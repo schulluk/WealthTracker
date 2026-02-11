@@ -16,6 +16,11 @@ _$ProfileImpl _$$ProfileImplFromJson(Map<String, dynamic> json) =>
       pushNotificationsEnabled:
           json['push_notifications_enabled'] as bool? ?? true,
       pushWeeklyReport: json['push_weekly_report'] as bool? ?? false,
+      syncReminderEnabled: json['sync_reminder_enabled'] as bool? ?? true,
+      syncReminderHour: (json['sync_reminder_hour'] as num?)?.toInt() ?? 9,
+      syncReminderMinute: (json['sync_reminder_minute'] as num?)?.toInt() ?? 0,
+      syncOnAppOpen: json['sync_on_app_open'] as bool? ?? false,
+      encryptionMigrated: json['encryption_migrated'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$$ProfileImplToJson(_$ProfileImpl instance) =>
@@ -27,4 +32,9 @@ Map<String, dynamic> _$$ProfileImplToJson(_$ProfileImpl instance) =>
       'default_chart_granularity': instance.defaultChartGranularity,
       'push_notifications_enabled': instance.pushNotificationsEnabled,
       'push_weekly_report': instance.pushWeeklyReport,
+      'sync_reminder_enabled': instance.syncReminderEnabled,
+      'sync_reminder_hour': instance.syncReminderHour,
+      'sync_reminder_minute': instance.syncReminderMinute,
+      'sync_on_app_open': instance.syncOnAppOpen,
+      'encryption_migrated': instance.encryptionMigrated,
     };

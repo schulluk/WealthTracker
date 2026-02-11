@@ -16,6 +16,17 @@ class Profile with _$Profile {
     @Default(true)
     bool pushNotificationsEnabled,
     @JsonKey(name: 'push_weekly_report') @Default(false) bool pushWeeklyReport,
+    // Sync reminder settings
+    @JsonKey(name: 'sync_reminder_enabled')
+    @Default(true)
+    bool syncReminderEnabled,
+    @JsonKey(name: 'sync_reminder_hour') @Default(9) int syncReminderHour,
+    @JsonKey(name: 'sync_reminder_minute') @Default(0) int syncReminderMinute,
+    @JsonKey(name: 'sync_on_app_open') @Default(false) bool syncOnAppOpen,
+    // Encryption status
+    @JsonKey(name: 'encryption_migrated')
+    @Default(false)
+    bool encryptionMigrated,
   }) = _Profile;
 
   factory Profile.fromJson(Map<String, dynamic> json) =>

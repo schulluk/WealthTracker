@@ -3,11 +3,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/datasources/api_client.dart';
 import '../../services/biometric_service.dart';
+import '../../services/crypto_service.dart';
+import '../../services/notification_service.dart';
 import '../../services/secure_storage_service.dart';
 
 /// Provider for the secure storage service.
 final secureStorageProvider = Provider<SecureStorageService>((ref) {
   return SecureStorageService();
+});
+
+/// Provider for the crypto service (Argon2 key derivation).
+final cryptoServiceProvider = Provider<CryptoService>((ref) {
+  return CryptoService();
+});
+
+/// Provider for the notification service (local notifications).
+final notificationServiceProvider = Provider<NotificationService>((ref) {
+  return NotificationService();
 });
 
 /// Provider for the API client.

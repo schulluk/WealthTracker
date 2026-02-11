@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../data/models/profile.dart';
 import '../providers/auth_provider.dart';
 import '../providers/core_providers.dart';
 import '../providers/profile_provider.dart';
+import '../providers/sync_provider.dart';
 import '../providers/wealth_provider.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -296,6 +298,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             const SizedBox(height: 24),
           ],
 
+          // Sync Settings Section
+          _SectionHeader(title: 'Sync Settings'),
+          profile.when(
+            data: (p) {
+              if (p == null) return const SizedBox.shrink();
+              return _SyncSettingsSection(profile: p);
+            },
+            loading: () => const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (_, _) => const SizedBox.shrink(),
+          ),
+          const SizedBox(height: 24),
+
           // Account Management Section
           _SectionHeader(title: 'Account Management'),
           ListTile(
@@ -424,5 +441,170 @@ class _ChartRangeChip extends StatelessWidget {
       onSelected: (_) => onTap(),
       showCheckmark: false,
     );
+  }
+}
+
+class _SyncSettingsSection extends ConsumerStatefulWidget {
+  final Profile profile;
+
+  const _SyncSettingsSection({required this.profile});
+
+  @override
+  ConsumerState<_SyncSettingsSection> createState() =>
+      _SyncSettingsSectionState();
+}
+
+class _SyncSettingsSectionState extends ConsumerState<_SyncSettingsSection> {
+  late bool _syncOnAppOpen;
+  late bool _syncReminderEnabled;
+  late int _syncReminderHour;
+  late int _syncReminderMinute;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncOnAppOpen = widget.profile.syncOnAppOpen;
+    _syncReminderEnabled = widget.profile.syncReminderEnabled;
+    _syncReminderHour = widget.profile.syncReminderHour;
+    _syncReminderMinute = widget.profile.syncReminderMinute;
+  }
+
+  @override
+  void didUpdateWidget(covariant _SyncSettingsSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.profile != widget.profile) {
+      setState(() {
+        _syncOnAppOpen = widget.profile.syncOnAppOpen;
+        _syncReminderEnabled = widget.profile.syncReminderEnabled;
+        _syncReminderHour = widget.profile.syncReminderHour;
+        _syncReminderMinute = widget.profile.syncReminderMinute;
+      });
+    }
+  }
+
+  Future<void> _updateSyncOnAppOpen(bool value) async {
+    setState(() => _syncOnAppOpen = value);
+    try {
+      await ref.read(syncSettingsProvider).updateSyncSettings(
+            syncOnAppOpen: value,
+          );
+    } catch (e) {
+      setState(() => _syncOnAppOpen = !value);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _updateSyncReminder(bool enabled) async {
+    setState(() => _syncReminderEnabled = enabled);
+    try {
+      await ref.read(syncSettingsProvider).updateSyncSettings(
+            syncReminderEnabled: enabled,
+          );
+    } catch (e) {
+      setState(() => _syncReminderEnabled = !enabled);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _selectReminderTime() async {
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(
+        hour: _syncReminderHour,
+        minute: _syncReminderMinute,
+      ),
+    );
+
+    if (time == null) return;
+
+    setState(() {
+      _syncReminderHour = time.hour;
+      _syncReminderMinute = time.minute;
+    });
+
+    try {
+      await ref.read(syncSettingsProvider).updateSyncSettings(
+            syncReminderHour: time.hour,
+            syncReminderMinute: time.minute,
+          );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update: $e')),
+        );
+      }
+    }
+  }
+
+  String _formatTime(int hour, int minute) {
+    final h = hour.toString().padLeft(2, '0');
+    final m = minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final syncState = ref.watch(syncAllProvider);
+
+    return Column(
+      children: [
+        SwitchListTile(
+          title: const Text('Sync when opening app'),
+          subtitle: const Text(
+            'Automatically sync all accounts when you open the app (max once per 20h)',
+          ),
+          value: _syncOnAppOpen,
+          onChanged: _updateSyncOnAppOpen,
+        ),
+        SwitchListTile(
+          title: const Text('Daily sync reminder'),
+          subtitle: Text(
+            _syncReminderEnabled
+                ? 'Remind me at ${_formatTime(_syncReminderHour, _syncReminderMinute)}'
+                : 'Disabled',
+          ),
+          value: _syncReminderEnabled,
+          onChanged: _updateSyncReminder,
+        ),
+        if (_syncReminderEnabled)
+          ListTile(
+            leading: const Icon(Icons.schedule),
+            title: const Text('Reminder time'),
+            trailing: TextButton(
+              onPressed: _selectReminderTime,
+              child: Text(_formatTime(_syncReminderHour, _syncReminderMinute)),
+            ),
+          ),
+        if (syncState.lastSyncTime != null)
+          ListTile(
+            leading: const Icon(Icons.sync),
+            title: const Text('Last sync'),
+            subtitle: Text(_formatLastSync(syncState.lastSyncTime!)),
+          ),
+      ],
+    );
+  }
+
+  String _formatLastSync(DateTime time) {
+    final now = DateTime.now();
+    final diff = now.difference(time);
+
+    if (diff.inMinutes < 1) {
+      return 'Just now';
+    } else if (diff.inHours < 1) {
+      return '${diff.inMinutes} minutes ago';
+    } else if (diff.inHours < 24) {
+      return '${diff.inHours} hours ago';
+    } else {
+      return '${diff.inDays} days ago';
+    }
   }
 }

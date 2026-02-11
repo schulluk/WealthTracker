@@ -1,6 +1,12 @@
 """
 Management command to sync all eligible accounts.
 
+DEPRECATED: This command only works for users who have NOT migrated to
+per-user encryption (KEK). For migrated users, syncing requires the user's
+KEK which is derived from their password and stored only on their device.
+
+After all users migrate, this command should be removed from crontabs.
+
 Usage:
     python manage.py sync_accounts
 
@@ -9,6 +15,7 @@ that:
 - Have auto_sync_enabled=True in user profile
 - Are not manual accounts
 - Use a broker that supports_auto_sync (no interactive 2FA required)
+- User has NOT migrated to per-user encryption (encryption_migrated=False)
 
 Brokers with decoupled TAN (push notification) like DKB are supported -
 the command will wait for app approval. Brokers requiring interactive 2FA
@@ -44,14 +51,24 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         dry_run = options['dry_run']
 
+        self.stdout.write(
+            self.style.WARNING(
+                'DEPRECATION WARNING: This command only works for non-migrated '
+                'users. After all users migrate to per-user encryption, remove '
+                'this command from crontabs.'
+            )
+        )
+
         # Get all non-manual accounts with auto_sync enabled
         # Only include brokers that support auto sync (decoupled TAN or no 2FA)
         # Excludes brokers requiring interactive 2FA (e.g., photoTAN)
         # Respects both global (user profile) and per-account sync_enabled settings
+        # IMPORTANT: Only include users who have NOT migrated to per-user encryption
         accounts = FinancialAccount.objects.filter(
             is_manual=False,
             sync_enabled=True,
             user__profile__auto_sync_enabled=True,
+            user__profile__encryption_migrated=False,  # Only non-migrated users
             broker__supports_auto_sync=True,
         ).exclude(
             encrypted_credentials=b''

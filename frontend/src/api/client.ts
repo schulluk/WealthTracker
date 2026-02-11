@@ -1,5 +1,16 @@
+import { argon2id } from 'hash-wasm';
+
 const TOKEN_KEY = 'wealth_access_token';
 const REFRESH_KEY = 'wealth_refresh_token';
+const KEK_KEY = 'wealth_kek';
+const AUTH_SALT_KEY = 'wealth_auth_salt';
+const KEK_SALT_KEY = 'wealth_kek_salt';
+
+// Argon2 parameters (must match server expectations)
+const ARGON2_TIME_COST = 3;
+const ARGON2_MEMORY_COST = 65536; // 64 MB
+const ARGON2_PARALLELISM = 4;
+const ARGON2_HASH_LEN = 32;
 
 export function getAccessToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
@@ -13,6 +24,63 @@ export function setTokens(access: string, refresh: string) {
 export function clearTokens() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(REFRESH_KEY);
+  // Also clear KEK and salts on logout
+  sessionStorage.removeItem(KEK_KEY);
+  sessionStorage.removeItem(AUTH_SALT_KEY);
+  sessionStorage.removeItem(KEK_SALT_KEY);
+}
+
+// KEK Management
+export function getKEK(): string | null {
+  return sessionStorage.getItem(KEK_KEY);
+}
+
+export function setKEK(kek: string) {
+  sessionStorage.setItem(KEK_KEY, kek);
+}
+
+export function setSalts(authSalt: string, kekSalt: string) {
+  sessionStorage.setItem(AUTH_SALT_KEY, authSalt);
+  sessionStorage.setItem(KEK_SALT_KEY, kekSalt);
+}
+
+export function getSalts(): { authSalt: string | null; kekSalt: string | null } {
+  return {
+    authSalt: sessionStorage.getItem(AUTH_SALT_KEY),
+    kekSalt: sessionStorage.getItem(KEK_SALT_KEY),
+  };
+}
+
+// Crypto utilities
+function base64ToBytes(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+async function deriveKey(password: string, salt: string): Promise<Uint8Array> {
+  const saltBytes = base64ToBytes(salt);
+  const hash = await argon2id({
+    password,
+    salt: saltBytes,
+    iterations: ARGON2_TIME_COST,
+    memorySize: ARGON2_MEMORY_COST,
+    parallelism: ARGON2_PARALLELISM,
+    hashLength: ARGON2_HASH_LEN,
+    outputType: 'binary',
+  });
+  return hash;
 }
 
 async function refreshAccessToken(): Promise<string | null> {
@@ -41,6 +109,7 @@ export async function fetchWithAuth(
   options: RequestInit = {},
 ): Promise<Response> {
   let token = getAccessToken();
+  const kek = getKEK();
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -50,6 +119,11 @@ export async function fetchWithAuth(
   if (token) {
     // Use X-Auth-Token to avoid conflict with HTTP Basic Auth's Authorization header
     headers['X-Auth-Token'] = `Bearer ${token}`;
+  }
+
+  // Add KEK header for encrypted operations (migrated users)
+  if (kek) {
+    headers['X-KEK'] = kek;
   }
 
   let res = await fetch(url, { ...options, headers, credentials: 'include' });
@@ -66,20 +140,120 @@ export async function fetchWithAuth(
 }
 
 // Auth API
-export async function login(username: string, password: string) {
-  const res = await fetch('/api/auth/login/', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password }),
+
+// Get salts for a user (for key derivation)
+async function getSaltsFromServer(username: string): Promise<{
+  auth_salt: string;
+  kek_salt: string;
+  migrated: boolean;
+}> {
+  const res = await fetch(`/api/auth/salt/?username=${encodeURIComponent(username)}`, {
     credentials: 'include',
   });
   if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.detail || 'Login failed');
+    throw new Error('Failed to get salts');
   }
-  const data = await res.json();
-  setTokens(data.access, data.refresh);
-  return data;
+  return res.json();
+}
+
+export async function login(username: string, password: string) {
+  // 1. Get salts from server
+  const { auth_salt, kek_salt, migrated } = await getSaltsFromServer(username);
+
+  let loginPayload: { username: string; password?: string; auth_hash?: string };
+
+  if (migrated) {
+    // 2a. User is migrated - derive auth_hash and KEK client-side
+    const authHashBytes = await deriveKey(password, auth_salt);
+    const kekBytes = await deriveKey(password, kek_salt);
+
+    const authHash = bytesToBase64(authHashBytes);
+    const kek = bytesToBase64(kekBytes);
+
+    loginPayload = { username, auth_hash: authHash };
+
+    // 3. Login with auth_hash
+    const res = await fetch('/api/auth/login/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(loginPayload),
+      credentials: 'include',
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || data.detail || 'Login failed');
+    }
+
+    const data = await res.json();
+    setTokens(data.access, data.refresh);
+
+    // Store KEK and salts for encrypted operations
+    setKEK(kek);
+    setSalts(auth_salt, kek_salt);
+
+    return data;
+  } else {
+    // 2b. User not migrated - use legacy password auth
+    const res = await fetch('/api/auth/login/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+      credentials: 'include',
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || data.detail || 'Login failed');
+    }
+
+    const data = await res.json();
+    setTokens(data.access, data.refresh);
+
+    // Store salts for potential migration
+    setSalts(auth_salt, kek_salt);
+
+    // If user needs to set up encryption, derive and store KEK
+    if (!data.encryption_migrated) {
+      const kekBytes = await deriveKey(password, kek_salt);
+      const kek = bytesToBase64(kekBytes);
+      setKEK(kek);
+
+      // Derive auth_hash for setup
+      const authHashBytes = await deriveKey(password, auth_salt);
+      const authHash = bytesToBase64(authHashBytes);
+
+      // Auto-setup encryption for the user
+      await setupEncryption(kek, authHash, auth_salt, kek_salt);
+    }
+
+    return data;
+  }
+}
+
+// Set up per-user encryption (for migration)
+export async function setupEncryption(
+  kek: string,
+  authHash: string,
+  authSalt: string,
+  kekSalt: string,
+) {
+  const res = await fetchWithAuth('/api/auth/setup-encryption/', {
+    method: 'POST',
+    body: JSON.stringify({
+      kek,
+      auth_hash: authHash,
+      auth_salt: authSalt,
+      kek_salt: kekSalt,
+    }),
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Failed to setup encryption');
+  }
+
+  return res.json();
 }
 
 export async function register(fields: {
@@ -402,17 +576,64 @@ export async function changePassword(
   newPassword: string,
   newPasswordConfirm: string,
 ) {
-  const res = await fetchWithAuth('/api/auth/change-password/', {
-    method: 'POST',
-    body: JSON.stringify({
-      old_password: oldPassword,
-      new_password: newPassword,
-      new_password_confirm: newPasswordConfirm,
-    }),
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.old_password || data.new_password_confirm || data.error || 'Failed to change password');
+  // Check if user has KEK (is migrated)
+  const kek = getKEK();
+  const { authSalt, kekSalt } = getSalts();
+
+  if (kek && authSalt && kekSalt) {
+    // KEK-based password change for migrated users
+    // 1. Get new salts from server
+    const newSaltsRes = await fetchWithAuth('/api/auth/salt/new/', {
+      method: 'POST',
+    });
+    if (!newSaltsRes.ok) {
+      throw new Error('Failed to get new salts');
+    }
+    const { new_auth_salt, new_kek_salt } = await newSaltsRes.json();
+
+    // 2. Derive old and new keys
+    const oldAuthHashBytes = await deriveKey(oldPassword, authSalt);
+    const oldKekBytes = await deriveKey(oldPassword, kekSalt);
+    const newAuthHashBytes = await deriveKey(newPassword, new_auth_salt);
+    const newKekBytes = await deriveKey(newPassword, new_kek_salt);
+
+    // 3. Call KEK password change endpoint
+    const res = await fetchWithAuth('/api/auth/change-password/kek/', {
+      method: 'POST',
+      body: JSON.stringify({
+        old_auth_hash: bytesToBase64(oldAuthHashBytes),
+        new_auth_hash: bytesToBase64(newAuthHashBytes),
+        old_kek: bytesToBase64(oldKekBytes),
+        new_kek: bytesToBase64(newKekBytes),
+        new_auth_salt: new_auth_salt,
+        new_kek_salt: new_kek_salt,
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to change password');
+    }
+
+    // 4. Update local KEK and salts
+    setKEK(bytesToBase64(newKekBytes));
+    setSalts(new_auth_salt, new_kek_salt);
+
+    return data;
+  } else {
+    // Legacy password change for non-migrated users
+    const res = await fetchWithAuth('/api/auth/change-password/', {
+      method: 'POST',
+      body: JSON.stringify({
+        old_password: oldPassword,
+        new_password: newPassword,
+        new_password_confirm: newPasswordConfirm,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.old_password || data.new_password_confirm || data.error || 'Failed to change password');
+    }
+    return data;
   }
-  return data;
 }

@@ -52,6 +52,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.kek_auth import KEKAuthenticationMixin
 from exchange_rates.models import ExchangeRate
 
 from .models import AccountSnapshot, FinancialAccount
@@ -88,13 +89,12 @@ class FinancialAccountDetailView(generics.RetrieveUpdateDestroyAPIView):
         return FinancialAccount.objects.filter(user=self.request.user)
 
 
-class AccountSyncView(APIView):
+class AccountSyncView(KEKAuthenticationMixin, APIView):
     """Trigger a sync for an account."""
     permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
         from brokers.integrations import get_broker_integration
-        from core.encryption import decrypt_credentials
 
         try:
             account = FinancialAccount.objects.get(pk=pk, user=request.user)
@@ -108,8 +108,8 @@ class AccountSyncView(APIView):
             return Response({'error': 'No credentials configured'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            # Decrypt credentials
-            credentials = decrypt_credentials(account.encrypted_credentials)
+            # Decrypt credentials (supports both legacy and KEK-based encryption)
+            credentials = self.decrypt_account_credentials(request, account)
 
             # Get broker integration
             integration = get_broker_integration(account.broker, credentials)
@@ -349,13 +349,12 @@ class AccountSyncView(APIView):
             return 0
 
 
-class SyncAllAccountsView(APIView):
+class SyncAllAccountsView(KEKAuthenticationMixin, APIView):
     """Trigger sync for all accounts that support auto-sync."""
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         from brokers.integrations import get_broker_integration
-        from core.encryption import decrypt_credentials
 
         # Find all syncable accounts
         accounts = FinancialAccount.objects.filter(
@@ -373,7 +372,7 @@ class SyncAllAccountsView(APIView):
 
         for account in accounts:
             try:
-                credentials = decrypt_credentials(account.encrypted_credentials)
+                credentials = self.decrypt_account_credentials(request, account)
                 integration = get_broker_integration(account.broker, credentials)
                 auth_result = integration.authenticate()
 
@@ -482,13 +481,12 @@ class SyncAllAccountsView(APIView):
         })
 
 
-class AccountAuthView(APIView):
+class AccountAuthView(KEKAuthenticationMixin, APIView):
     """Handle 2FA authentication for an account."""
     permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
         from brokers.integrations import get_broker_integration
-        from core.encryption import decrypt_credentials
 
         try:
             account = FinancialAccount.objects.get(pk=pk, user=request.user)
@@ -512,7 +510,7 @@ class AccountAuthView(APIView):
 
         try:
             # Decrypt credentials and get integration
-            credentials = decrypt_credentials(account.encrypted_credentials)
+            credentials = self.decrypt_account_credentials(request, account)
             integration = get_broker_integration(account.broker, credentials)
 
             # Re-authenticate to restore session
@@ -542,7 +540,7 @@ class AccountAuthView(APIView):
             )
 
 
-class AccountCredentialsView(APIView):
+class AccountCredentialsView(KEKAuthenticationMixin, APIView):
     """Get or update credentials for an account."""
     permission_classes = [IsAuthenticated]
 
@@ -551,8 +549,6 @@ class AccountCredentialsView(APIView):
 
     def get(self, request, pk):
         """Get current credentials with sensitive fields masked."""
-        from core.encryption import decrypt_credentials
-
         try:
             account = FinancialAccount.objects.get(pk=pk, user=request.user)
         except FinancialAccount.DoesNotExist:
@@ -565,7 +561,7 @@ class AccountCredentialsView(APIView):
             return Response({'credentials': {}})
 
         try:
-            credentials = decrypt_credentials(account.encrypted_credentials)
+            credentials = self.decrypt_account_credentials(request, account)
             # Mask sensitive fields
             masked = {}
             for key, value in credentials.items():
@@ -579,8 +575,6 @@ class AccountCredentialsView(APIView):
             return Response({'credentials': {}})
 
     def put(self, request, pk):
-        from core.encryption import encrypt_credentials, decrypt_credentials
-
         try:
             account = FinancialAccount.objects.get(pk=pk, user=request.user)
         except FinancialAccount.DoesNotExist:
@@ -603,7 +597,7 @@ class AccountCredentialsView(APIView):
         existing = {}
         if account.encrypted_credentials:
             try:
-                existing = decrypt_credentials(account.encrypted_credentials)
+                existing = self.decrypt_account_credentials(request, account)
             except Exception:
                 pass
 
@@ -616,7 +610,7 @@ class AccountCredentialsView(APIView):
             if value and value != '••••••••':
                 existing[key] = value
 
-        account.encrypted_credentials = encrypt_credentials(existing)
+        account.encrypted_credentials = self.encrypt_account_credentials(request, existing)
         account.status = 'active'  # Reset status since credentials were updated
         account.last_sync_error = ''
         account.save()

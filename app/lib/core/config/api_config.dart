@@ -12,6 +12,10 @@ class ApiConfig {
   static const String loginPath = '/api/auth/login/';
   static const String refreshPath = '/api/auth/refresh/';
   static const String mePath = '/api/auth/me/';
+  static const String saltPath = '/api/auth/salt/';
+  static const String newSaltPath = '/api/auth/salt/new/';
+  static const String setupEncryptionPath = '/api/auth/setup-encryption/';
+  static const String changePasswordPath = '/api/auth/change-password/kek/';
   static const String profilePath = '/api/profile/';
   static const String accountsPath = '/api/accounts/';
   static const String wealthSummaryPath = '/api/wealth/summary/';

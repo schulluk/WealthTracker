@@ -34,7 +34,17 @@ mixin _$Profile {
   @JsonKey(name: 'push_notifications_enabled')
   bool get pushNotificationsEnabled => throw _privateConstructorUsedError;
   @JsonKey(name: 'push_weekly_report')
-  bool get pushWeeklyReport => throw _privateConstructorUsedError;
+  bool get pushWeeklyReport => throw _privateConstructorUsedError; // Sync reminder settings
+  @JsonKey(name: 'sync_reminder_enabled')
+  bool get syncReminderEnabled => throw _privateConstructorUsedError;
+  @JsonKey(name: 'sync_reminder_hour')
+  int get syncReminderHour => throw _privateConstructorUsedError;
+  @JsonKey(name: 'sync_reminder_minute')
+  int get syncReminderMinute => throw _privateConstructorUsedError;
+  @JsonKey(name: 'sync_on_app_open')
+  bool get syncOnAppOpen => throw _privateConstructorUsedError; // Encryption status
+  @JsonKey(name: 'encryption_migrated')
+  bool get encryptionMigrated => throw _privateConstructorUsedError;
 
   /// Serializes this Profile to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -58,6 +68,11 @@ abstract class $ProfileCopyWith<$Res> {
     @JsonKey(name: 'default_chart_granularity') String defaultChartGranularity,
     @JsonKey(name: 'push_notifications_enabled') bool pushNotificationsEnabled,
     @JsonKey(name: 'push_weekly_report') bool pushWeeklyReport,
+    @JsonKey(name: 'sync_reminder_enabled') bool syncReminderEnabled,
+    @JsonKey(name: 'sync_reminder_hour') int syncReminderHour,
+    @JsonKey(name: 'sync_reminder_minute') int syncReminderMinute,
+    @JsonKey(name: 'sync_on_app_open') bool syncOnAppOpen,
+    @JsonKey(name: 'encryption_migrated') bool encryptionMigrated,
   });
 }
 
@@ -83,6 +98,11 @@ class _$ProfileCopyWithImpl<$Res, $Val extends Profile>
     Object? defaultChartGranularity = null,
     Object? pushNotificationsEnabled = null,
     Object? pushWeeklyReport = null,
+    Object? syncReminderEnabled = null,
+    Object? syncReminderHour = null,
+    Object? syncReminderMinute = null,
+    Object? syncOnAppOpen = null,
+    Object? encryptionMigrated = null,
   }) {
     return _then(
       _value.copyWith(
@@ -114,6 +134,26 @@ class _$ProfileCopyWithImpl<$Res, $Val extends Profile>
                 ? _value.pushWeeklyReport
                 : pushWeeklyReport // ignore: cast_nullable_to_non_nullable
                       as bool,
+            syncReminderEnabled: null == syncReminderEnabled
+                ? _value.syncReminderEnabled
+                : syncReminderEnabled // ignore: cast_nullable_to_non_nullable
+                      as bool,
+            syncReminderHour: null == syncReminderHour
+                ? _value.syncReminderHour
+                : syncReminderHour // ignore: cast_nullable_to_non_nullable
+                      as int,
+            syncReminderMinute: null == syncReminderMinute
+                ? _value.syncReminderMinute
+                : syncReminderMinute // ignore: cast_nullable_to_non_nullable
+                      as int,
+            syncOnAppOpen: null == syncOnAppOpen
+                ? _value.syncOnAppOpen
+                : syncOnAppOpen // ignore: cast_nullable_to_non_nullable
+                      as bool,
+            encryptionMigrated: null == encryptionMigrated
+                ? _value.encryptionMigrated
+                : encryptionMigrated // ignore: cast_nullable_to_non_nullable
+                      as bool,
           )
           as $Val,
     );
@@ -136,6 +176,11 @@ abstract class _$$ProfileImplCopyWith<$Res> implements $ProfileCopyWith<$Res> {
     @JsonKey(name: 'default_chart_granularity') String defaultChartGranularity,
     @JsonKey(name: 'push_notifications_enabled') bool pushNotificationsEnabled,
     @JsonKey(name: 'push_weekly_report') bool pushWeeklyReport,
+    @JsonKey(name: 'sync_reminder_enabled') bool syncReminderEnabled,
+    @JsonKey(name: 'sync_reminder_hour') int syncReminderHour,
+    @JsonKey(name: 'sync_reminder_minute') int syncReminderMinute,
+    @JsonKey(name: 'sync_on_app_open') bool syncOnAppOpen,
+    @JsonKey(name: 'encryption_migrated') bool encryptionMigrated,
   });
 }
 
@@ -160,6 +205,11 @@ class __$$ProfileImplCopyWithImpl<$Res>
     Object? defaultChartGranularity = null,
     Object? pushNotificationsEnabled = null,
     Object? pushWeeklyReport = null,
+    Object? syncReminderEnabled = null,
+    Object? syncReminderHour = null,
+    Object? syncReminderMinute = null,
+    Object? syncOnAppOpen = null,
+    Object? encryptionMigrated = null,
   }) {
     return _then(
       _$ProfileImpl(
@@ -191,6 +241,26 @@ class __$$ProfileImplCopyWithImpl<$Res>
             ? _value.pushWeeklyReport
             : pushWeeklyReport // ignore: cast_nullable_to_non_nullable
                   as bool,
+        syncReminderEnabled: null == syncReminderEnabled
+            ? _value.syncReminderEnabled
+            : syncReminderEnabled // ignore: cast_nullable_to_non_nullable
+                  as bool,
+        syncReminderHour: null == syncReminderHour
+            ? _value.syncReminderHour
+            : syncReminderHour // ignore: cast_nullable_to_non_nullable
+                  as int,
+        syncReminderMinute: null == syncReminderMinute
+            ? _value.syncReminderMinute
+            : syncReminderMinute // ignore: cast_nullable_to_non_nullable
+                  as int,
+        syncOnAppOpen: null == syncOnAppOpen
+            ? _value.syncOnAppOpen
+            : syncOnAppOpen // ignore: cast_nullable_to_non_nullable
+                  as bool,
+        encryptionMigrated: null == encryptionMigrated
+            ? _value.encryptionMigrated
+            : encryptionMigrated // ignore: cast_nullable_to_non_nullable
+                  as bool,
       ),
     );
   }
@@ -209,6 +279,11 @@ class _$ProfileImpl implements _Profile {
     @JsonKey(name: 'push_notifications_enabled')
     this.pushNotificationsEnabled = true,
     @JsonKey(name: 'push_weekly_report') this.pushWeeklyReport = false,
+    @JsonKey(name: 'sync_reminder_enabled') this.syncReminderEnabled = true,
+    @JsonKey(name: 'sync_reminder_hour') this.syncReminderHour = 9,
+    @JsonKey(name: 'sync_reminder_minute') this.syncReminderMinute = 0,
+    @JsonKey(name: 'sync_on_app_open') this.syncOnAppOpen = false,
+    @JsonKey(name: 'encryption_migrated') this.encryptionMigrated = false,
   });
 
   factory _$ProfileImpl.fromJson(Map<String, dynamic> json) =>
@@ -235,10 +310,27 @@ class _$ProfileImpl implements _Profile {
   @override
   @JsonKey(name: 'push_weekly_report')
   final bool pushWeeklyReport;
+  // Sync reminder settings
+  @override
+  @JsonKey(name: 'sync_reminder_enabled')
+  final bool syncReminderEnabled;
+  @override
+  @JsonKey(name: 'sync_reminder_hour')
+  final int syncReminderHour;
+  @override
+  @JsonKey(name: 'sync_reminder_minute')
+  final int syncReminderMinute;
+  @override
+  @JsonKey(name: 'sync_on_app_open')
+  final bool syncOnAppOpen;
+  // Encryption status
+  @override
+  @JsonKey(name: 'encryption_migrated')
+  final bool encryptionMigrated;
 
   @override
   String toString() {
-    return 'Profile(baseCurrency: $baseCurrency, autoSyncEnabled: $autoSyncEnabled, sendWeeklyReport: $sendWeeklyReport, defaultChartRange: $defaultChartRange, defaultChartGranularity: $defaultChartGranularity, pushNotificationsEnabled: $pushNotificationsEnabled, pushWeeklyReport: $pushWeeklyReport)';
+    return 'Profile(baseCurrency: $baseCurrency, autoSyncEnabled: $autoSyncEnabled, sendWeeklyReport: $sendWeeklyReport, defaultChartRange: $defaultChartRange, defaultChartGranularity: $defaultChartGranularity, pushNotificationsEnabled: $pushNotificationsEnabled, pushWeeklyReport: $pushWeeklyReport, syncReminderEnabled: $syncReminderEnabled, syncReminderHour: $syncReminderHour, syncReminderMinute: $syncReminderMinute, syncOnAppOpen: $syncOnAppOpen, encryptionMigrated: $encryptionMigrated)';
   }
 
   @override
@@ -265,7 +357,17 @@ class _$ProfileImpl implements _Profile {
                 ) ||
                 other.pushNotificationsEnabled == pushNotificationsEnabled) &&
             (identical(other.pushWeeklyReport, pushWeeklyReport) ||
-                other.pushWeeklyReport == pushWeeklyReport));
+                other.pushWeeklyReport == pushWeeklyReport) &&
+            (identical(other.syncReminderEnabled, syncReminderEnabled) ||
+                other.syncReminderEnabled == syncReminderEnabled) &&
+            (identical(other.syncReminderHour, syncReminderHour) ||
+                other.syncReminderHour == syncReminderHour) &&
+            (identical(other.syncReminderMinute, syncReminderMinute) ||
+                other.syncReminderMinute == syncReminderMinute) &&
+            (identical(other.syncOnAppOpen, syncOnAppOpen) ||
+                other.syncOnAppOpen == syncOnAppOpen) &&
+            (identical(other.encryptionMigrated, encryptionMigrated) ||
+                other.encryptionMigrated == encryptionMigrated));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -279,6 +381,11 @@ class _$ProfileImpl implements _Profile {
     defaultChartGranularity,
     pushNotificationsEnabled,
     pushWeeklyReport,
+    syncReminderEnabled,
+    syncReminderHour,
+    syncReminderMinute,
+    syncOnAppOpen,
+    encryptionMigrated,
   );
 
   /// Create a copy of Profile
@@ -306,6 +413,11 @@ abstract class _Profile implements Profile {
     @JsonKey(name: 'push_notifications_enabled')
     final bool pushNotificationsEnabled,
     @JsonKey(name: 'push_weekly_report') final bool pushWeeklyReport,
+    @JsonKey(name: 'sync_reminder_enabled') final bool syncReminderEnabled,
+    @JsonKey(name: 'sync_reminder_hour') final int syncReminderHour,
+    @JsonKey(name: 'sync_reminder_minute') final int syncReminderMinute,
+    @JsonKey(name: 'sync_on_app_open') final bool syncOnAppOpen,
+    @JsonKey(name: 'encryption_migrated') final bool encryptionMigrated,
   }) = _$ProfileImpl;
 
   factory _Profile.fromJson(Map<String, dynamic> json) = _$ProfileImpl.fromJson;
@@ -330,7 +442,22 @@ abstract class _Profile implements Profile {
   bool get pushNotificationsEnabled;
   @override
   @JsonKey(name: 'push_weekly_report')
-  bool get pushWeeklyReport;
+  bool get pushWeeklyReport; // Sync reminder settings
+  @override
+  @JsonKey(name: 'sync_reminder_enabled')
+  bool get syncReminderEnabled;
+  @override
+  @JsonKey(name: 'sync_reminder_hour')
+  int get syncReminderHour;
+  @override
+  @JsonKey(name: 'sync_reminder_minute')
+  int get syncReminderMinute;
+  @override
+  @JsonKey(name: 'sync_on_app_open')
+  bool get syncOnAppOpen; // Encryption status
+  @override
+  @JsonKey(name: 'encryption_migrated')
+  bool get encryptionMigrated;
 
   /// Create a copy of Profile
   /// with the given fields replaced by the non-null parameter values.
