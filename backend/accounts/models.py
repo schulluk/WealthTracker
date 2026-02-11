@@ -107,6 +107,12 @@ class UserProfile(models.Model):
         help_text='Automatically sync when opening app'
     )
 
+    # Demo mode flag
+    is_demo_user = models.BooleanField(
+        default=False,
+        help_text='Demo user created by generate_demo_data command'
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

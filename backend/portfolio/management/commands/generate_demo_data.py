@@ -4,6 +4,10 @@ Management command to generate demo data for testing and demonstration.
 Creates users with sample accounts and historical balance snapshots.
 Designed to be run daily to keep demo data fresh.
 
+IMPORTANT: This command deletes and recreates demo users on each run.
+Only users marked as demo users (is_demo_user=True) will be deleted.
+If a username belongs to a real user, the command will fail.
+
 Usage:
     python manage.py generate_demo_data --users demo1:password1 demo2:password2
 
@@ -17,7 +21,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from django.contrib.auth.models import User
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from accounts.models import UserProfile
@@ -71,15 +75,9 @@ class Command(BaseCommand):
             action='store_true',
             help='Show what would be created without making changes',
         )
-        parser.add_argument(
-            '--clear',
-            action='store_true',
-            help='Clear existing demo data before creating new',
-        )
 
     def handle(self, *args, **options):
         dry_run = options['dry_run']
-        clear = options['clear']
 
         # Get user credentials from args or environment
         user_pairs = options.get('users') or []
@@ -113,50 +111,89 @@ class Command(BaseCommand):
         if dry_run:
             self.stdout.write(self.style.WARNING('DRY RUN - no changes will be made'))
 
+        # First, validate that all usernames are either new or demo users
+        self._validate_usernames([u[0] for u in users_to_create], dry_run)
+
+        # Delete existing demo users and their data
+        self._delete_demo_users([u[0] for u in users_to_create], dry_run)
+
+        # Create new demo users
         for username, password in users_to_create:
-            self._process_user(username, password, dry_run, clear)
+            self._create_demo_user(username, password, dry_run)
 
         self.stdout.write(self.style.SUCCESS('Demo data generation complete'))
 
+    def _validate_usernames(self, usernames, dry_run):
+        """
+        Validate that all usernames are either new or belong to demo users.
+
+        Raises CommandError if any username belongs to a real (non-demo) user.
+        """
+        for username in usernames:
+            try:
+                user = User.objects.get(username=username)
+                profile = getattr(user, 'profile', None)
+
+                if profile and not profile.is_demo_user:
+                    raise CommandError(
+                        f'User "{username}" exists and is NOT a demo user. '
+                        f'Cannot overwrite real user data. '
+                        f'Use a different username or manually delete this user.'
+                    )
+            except User.DoesNotExist:
+                # New user, OK to create
+                pass
+
+        if not dry_run:
+            self.stdout.write('  All usernames validated')
+
+    def _delete_demo_users(self, usernames, dry_run):
+        """Delete demo users and all their associated data."""
+        for username in usernames:
+            try:
+                user = User.objects.get(username=username)
+                profile = getattr(user, 'profile', None)
+
+                if profile and profile.is_demo_user:
+                    if dry_run:
+                        account_count = FinancialAccount.objects.filter(user=user).count()
+                        self.stdout.write(
+                            f'  Would delete demo user "{username}" '
+                            f'with {account_count} accounts'
+                        )
+                    else:
+                        # Delete cascades to accounts and snapshots
+                        user.delete()
+                        self.stdout.write(f'  Deleted demo user: {username}')
+            except User.DoesNotExist:
+                pass
+
     @transaction.atomic
-    def _process_user(self, username, password, dry_run, clear):
-        """Create or update a demo user with accounts and snapshots."""
-        self.stdout.write(f'\nProcessing user: {username}')
-
-        # Get or create user
-        user, created = User.objects.get_or_create(
-            username=username,
-            defaults={'email': f'{username}@demo.local'}
-        )
-
-        if created:
-            self.stdout.write(f'  Created new user: {username}')
-        else:
-            self.stdout.write(f'  Found existing user: {username}')
+    def _create_demo_user(self, username, password, dry_run):
+        """Create a demo user with accounts and snapshots."""
+        self.stdout.write(f'\nCreating demo user: {username}')
 
         if dry_run:
+            self.stdout.write('  Would create user with 5 demo accounts')
             return
 
-        # Set password
-        user.set_password(password)
-        user.save()
+        # Create user
+        user = User.objects.create_user(
+            username=username,
+            email=f'{username}@demo.local',
+            password=password
+        )
+        self.stdout.write(f'  Created user: {username}')
 
-        # Ensure profile exists
+        # Get or create profile and mark as demo user
         profile, _ = UserProfile.objects.get_or_create(user=user)
         profile.base_currency = 'EUR'
         profile.auto_sync_enabled = False
+        profile.is_demo_user = True
 
-        # Set up encryption for the user if not already done
-        if not profile.encryption_migrated:
-            self._setup_user_encryption(profile, password)
-
+        # Set up encryption for the user
+        self._setup_user_encryption(profile, password)
         profile.save()
-
-        # Clear existing accounts if requested
-        if clear:
-            deleted_count = FinancialAccount.objects.filter(user=user).delete()[0]
-            if deleted_count:
-                self.stdout.write(f'  Cleared {deleted_count} existing accounts')
 
         # Create demo accounts
         self._create_demo_accounts(user, profile)
@@ -212,7 +249,7 @@ class Command(BaseCommand):
         today = date.today()
 
         for name, broker_code, account_type, currency, is_manual, days_offset in DEMO_ACCOUNTS:
-            # Get or create the broker
+            # Get the broker
             try:
                 broker = Broker.objects.get(code=broker_code)
             except Broker.DoesNotExist:
@@ -221,24 +258,18 @@ class Command(BaseCommand):
                 ))
                 continue
 
-            # Check if account already exists
-            account, created = FinancialAccount.objects.get_or_create(
+            # Create account
+            account = FinancialAccount.objects.create(
                 user=user,
+                broker=broker,
                 name=name,
-                defaults={
-                    'broker': broker,
-                    'account_type': account_type,
-                    'currency': currency,
-                    'is_manual': is_manual,
-                    'sync_enabled': False,  # No auto-sync for demo accounts
-                    'status': 'active',
-                }
+                account_type=account_type,
+                currency=currency,
+                is_manual=is_manual,
+                sync_enabled=False,
+                status='active',
             )
-
-            if created:
-                self.stdout.write(f'  Created account: {name}')
-            else:
-                self.stdout.write(f'  Found existing account: {name}')
+            self.stdout.write(f'  Created account: {name}')
 
             # Generate snapshots
             newest_date = today - timedelta(days=days_offset)
@@ -248,11 +279,6 @@ class Command(BaseCommand):
         """Generate historical snapshots for an account."""
         # Calculate date range
         oldest_date = newest_date - timedelta(days=HISTORY_DAYS)
-
-        # Delete existing snapshots for this account (refresh daily)
-        deleted = AccountSnapshot.objects.filter(account=account).delete()[0]
-        if deleted:
-            self.stdout.write(f'    Refreshed {deleted} existing snapshots')
 
         # Generate snapshot dates (every 5 days, from oldest to newest)
         snapshot_dates = []
@@ -272,7 +298,7 @@ class Command(BaseCommand):
         snapshots_to_create = []
         for snapshot_date, balance in zip(snapshot_dates, balances):
             # Convert to base currency if different
-            balance_base = balance  # Simplified: assume 1:1 for demo
+            balance_base = balance
             exchange_rate = Decimal('1.0')
 
             if account.currency != profile.base_currency:
