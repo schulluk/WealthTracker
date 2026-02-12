@@ -91,7 +91,7 @@ class UserProfile(models.Model):
 
     # Sync reminder settings
     sync_reminder_enabled = models.BooleanField(
-        default=True,
+        default=False,
         help_text='Enable daily sync reminder notification'
     )
     sync_reminder_hour = models.PositiveSmallIntegerField(

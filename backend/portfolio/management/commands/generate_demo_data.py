@@ -49,16 +49,16 @@ STARTING_BALANCE = Decimal('147826.0000')
 
 # Growth/decrease parameters
 GROWTH_RATE_MIN = Decimal('0.02')   # 2%
-GROWTH_RATE_MAX = Decimal('0.05')   # 5%
+GROWTH_RATE_MAX = Decimal('0.04')   # 4%
 DECREASE_RATE_MIN = Decimal('0.01')  # 1%
 DECREASE_RATE_MAX = Decimal('0.03')  # 3%
 
 # Probability of growth in a month (applied per 4 snapshots since ~20 days)
-GROWTH_PROBABILITY = 0.70
+GROWTH_PROBABILITY = 0.60
 
 # Snapshots configuration
 SNAPSHOT_INTERVAL_DAYS = 5
-HISTORY_DAYS = int(365 * 1.5)  # 1.5 years
+HISTORY_DAYS = int(365 * 2.5)  # 2.5 years
 
 
 class Command(BaseCommand):

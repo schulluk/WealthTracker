@@ -1,9 +1,11 @@
+import 'package:app_settings/app_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/models/profile.dart';
+import '../../services/notification_service.dart';
 import '../providers/auth_provider.dart';
 import '../providers/core_providers.dart';
 import '../providers/profile_provider.dart';
@@ -456,17 +458,29 @@ class _SyncSettingsSection extends ConsumerStatefulWidget {
 
 class _SyncSettingsSectionState extends ConsumerState<_SyncSettingsSection> {
   late bool _syncOnAppOpen;
-  late bool _syncReminderEnabled;
-  late int _syncReminderHour;
-  late int _syncReminderMinute;
+  bool _syncReminderEnabled = false;
+  int _syncReminderHour = 9;
+  int _syncReminderMinute = 0;
 
   @override
   void initState() {
     super.initState();
     _syncOnAppOpen = widget.profile.syncOnAppOpen;
-    _syncReminderEnabled = widget.profile.syncReminderEnabled;
-    _syncReminderHour = widget.profile.syncReminderHour;
-    _syncReminderMinute = widget.profile.syncReminderMinute;
+    _loadLocalReminderSettings();
+  }
+
+  Future<void> _loadLocalReminderSettings() async {
+    final notificationService = ref.read(notificationServiceProvider);
+    final enabled = await notificationService.isSyncReminderEnabled();
+    final hour = await notificationService.getSyncReminderHour();
+    final minute = await notificationService.getSyncReminderMinute();
+    if (mounted) {
+      setState(() {
+        _syncReminderEnabled = enabled;
+        _syncReminderHour = hour;
+        _syncReminderMinute = minute;
+      });
+    }
   }
 
   @override
@@ -475,9 +489,6 @@ class _SyncSettingsSectionState extends ConsumerState<_SyncSettingsSection> {
     if (oldWidget.profile != widget.profile) {
       setState(() {
         _syncOnAppOpen = widget.profile.syncOnAppOpen;
-        _syncReminderEnabled = widget.profile.syncReminderEnabled;
-        _syncReminderHour = widget.profile.syncReminderHour;
-        _syncReminderMinute = widget.profile.syncReminderMinute;
       });
     }
   }
@@ -485,9 +496,7 @@ class _SyncSettingsSectionState extends ConsumerState<_SyncSettingsSection> {
   Future<void> _updateSyncOnAppOpen(bool value) async {
     setState(() => _syncOnAppOpen = value);
     try {
-      await ref.read(syncSettingsProvider).updateSyncSettings(
-            syncOnAppOpen: value,
-          );
+      await ref.read(syncSettingsProvider).updateSyncOnAppOpen(value);
     } catch (e) {
       setState(() => _syncOnAppOpen = !value);
       if (mounted) {
@@ -499,10 +508,38 @@ class _SyncSettingsSectionState extends ConsumerState<_SyncSettingsSection> {
   }
 
   Future<void> _updateSyncReminder(bool enabled) async {
+    if (enabled) {
+      // When enabling, request notification permissions first
+      final notificationService = ref.read(notificationServiceProvider);
+      final result = await notificationService.requestPermissions();
+
+      switch (result) {
+        case NotificationPermissionResult.granted:
+          // Permission granted, proceed with enabling
+          break;
+        case NotificationPermissionResult.denied:
+          // Permission denied, don't enable
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Notification permission required for reminders'),
+              ),
+            );
+          }
+          return;
+        case NotificationPermissionResult.permanentlyDenied:
+          // Permission permanently denied, show dialog
+          if (mounted) {
+            await _showPermissionDeniedDialog();
+          }
+          return;
+      }
+    }
+
     setState(() => _syncReminderEnabled = enabled);
     try {
-      await ref.read(syncSettingsProvider).updateSyncSettings(
-            syncReminderEnabled: enabled,
+      await ref.read(syncSettingsProvider).updateSyncReminder(
+            enabled: enabled,
           );
     } catch (e) {
       setState(() => _syncReminderEnabled = !enabled);
@@ -512,6 +549,33 @@ class _SyncSettingsSectionState extends ConsumerState<_SyncSettingsSection> {
         );
       }
     }
+  }
+
+  Future<void> _showPermissionDeniedDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Notifications Disabled'),
+        content: const Text(
+          'You have previously denied notification permissions. '
+          'To enable sync reminders, please allow notifications for Wealth Tracker '
+          'in your device settings.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+              AppSettings.openAppSettings(type: AppSettingsType.notification);
+            },
+            child: const Text('Open Settings'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _selectReminderTime() async {
@@ -531,9 +595,9 @@ class _SyncSettingsSectionState extends ConsumerState<_SyncSettingsSection> {
     });
 
     try {
-      await ref.read(syncSettingsProvider).updateSyncSettings(
-            syncReminderHour: time.hour,
-            syncReminderMinute: time.minute,
+      await ref.read(syncSettingsProvider).updateSyncReminder(
+            hour: time.hour,
+            minute: time.minute,
           );
     } catch (e) {
       if (mounted) {

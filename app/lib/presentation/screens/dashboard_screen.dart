@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/models/account.dart';
+import 'dart:async';
+
+import '../../main.dart' show initialNotificationResponse, notificationTapStream;
 import '../providers/accounts_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/sync_provider.dart';
@@ -24,23 +27,32 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   bool _checkedQuickSnapshot = false;
   final Set<int> _syncingAccounts = {};
   bool _syncingAll = false;
-  bool _initialSyncChecked = false;
+  StreamSubscription<String>? _notificationSub;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _notificationSub = notificationTapStream.stream.listen(_onNotificationTap);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkQuickSnapshotPrompt();
       _initializeSyncReminders();
-      _checkSyncOnAppOpen();
+      _initStartupSync();
     });
   }
 
   @override
   void dispose() {
+    _notificationSub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  void _onNotificationTap(String payload) {
+    if (payload == 'sync_reminder' && mounted && !_syncingAll) {
+      debugPrint('Sync reminder notification tapped while app running, triggering sync');
+      _syncAllAccounts();
+    }
   }
 
   @override
@@ -59,9 +71,35 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     }
   }
 
+  /// Run notification-launch sync first, then sync-on-app-open (if not already syncing).
+  Future<void> _initStartupSync() async {
+    bool syncedFromNotification = false;
+
+    // 1. Check if app was launched from a sync reminder notification
+    final response = initialNotificationResponse;
+    if (response != null && response.payload == 'sync_reminder') {
+      debugPrint('App launched from sync reminder notification, triggering sync');
+      initialNotificationResponse = null;
+      syncedFromNotification = true;
+
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (mounted) {
+        await _syncAllAccounts();
+      }
+    }
+
+    // 2. Check sync-on-app-open (skip if we already synced from notification)
+    if (!syncedFromNotification && mounted) {
+      try {
+        await ref.read(syncAllProvider.notifier).trySyncOnAppOpen();
+      } catch (e) {
+        debugPrint('Auto-sync on app open failed: $e');
+      }
+    }
+  }
+
   Future<void> _checkSyncOnAppOpen() async {
-    if (_initialSyncChecked && !mounted) return;
-    _initialSyncChecked = true;
+    if (!mounted) return;
 
     try {
       await ref.read(syncAllProvider.notifier).trySyncOnAppOpen();
@@ -139,12 +177,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   }
 
   Future<void> _syncAllAccounts() async {
-    if (_syncingAll) return;
+    if (_syncingAll || !mounted) return;
 
     setState(() => _syncingAll = true);
 
     // Show hint that some banks may require approval
-    _showSyncHint();
+    if (mounted) _showSyncHint();
 
     try {
       final repo = ref.read(accountRepositoryProvider);

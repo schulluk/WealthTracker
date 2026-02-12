@@ -51,7 +51,7 @@ class AuthNotifier extends AsyncNotifier<User?> {
       return (
         authSalt: data['auth_salt'] as String?,
         kekSalt: data['kek_salt'] as String?,
-        migrated: data['encryption_migrated'] as bool? ?? false,
+        migrated: data['migrated'] as bool? ?? false,
       );
     } catch (e) {
       // User might not exist or server doesn't support KEK auth
@@ -145,9 +145,9 @@ class AuthNotifier extends AsyncNotifier<User?> {
 
     try {
       // Generate new salts
-      final saltResponse = await apiClient.get(ApiConfig.newSaltPath);
-      final newAuthSalt = saltResponse.data['auth_salt'] as String;
-      final newKekSalt = saltResponse.data['kek_salt'] as String;
+      final saltResponse = await apiClient.post(ApiConfig.newSaltPath);
+      final newAuthSalt = saltResponse.data['new_auth_salt'] as String;
+      final newKekSalt = saltResponse.data['new_kek_salt'] as String;
 
       // Derive keys from password
       final keys = await cryptoService.deriveKeys(

@@ -44,7 +44,7 @@ dependencies:
   url_launcher: ^6.3.2
 
   # Cryptography (for KEK-based authentication)
-  dargon2_flutter: ^3.2.2
+  cryptography: ^2.9.0
 
   # Local Notifications (for sync reminders)
   flutter_local_notifications: ^19.0.0
@@ -52,6 +52,10 @@ dependencies:
 
   # Shared Preferences (for last sync timestamp)
   shared_preferences: ^2.3.1
+
+  # Permission handling (for notification permissions)
+  permission_handler: ^11.3.1
+  app_settings: ^5.1.1
 
 dev_dependencies:
   flutter_test:

@@ -1,13 +1,13 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:dargon2_flutter/dargon2_flutter.dart';
+import 'package:cryptography/cryptography.dart';
 
 /// Service for cryptographic operations including Argon2 key derivation.
 class CryptoService {
   /// Argon2id parameters matching the backend/React implementation.
   static const int _timeCost = 3;
-  static const int _memoryCost = 65536; // 64 MB
+  static const int _memoryCost = 65536; // 64 MB (in KB)
   static const int _parallelism = 4;
   static const int _hashLength = 32;
 
@@ -15,19 +15,22 @@ class CryptoService {
   ///
   /// Returns base64-encoded 32-byte key.
   Future<String> deriveKey(String password, String saltBase64) async {
-    final salt = Salt(base64Decode(saltBase64));
-
-    final result = await argon2.hashPasswordString(
-      password,
-      salt: salt,
-      iterations: _timeCost,
+    final algorithm = Argon2id(
       memory: _memoryCost,
       parallelism: _parallelism,
-      length: _hashLength,
-      type: Argon2Type.id,
+      iterations: _timeCost,
+      hashLength: _hashLength,
     );
 
-    return base64Encode(result.rawBytes);
+    final saltBytes = base64Decode(saltBase64);
+
+    final secretKey = await algorithm.deriveKeyFromPassword(
+      password: password,
+      nonce: saltBytes,
+    );
+
+    final keyBytes = await secretKey.extractBytes();
+    return base64Encode(keyBytes);
   }
 
   /// Derive authentication hash from password and salt.

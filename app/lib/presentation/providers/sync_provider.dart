@@ -130,7 +130,7 @@ class SyncAllNotifier extends StateNotifier<SyncAllState> {
   }
 }
 
-/// Provider to update sync settings in the profile.
+/// Provider to update sync settings.
 final syncSettingsProvider = Provider((ref) => SyncSettingsManager(ref));
 
 class SyncSettingsManager {
@@ -138,59 +138,62 @@ class SyncSettingsManager {
 
   SyncSettingsManager(this._ref);
 
-  /// Update sync reminder settings.
-  Future<void> updateSyncSettings({
-    bool? syncReminderEnabled,
-    int? syncReminderHour,
-    int? syncReminderMinute,
-    bool? syncOnAppOpen,
-  }) async {
+  /// Update sync-on-app-open setting (stored on server).
+  Future<void> updateSyncOnAppOpen(bool value) async {
     final repository = _ref.read(profileRepositoryProvider);
+    await repository.updateProfile(syncOnAppOpen: value);
+    _ref.invalidate(profileProvider);
+  }
+
+  /// Update sync reminder settings (stored locally).
+  Future<void> updateSyncReminder({
+    bool? enabled,
+    int? hour,
+    int? minute,
+  }) async {
     final notificationService = _ref.read(notificationServiceProvider);
 
-    // Update on server
-    await repository.updateProfile(
-      syncReminderEnabled: syncReminderEnabled,
-      syncReminderHour: syncReminderHour,
-      syncReminderMinute: syncReminderMinute,
-      syncOnAppOpen: syncOnAppOpen,
-    );
+    if (enabled != null) {
+      await notificationService.setSyncReminderEnabled(enabled);
+    }
+    if (hour != null || minute != null) {
+      final currentHour = hour ?? await notificationService.getSyncReminderHour();
+      final currentMinute = minute ?? await notificationService.getSyncReminderMinute();
+      await notificationService.setSyncReminderTime(currentHour, currentMinute);
+    }
 
-    // Update local notifications
-    final profile = await _ref.read(profileProvider.future);
-    if (profile != null) {
-      final enabled = syncReminderEnabled ?? profile.syncReminderEnabled;
-      final hour = syncReminderHour ?? profile.syncReminderHour;
-      final minute = syncReminderMinute ?? profile.syncReminderMinute;
+    // Schedule or cancel the notification
+    final isEnabled = enabled ?? await notificationService.isSyncReminderEnabled();
+    if (isEnabled) {
+      final h = hour ?? await notificationService.getSyncReminderHour();
+      final m = minute ?? await notificationService.getSyncReminderMinute();
+      await notificationService.scheduleSyncReminder(hour: h, minute: m);
+    } else {
+      await notificationService.cancelSyncReminder();
+    }
+  }
 
-      if (enabled) {
+  /// Initialize sync reminders from local settings.
+  ///
+  /// Only schedules the reminder if permissions are already granted.
+  /// Does NOT prompt for permissions - that only happens when the user
+  /// explicitly enables the reminder in settings.
+  Future<void> initializeSyncReminders() async {
+    final notificationService = _ref.read(notificationServiceProvider);
+    await notificationService.initialize();
+
+    final enabled = await notificationService.isSyncReminderEnabled();
+    if (enabled) {
+      final hasPermission =
+          await notificationService.hasNotificationPermission();
+      if (hasPermission) {
+        final hour = await notificationService.getSyncReminderHour();
+        final minute = await notificationService.getSyncReminderMinute();
         await notificationService.scheduleSyncReminder(
           hour: hour,
           minute: minute,
         );
-      } else {
-        await notificationService.cancelSyncReminder();
       }
-    }
-
-    // Refresh profile
-    _ref.invalidate(profileProvider);
-  }
-
-  /// Initialize sync reminders from profile settings.
-  Future<void> initializeSyncReminders() async {
-    final profile = await _ref.read(profileProvider.future);
-    if (profile == null) return;
-
-    final notificationService = _ref.read(notificationServiceProvider);
-    await notificationService.initialize();
-
-    if (profile.syncReminderEnabled) {
-      await notificationService.requestPermissions();
-      await notificationService.scheduleSyncReminder(
-        hour: profile.syncReminderHour,
-        minute: profile.syncReminderMinute,
-      );
     }
   }
 }

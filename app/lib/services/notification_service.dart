@@ -1,12 +1,30 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
+/// Result of a notification permission request.
+enum NotificationPermissionResult {
+  /// Permission was granted.
+  granted,
+
+  /// Permission was denied (user can be asked again).
+  denied,
+
+  /// Permission was permanently denied (user must enable in settings).
+  permanentlyDenied,
+}
+
 /// Service for managing local notifications, particularly sync reminders.
 class NotificationService {
   static const String _lastSyncAllKey = 'last_sync_all_timestamp';
+  static const String _syncReminderEnabledKey = 'sync_reminder_enabled';
+  static const String _syncReminderHourKey = 'sync_reminder_hour';
+  static const String _syncReminderMinuteKey = 'sync_reminder_minute';
   static const int _syncReminderNotificationId = 1;
   static const String _syncReminderChannelId = 'sync_reminder';
   static const String _syncReminderChannelName = 'Sync Reminders';
@@ -56,29 +74,85 @@ class NotificationService {
     debugPrint('Notification tapped: ${response.payload}');
   }
 
-  /// Request notification permissions (iOS).
-  Future<bool> requestPermissions() async {
-    final iosPlugin = _notifications.resolvePlatformSpecificImplementation<
-        IOSFlutterLocalNotificationsPlugin>();
+  /// Check the current notification permission status.
+  Future<PermissionStatus> getNotificationPermissionStatus() async {
+    return Permission.notification.status;
+  }
 
-    if (iosPlugin != null) {
-      final granted = await iosPlugin.requestPermissions(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
-      return granted ?? false;
+  /// Check if notification permissions are granted.
+  Future<bool> hasNotificationPermission() async {
+    final status = await Permission.notification.status;
+    return status.isGranted;
+  }
+
+  /// Check if notification permissions are permanently denied.
+  ///
+  /// On iOS, this means the user has explicitly denied and must go to settings.
+  /// On Android 13+, this also applies after denying the runtime permission.
+  Future<bool> isNotificationPermissionPermanentlyDenied() async {
+    final status = await Permission.notification.status;
+    return status.isPermanentlyDenied;
+  }
+
+  /// Request notification permissions.
+  ///
+  /// Returns the result of the permission request.
+  Future<NotificationPermissionResult> requestPermissions() async {
+    // Check current status first
+    var status = await Permission.notification.status;
+
+    // If already granted, return immediately
+    if (status.isGranted) {
+      return NotificationPermissionResult.granted;
     }
 
-    final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
-
-    if (androidPlugin != null) {
-      final granted = await androidPlugin.requestNotificationsPermission();
-      return granted ?? false;
+    // If permanently denied on iOS, user must go to settings
+    if (status.isPermanentlyDenied) {
+      return NotificationPermissionResult.permanentlyDenied;
     }
 
-    return true;
+    // Request permission
+    if (Platform.isIOS) {
+      // On iOS, use the flutter_local_notifications plugin for the initial request
+      final iosPlugin = _notifications.resolvePlatformSpecificImplementation<
+          IOSFlutterLocalNotificationsPlugin>();
+
+      if (iosPlugin != null) {
+        final granted = await iosPlugin.requestPermissions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+
+        if (granted == true) {
+          return NotificationPermissionResult.granted;
+        }
+
+        // Check if now permanently denied
+        status = await Permission.notification.status;
+        if (status.isPermanentlyDenied) {
+          return NotificationPermissionResult.permanentlyDenied;
+        }
+
+        return NotificationPermissionResult.denied;
+      }
+    } else if (Platform.isAndroid) {
+      // On Android 13+, request the notification permission
+      status = await Permission.notification.request();
+
+      if (status.isGranted) {
+        return NotificationPermissionResult.granted;
+      }
+
+      if (status.isPermanentlyDenied) {
+        return NotificationPermissionResult.permanentlyDenied;
+      }
+
+      return NotificationPermissionResult.denied;
+    }
+
+    // Fallback for other platforms
+    return NotificationPermissionResult.granted;
   }
 
   /// Schedule a daily sync reminder at the specified time.
@@ -145,6 +219,34 @@ class NotificationService {
     }
 
     return scheduled;
+  }
+
+  // --- Local sync reminder settings ---
+
+  Future<bool> isSyncReminderEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_syncReminderEnabledKey) ?? false;
+  }
+
+  Future<void> setSyncReminderEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_syncReminderEnabledKey, enabled);
+  }
+
+  Future<int> getSyncReminderHour() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_syncReminderHourKey) ?? 9;
+  }
+
+  Future<int> getSyncReminderMinute() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_syncReminderMinuteKey) ?? 0;
+  }
+
+  Future<void> setSyncReminderTime(int hour, int minute) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_syncReminderHourKey, hour);
+    await prefs.setInt(_syncReminderMinuteKey, minute);
   }
 
   /// Record a sync-all operation timestamp.
