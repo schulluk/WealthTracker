@@ -263,7 +263,7 @@ developer. The only data collected by the developer is crash diagnostics.
 
 ## Contact Information
 
-- Developer: MiniApps
+- Developer: Lukas Schulze
 - Email: support@miniapps.ch
 - Privacy Policy URL: https://your-server.example.com/privacy
 - Website: https://miniapps.ch

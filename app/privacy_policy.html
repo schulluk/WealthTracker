@@ -66,71 +66,27 @@
     </div>
 
     <div class="container">
-        <p class="last-updated">Last updated: February 10, 2026</p>
+        <p class="last-updated">Last updated: February 12, 2026</p>
 
         <div class="section">
             <h2>1. Introduction</h2>
-            <p>Welcome to Wealth Tracker ("we," "our," or "us"). We are committed to protecting your privacy and ensuring the security of your personal and financial information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application.</p>
+            <p>Welcome to Wealth Tracker ("we," "our," or "us"). Wealth Tracker is a <strong>self-hosted</strong> application. You run the backend on your own server, which means your personal and financial data is stored entirely under your control. The developer does not operate any servers that store your data.</p>
+            <p>This Privacy Policy explains what limited data we collect through the app itself, how we use it, and your rights regarding that data.</p>
         </div>
 
         <div class="section">
-            <h2>2. Information We Collect</h2>
-
-            <h3>2.1 Information You Provide</h3>
+            <h2>2. Self-Hosted Architecture</h2>
+            <p>Wealth Tracker is designed so that you host the backend server yourself. This means:</p>
             <ul>
-                <li><strong>Account Information:</strong> When you create an account, we collect your email address, username, and password.</li>
-                <li><strong>Financial Data:</strong> Account names, balances, and portfolio information that you manually enter or sync from connected financial institutions.</li>
-                <li><strong>Broker Credentials:</strong> If you choose to connect external accounts, we securely store encrypted credentials to access your financial data.</li>
-            </ul>
-
-            <h3>2.2 Information Collected Automatically</h3>
-            <ul>
-                <li><strong>Device Information:</strong> Device type, operating system version, and unique device identifiers.</li>
-                <li><strong>Usage Data:</strong> How you interact with the app, including features used and time spent.</li>
-                <li><strong>Crash Reports:</strong> Technical information about app crashes, including device state, stack traces, and app version, collected via Firebase Crashlytics to help us improve stability.</li>
+                <li><strong>Your data stays on your server:</strong> All personal information (username, email), financial data (account names, balances, broker credentials), and usage history are stored exclusively on your self-hosted server.</li>
+                <li><strong>We have no access:</strong> The developer does not have access to your server, your accounts, or your financial data.</li>
+                <li><strong>You are in control:</strong> You decide where your data is stored, how it is backed up, and when it is deleted.</li>
             </ul>
         </div>
 
         <div class="section">
-            <h2>3. How We Use Your Information</h2>
-            <p>We use the collected information to:</p>
-            <ul>
-                <li>Provide and maintain the Wealth Tracker service</li>
-                <li>Display your financial portfolio and track your wealth over time</li>
-                <li>Sync data from connected financial institutions</li>
-                <li>Send you important notifications about your accounts</li>
-                <li>Improve and optimize our application</li>
-                <li>Respond to your inquiries and provide customer support</li>
-                <li>Ensure the security of your account and our services</li>
-            </ul>
-        </div>
-
-        <div class="section">
-            <h2>4. Data Security</h2>
-            <p>We implement robust security measures to protect your information:</p>
-            <ul>
-                <li><strong>Encryption:</strong> All sensitive data, including credentials and financial information, is encrypted both in transit (TLS/SSL) and at rest.</li>
-                <li><strong>Secure Storage:</strong> Credentials are stored using industry-standard encryption (Fernet symmetric encryption).</li>
-                <li><strong>Authentication:</strong> We use secure JWT-based authentication with regular token rotation.</li>
-                <li><strong>Biometric Protection:</strong> The app supports biometric authentication (Face ID, Touch ID, fingerprint) for additional security.</li>
-            </ul>
-        </div>
-
-        <div class="section">
-            <h2>5. Data Sharing and Disclosure</h2>
-            <p>We do not sell, trade, or rent your personal information to third parties. We may share your information only in the following circumstances:</p>
-            <ul>
-                <li><strong>Service Providers:</strong> We may share data with trusted service providers who assist in operating our app (e.g., cloud hosting, Firebase Crashlytics for crash reporting).</li>
-                <li><strong>Legal Requirements:</strong> We may disclose information if required by law or in response to valid legal requests.</li>
-                <li><strong>Business Transfers:</strong> In the event of a merger, acquisition, or sale of assets, your information may be transferred as part of that transaction.</li>
-            </ul>
-        </div>
-
-        <div class="section">
-            <h2>6. Third-Party Services</h2>
-
-            <h3>6.1 Firebase Crashlytics</h3>
-            <p>We use Firebase Crashlytics, a service provided by Google, to collect crash reports and diagnostic information. This helps us identify and fix issues to improve app stability. Crashlytics collects:</p>
+            <h2>3. Information We Collect</h2>
+            <p>The only data collected by the developer is <strong>crash diagnostics</strong>, sent via Firebase Crashlytics when the app encounters an error. This includes:</p>
             <ul>
                 <li>Crash stack traces and exception information</li>
                 <li>Device model, OS version, and orientation</li>
@@ -138,58 +94,76 @@
                 <li>A Crashlytics Installation UUID to identify unique app installations</li>
                 <li>App version and build number</li>
             </ul>
-            <p>Crashlytics does not collect personally identifiable information such as names, email addresses, or financial data. For more information, see <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Firebase Privacy Policy</a>.</p>
-
-            <h3>6.2 Financial Integrations</h3>
-            <p>Our app integrates with third-party financial services to sync your account data:</p>
-            <ul>
-                <li><strong>Banking Integrations:</strong> We connect to banks via FinTS/HBCI protocols (for German banks) or direct API integrations.</li>
-                <li><strong>Broker Integrations:</strong> We connect to investment platforms like Interactive Brokers, TrueWealth, VIAC, and Morgan Stanley.</li>
-            </ul>
-            <p>When you connect an external account, you authorize us to access your financial data from that institution. We only retrieve the information necessary to display your balances and portfolio.</p>
+            <p>Crashlytics does <strong>not</strong> collect personally identifiable information such as names, email addresses, or financial data.</p>
         </div>
 
         <div class="section">
-            <h2>7. Data Retention</h2>
-            <p>We retain your information for as long as your account is active or as needed to provide you services. You can request deletion of your account and associated data at any time by contacting us.</p>
+            <h2>4. Data Stored on Your Server</h2>
+            <p>The following data is processed and stored on your self-hosted server (not collected by the developer):</p>
+            <ul>
+                <li><strong>Account Information:</strong> Username, email address, and password (hashed).</li>
+                <li><strong>Financial Data:</strong> Account names, balance snapshots, and portfolio information.</li>
+                <li><strong>Broker Credentials:</strong> Encrypted credentials for connected financial institutions, protected with per-user encryption keys derived from your password.</li>
+            </ul>
+            <p>Security measures on your server include:</p>
+            <ul>
+                <li><strong>Per-user encryption:</strong> Each user has their own encryption key, derived from their password using Argon2id. The server never stores your password or encryption key in plain text.</li>
+                <li><strong>Ephemeral tokens:</strong> Login credentials are used only to derive encryption keys during authentication and are not persisted on the server.</li>
+                <li><strong>TLS encryption:</strong> All communication between the app and your server is encrypted.</li>
+                <li><strong>Biometric protection:</strong> The app supports Face ID, Touch ID, and fingerprint authentication for convenient, secure access.</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>5. Data Sharing and Disclosure</h2>
+            <p>We do not sell, trade, or rent any information. The only data shared with a third party is crash diagnostic data sent to Firebase Crashlytics (operated by Google) to help improve app stability. For more information, see the <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Firebase Privacy Policy</a>.</p>
+        </div>
+
+        <div class="section">
+            <h2>6. Financial Integrations</h2>
+            <p>The app can connect to third-party financial services to sync your account balances:</p>
+            <ul>
+                <li>German banks via FinTS/HBCI protocols</li>
+                <li>Interactive Brokers, TrueWealth, VIAC, Morgan Stanley at Work</li>
+            </ul>
+            <p>These connections are made directly from your self-hosted server. The developer has no involvement in or access to these connections.</p>
+        </div>
+
+        <div class="section">
+            <h2>7. Data Retention and Deletion</h2>
+            <p>Since all personal and financial data is stored on your own server, you have full control over data retention and deletion. You can delete your data at any time by managing your server directly.</p>
+            <p>Crash diagnostic data collected by Firebase Crashlytics is retained according to Google's data retention policies.</p>
         </div>
 
         <div class="section">
             <h2>8. Your Rights</h2>
-            <p>Depending on your location, you may have the following rights:</p>
-            <ul>
-                <li><strong>Access:</strong> Request a copy of the personal data we hold about you.</li>
-                <li><strong>Correction:</strong> Request correction of inaccurate personal data.</li>
-                <li><strong>Deletion:</strong> Request deletion of your personal data.</li>
-                <li><strong>Data Portability:</strong> Request a copy of your data in a portable format.</li>
-                <li><strong>Withdraw Consent:</strong> Withdraw consent for data processing where applicable.</li>
-            </ul>
-            <p>To exercise these rights, please contact us using the information provided below.</p>
+            <p>Because Wealth Tracker is self-hosted, you already have full control over your data. You can access, modify, export, or delete all your data directly on your server at any time.</p>
+            <p>For questions about crash data collected via Firebase Crashlytics, please contact us using the information below.</p>
         </div>
 
         <div class="section">
             <h2>9. Children's Privacy</h2>
-            <p>Our app is not intended for use by children under the age of 16. We do not knowingly collect personal information from children. If you believe we have collected information from a child, please contact us immediately.</p>
+            <p>Our app is not intended for use by children under the age of 16. We do not knowingly collect personal information from children.</p>
         </div>
 
         <div class="section">
             <h2>10. Changes to This Policy</h2>
-            <p>We may update this Privacy Policy from time to time. We will notify you of any significant changes by posting the new Privacy Policy within the app or via email. Your continued use of the app after changes constitutes acceptance of the updated policy.</p>
+            <p>We may update this Privacy Policy from time to time. We will notify you of any significant changes by posting the new Privacy Policy within the app or at this URL. Your continued use of the app after changes constitutes acceptance of the updated policy.</p>
         </div>
 
         <div class="section">
             <h2>11. Contact Us</h2>
-            <p>If you have any questions about this Privacy Policy or our data practices, please contact us at:</p>
+            <p>If you have any questions about this Privacy Policy, please contact us at:</p>
             <ul class="list-unstyled">
                 <li><strong>Email:</strong> privacy@miniapps.ch</li>
-                <li><strong>Developer:</strong> MiniApps</li>
+                <li><strong>Developer:</strong> Lukas Schulze</li>
             </ul>
         </div>
 
         <hr class="my-4">
 
         <footer class="text-center text-muted">
-            <p>&copy; 2026 Wealth Tracker by MiniApps. All rights reserved.</p>
+            <p>&copy; 2026 Wealth Tracker by Lukas Schulze. All rights reserved.</p>
         </footer>
     </div>
 
