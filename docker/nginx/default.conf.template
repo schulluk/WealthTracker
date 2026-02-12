@@ -8,8 +8,8 @@ http {
     include /etc/nginx/mime.types;
     default_type application/octet-stream;
 
-    log_format combined_realip '$http_x_forwarded_for - $remote_user [$time_local] '
-                    '"$request" $status $body_bytes_sent '
+    log_format combined_realip '$http_x_forwarded_for - $remote_user [$time_local] "$host" '
+                    '"$request" $status $body_bytes_sent $request_time '
                     '"$http_referer" "$http_user_agent"';
 
     access_log /dev/stdout combined_realip;
@@ -33,10 +33,12 @@ http {
 
         # API requests to Django
         location /api {
+            proxy_set_header Host $host;
             proxy_set_header X-Forwarded-Host $host;
             proxy_set_header X-Forwarded-Port $server_port;
             proxy_set_header X-Forwarded-Server $host;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
 
             proxy_buffering off;
 
@@ -50,10 +52,20 @@ http {
 
         # Admin requests to Django
         location /admin {
+            proxy_set_header Host $host;
             proxy_set_header X-Forwarded-Host $host;
             proxy_set_header X-Forwarded-Port $server_port;
             proxy_set_header X-Forwarded-Server $host;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            proxy_buffering off;
+
+            proxy_connect_timeout 900;
+            proxy_send_timeout 900;
+            proxy_read_timeout 900;
+            send_timeout 900;
+
             proxy_pass http://handler;
         }
     }

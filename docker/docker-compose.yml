@@ -16,7 +16,6 @@ services:
       - '/var/run/docker.sock:/var/run/docker.sock:ro'
     labels:
       traefik.enable: true
-      # traefik.http.middlewares.wealth-auth.basicauth.users: '${HTPASSWD}'
     networks:
       - wealth
 
@@ -29,11 +28,10 @@ services:
       PYTHON_ENDPOINT: 'wealth-py'
     labels:
       traefik.enable: true
-      traefik.http.routers.wealth.rule: Host(`${DOMAIN:-wealth.localhost}`)
+      traefik.http.routers.wealth.rule: Host(`${DOMAIN:-wealth.localhost}`) && (PathPrefix(`/api`) || PathPrefix(`/admin`) || PathPrefix(`/static`) || PathPrefix(`/media`))
       traefik.http.routers.wealth.entrypoints: 'websecure'
       traefik.http.routers.wealth.tls: true
       traefik.http.routers.wealth.tls.certresolver: 'default'
-      traefik.http.routers.wealth.middlewares: 'wealth-auth'
     volumes:
       - './nginx/nginx.conf:/etc/nginx/nginx.conf:ro'
       - './nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro'
@@ -85,7 +83,6 @@ services:
       traefik.http.routers.wealth-frontend.tls: true
       traefik.http.routers.wealth-frontend.tls.certresolver: 'default'
       traefik.http.routers.wealth-frontend.priority: 1
-      traefik.http.routers.wealth-frontend.middlewares: 'wealth-auth'
       traefik.http.services.wealth-frontend.loadbalancer.server.port: 80
     networks:
       - wealth
