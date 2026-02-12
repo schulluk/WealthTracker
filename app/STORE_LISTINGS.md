@@ -77,25 +77,18 @@ Version 1.3.0:
 
 ## Apple App Store Privacy
 
+Note: Wealth Tracker is a self-hosted app. All personal and financial data
+(email, accounts, balances) is stored on the user's own server, not on any
+server operated by the developer. The only data collected by the developer
+is crash diagnostics via Firebase Crashlytics.
+
 ### Data Collection Declarations
 
 #### Data Used to Track You
 None
 
 #### Data Linked to You
-
-**Contact Info**
-- Email Address
-- Purpose: App Functionality, Account Registration
-
-**Financial Info**
-- Bank Account Info (account names, balances)
-- Investment Portfolio (holdings, valuations)
-- Purpose: App Functionality
-
-**Identifiers**
-- User ID
-- Purpose: App Functionality
+None
 
 #### Data Not Linked to You
 
@@ -107,9 +100,6 @@ None
 
 | Data Type | Collected | Linked to Identity | Used for Tracking |
 |-----------|-----------|-------------------|-------------------|
-| Email Address | Yes | Yes | No |
-| Financial Info | Yes | Yes | No |
-| User ID | Yes | Yes | No |
 | Crash Data | Yes | No | No |
 
 ---
@@ -179,28 +169,13 @@ Download it, point it at your server, and start tracking.
 
 ## Google Play Data Safety
 
+Note: Wealth Tracker is a self-hosted app. All personal and financial data
+is stored on the user's own server, not on any server operated by the
+developer. The only data collected by the developer is crash diagnostics.
+
 ### Data Collection and Sharing
 
 #### Data Collected
-
-**Personal Info**
-- Email address
-- Collected: Yes
-- Shared: No
-- Purpose: Account management, App functionality
-
-**Financial Info**
-- Financial accounts (bank accounts, investment accounts)
-- Purchase history (transaction data from connected accounts)
-- Collected: Yes
-- Shared: No
-- Purpose: App functionality, Core feature of the app
-
-**App Activity**
-- App interactions
-- Collected: Yes
-- Shared: No
-- Purpose: Analytics, App functionality
 
 **App Info and Performance**
 - Crash logs
@@ -215,20 +190,25 @@ Download it, point it at your server, and start tracking.
 - Shared: Yes (with Firebase Crashlytics / Google)
 - Purpose: App stability and performance
 
+#### Data Not Collected
+
+- Personal Info (email, name) - stored on user's own server, not collected by developer
+- Financial Info (accounts, balances) - stored on user's own server, not collected by developer
+- App Activity - not collected
+
 ### Security Practices
 
 - Data is encrypted in transit (TLS/SSL)
-- Data is encrypted at rest
-- You can request that data be deleted
-- Data is handled securely following industry standards
+- You can request that data be deleted (by managing your own server)
+- Crash data is handled securely following industry standards
 
 ### Data Safety Form Answers
 
 | Question | Answer |
 |----------|--------|
-| Does your app collect or share any required user data types? | Yes |
+| Does your app collect or share any required user data types? | Yes (crash data only) |
 | Is all collected data encrypted in transit? | Yes |
-| Do you provide a way for users to request data deletion? | Yes |
+| Do you provide a way for users to request data deletion? | Yes (user controls their own server) |
 | Is any data shared with third parties? | Yes (crash/diagnostic data with Firebase) |
 | Does your app comply with Google Play's Families Policy? | N/A (not a kids app) |
 
