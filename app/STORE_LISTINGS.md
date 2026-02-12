@@ -6,67 +6,66 @@
 Wealth Tracker
 
 ### Subtitle (30 characters max)
-Track Your Net Worth
+Simple Self-Hosted Net Worth
 
 ### Promotional Text (170 characters max)
-Track your complete financial portfolio in one place. Connect banks and brokers, monitor investments, and watch your wealth grow over time with beautiful charts and insights.
+A simple, self-hosted net worth tracker. See all your accounts in one place, track your balance over time, and keep your financial data on your own server - fully private.
 
 ### Description (4000 characters max, no unicode)
 
-Take control of your financial future with Wealth Tracker - the comprehensive personal finance app designed to give you a complete picture of your wealth.
+Ever wondered "how much do I actually have?" Wealth Tracker is a simple app that answers that question. Add your bank accounts, savings, investments, and retirement funds, and see your total net worth on a single screen. No spreadsheets, no complexity - just a clear number and a chart showing how it changes over time.
 
-TRACK EVERYTHING IN ONE PLACE
-Wealth Tracker brings all your financial accounts together. Whether you have bank accounts, investment portfolios, retirement funds, real estate, or other assets, you can track them all in a single, intuitive dashboard.
+HOW IT WORKS
+Wealth Tracker takes regular snapshots of your account balances. Over time, this builds a history that shows how your net worth grows (or dips). Think of it as a weighing scale for your finances - step on it regularly and watch the trend.
+
+You can enter balances manually or connect supported accounts to sync automatically.
+
+SELF-HOSTED - YOUR DATA, YOUR SERVER
+Unlike other finance apps, Wealth Tracker does not store your data on someone else's cloud. You host the backend yourself. That means:
+- Your financial data never leaves your control
+- No company can sell, leak, or lose your information
+- You decide where your data lives and who has access
+- The app works with your own server - set it up once and you are good to go
+
+BUILT FOR SECURITY
+Your finances deserve serious protection:
+- Per-user encryption: each account has its own encryption key derived from your password
+- Ephemeral login tokens: credentials are never stored on the server after authentication
+- Biometric unlock (Face ID, Touch ID) for quick but secure access
+- All communication encrypted via TLS
+- No ads, no tracking, no data sharing
 
 CONNECT YOUR ACCOUNTS
-Seamlessly sync with major financial institutions:
-- Banks via secure FinTS/HBCI protocols (German banks)
-- Interactive Brokers (IBKR) via Flex Web Service
-- TrueWealth - Swiss robo-advisor
-- VIAC - Swiss 3a retirement accounts
-- Morgan Stanley at Work - equity compensation
-- Manual accounts for any other assets
-
-POWERFUL PORTFOLIO INSIGHTS
-- View your total net worth at a glance
-- Track individual account performance over time
-- See asset allocation across your entire portfolio
-- Monitor investments with real-time valuations
-- Historical snapshots to visualize wealth growth
+Sync balances automatically from supported institutions:
+- German banks via FinTS/HBCI
+- Interactive Brokers (IBKR)
+- TrueWealth (Swiss robo-advisor)
+- VIAC (Swiss 3a retirement)
+- Morgan Stanley at Work
+- Or simply add any account manually
 
 MULTI-CURRENCY SUPPORT
-Perfect for international portfolios. Wealth Tracker automatically fetches exchange rates and displays all values in your preferred base currency while preserving native currency details.
+Have accounts in different currencies? No problem. Wealth Tracker fetches exchange rates automatically and shows everything in your preferred base currency.
 
-SECURITY FIRST
-Your financial data deserves the highest protection:
-- All credentials encrypted with industry-standard encryption
-- Biometric authentication (Face ID, Touch ID) support
-- Secure JWT-based authentication
-- Your data stays on secure servers - never sold or shared
-
-BEAUTIFUL VISUALIZATIONS
-Understand your finances at a glance with:
-- Net worth timeline charts
-- Asset allocation breakdowns
-- Account-by-account performance tracking
-- Clean, modern interface designed for clarity
-
-PRIVACY FOCUSED
-We believe your financial data is yours alone. Wealth Tracker is built with privacy as a core principle. We do not sell your data, show ads, or share your information with third parties.
+CLEAN AND SIMPLE
+- One dashboard with your total net worth
+- A chart showing your wealth over time
+- List of all accounts with their latest balances
+- No bloat, no ads, no upsells
 
 PERFECT FOR
-- Investors tracking multiple brokerage accounts
-- Expats managing finances across countries
-- Anyone wanting a complete view of their net worth
-- People planning for financial independence
-- Families coordinating household finances
+- Anyone who wants to know their net worth at a glance
+- People with accounts at multiple banks or brokers
+- Privacy-conscious users who want to own their data
+- Expats with finances in different countries
+- Anyone saving toward a goal and wanting to see progress
 
-Whether you are building wealth, planning for retirement, or simply want to understand where your money is, Wealth Tracker gives you the tools and insights you need.
+Wealth Tracker is not a budgeting app and does not track individual transactions. It simply answers: "What is my net worth today, and how has it changed?"
 
-Download Wealth Tracker today and start your journey to financial clarity.
+Download it, point it at your server, and start tracking.
 
 ### Keywords (100 characters max, comma-separated)
-net worth,portfolio,finance,investment,wealth,money,stocks,assets,budget,tracker,banking,FIRE
+net worth,self-hosted,portfolio,finance,wealth,tracker,privacy,balance,assets,savings,open source
 
 ### What's New (Version Notes)
 Version 1.3.0:
@@ -121,61 +120,60 @@ None
 Wealth Tracker
 
 ### Short Description (80 characters max)
-Track your net worth, investments, and complete financial portfolio in one app.
+Simple, self-hosted net worth tracker. Your data stays on your own server.
 
 ### Full Description (4000 characters max)
 
-Take control of your financial future with Wealth Tracker - the comprehensive personal finance app designed to give you a complete picture of your wealth.
+Ever wondered "how much do I actually have?" Wealth Tracker is a simple app that answers that question. Add your accounts, see your total net worth, and watch how it changes over time. No spreadsheets, no complexity.
 
-📊 TRACK EVERYTHING IN ONE PLACE
-Wealth Tracker brings all your financial accounts together. Whether you have bank accounts, investment portfolios, retirement funds, real estate, or other assets, you can track them all in a single, intuitive dashboard.
+📊 HOW IT WORKS
+Wealth Tracker takes regular snapshots of your account balances. Over time, this builds a history that shows how your net worth grows (or dips). Think of it as a weighing scale for your finances - step on it regularly and watch the trend.
+
+You can enter balances manually or connect supported accounts to sync automatically.
+
+🏠 SELF-HOSTED - YOUR DATA, YOUR SERVER
+Unlike other finance apps, Wealth Tracker does not store your data on someone else's cloud. You host the backend yourself:
+• Your financial data never leaves your control
+• No company can sell, leak, or lose your information
+• You decide where your data lives and who has access
+• Set it up once and you are good to go
+
+🔒 BUILT FOR SECURITY
+Your finances deserve serious protection:
+• Per-user encryption: each account has its own encryption key derived from your password
+• Ephemeral login tokens: credentials are never stored on the server after authentication
+• Biometric unlock (fingerprint, face) for quick but secure access
+• All communication encrypted via TLS
+• No ads, no tracking, no data sharing
 
 🔗 CONNECT YOUR ACCOUNTS
-Seamlessly sync with major financial institutions:
-• Banks via secure FinTS/HBCI protocols (German banks)
-• Interactive Brokers (IBKR) via Flex Web Service
-• TrueWealth - Swiss robo-advisor
-• VIAC - Swiss 3a retirement accounts
-• Morgan Stanley at Work - equity compensation
-• Manual accounts for any other assets
-
-📈 POWERFUL PORTFOLIO INSIGHTS
-• View your total net worth at a glance
-• Track individual account performance over time
-• See asset allocation across your entire portfolio
-• Monitor investments with real-time valuations
-• Historical snapshots to visualize wealth growth
+Sync balances automatically from supported institutions:
+• German banks via FinTS/HBCI
+• Interactive Brokers (IBKR)
+• TrueWealth (Swiss robo-advisor)
+• VIAC (Swiss 3a retirement)
+• Morgan Stanley at Work
+• Or simply add any account manually
 
 💱 MULTI-CURRENCY SUPPORT
-Perfect for international portfolios. Wealth Tracker automatically fetches exchange rates and displays all values in your preferred base currency while preserving native currency details.
+Have accounts in different currencies? No problem. Wealth Tracker fetches exchange rates automatically and shows everything in your preferred base currency.
 
-🔒 SECURITY FIRST
-Your financial data deserves the highest protection:
-• All credentials encrypted with industry-standard encryption
-• Biometric authentication (fingerprint) support
-• Secure JWT-based authentication
-• Your data stays on secure servers - never sold or shared
+✨ CLEAN AND SIMPLE
+• One dashboard with your total net worth
+• A chart showing your wealth over time
+• List of all accounts with their latest balances
+• No bloat, no ads, no upsells
 
-📉 BEAUTIFUL VISUALIZATIONS
-Understand your finances at a glance with:
-• Net worth timeline charts
-• Asset allocation breakdowns
-• Account-by-account performance tracking
-• Clean, modern interface designed for clarity
+👤 PERFECT FOR
+• Anyone who wants to know their net worth at a glance
+• People with accounts at multiple banks or brokers
+• Privacy-conscious users who want to own their data
+• Expats with finances in different countries
+• Anyone saving toward a goal and wanting to see progress
 
-🛡️ PRIVACY FOCUSED
-We believe your financial data is yours alone. Wealth Tracker is built with privacy as a core principle. We do not sell your data, show ads, or share your information with third parties.
+Wealth Tracker is not a budgeting app and does not track individual transactions. It simply answers: "What is my net worth today, and how has it changed?"
 
-✨ PERFECT FOR
-• Investors tracking multiple brokerage accounts
-• Expats managing finances across countries
-• Anyone wanting a complete view of their net worth
-• People planning for financial independence (FIRE)
-• Families coordinating household finances
-
-Whether you're building wealth, planning for retirement, or simply want to understand where your money is, Wealth Tracker gives you the tools and insights you need.
-
-Download Wealth Tracker today and start your journey to financial clarity!
+Download it, point it at your server, and start tracking.
 
 ---
 
