@@ -16,7 +16,7 @@ services:
       - '/var/run/docker.sock:/var/run/docker.sock:ro'
     labels:
       traefik.enable: true
-      traefik.http.middlewares.wealth-auth.basicauth.users: '${HTPASSWD}'
+      # traefik.http.middlewares.wealth-auth.basicauth.users: '${HTPASSWD}'
     networks:
       - wealth
 
@@ -68,7 +68,7 @@ services:
       - '/opt/data/wealth/repo/backend:/var/www/app:rw'
       - '/opt/data/wealth/public/media:/var/www/public/media:rw'
       - '/opt/data/wealth/public/static:/var/www/public/static:rw'
-      - '/opt/data/wealth/repo/docker/crontabs:/crontabs:ro'
+      - '/opt/data/wealth/repo/backend/crontabs:/crontabs:ro'
     depends_on:
       - wealth-db
     networks:
