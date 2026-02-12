@@ -48,10 +48,10 @@ DEMO_ACCOUNTS = [
 STARTING_BALANCE = Decimal('147826.0000')
 
 # Growth/decrease parameters
-GROWTH_RATE_MIN = Decimal('0.02')   # 2%
-GROWTH_RATE_MAX = Decimal('0.04')   # 4%
-DECREASE_RATE_MIN = Decimal('0.01')  # 1%
-DECREASE_RATE_MAX = Decimal('0.03')  # 3%
+GROWTH_RATE_MIN = Decimal('0.03')   # 3%
+GROWTH_RATE_MAX = Decimal('0.10')   # 10%
+DECREASE_RATE_MIN = Decimal('0.02')  # 2%
+DECREASE_RATE_MAX = Decimal('0.08')  # 8%
 
 # Probability of growth in a month (applied per 4 snapshots since ~20 days)
 GROWTH_PROBABILITY = 0.60
