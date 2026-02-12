@@ -38,7 +38,7 @@ platform :ios do
 
     # Build the Flutter archive (without export)
     Dir.chdir("..") do
-      sh("flutter build ios --release --no-codesign")
+      sh("env -u GEM_HOME -u GEM_PATH -u BUNDLE_GEMFILE -u BUNDLE_BIN_PATH flutter build ios --release --no-codesign")
     end
 
     # Archive and export
@@ -106,7 +106,7 @@ platform :ios do
 
     # Build the Flutter archive (without export)
     Dir.chdir("..") do
-      sh("flutter build ios --release --no-codesign")
+      sh("env -u GEM_HOME -u GEM_PATH -u BUNDLE_GEMFILE -u BUNDLE_BIN_PATH flutter build ios --release --no-codesign")
     end
 
     # Archive and export
@@ -174,7 +174,7 @@ platform :ios do
     install_provisioning_profile(path: lane_context[SharedValues::SIGH_PROFILE_PATH])
 
     Dir.chdir("..") do
-      sh("flutter build ios --release --no-codesign")
+      sh("env -u GEM_HOME -u GEM_PATH -u BUNDLE_GEMFILE -u BUNDLE_BIN_PATH flutter build ios --release --no-codesign")
     end
 
     archive_path = File.expand_path("../build/ios/archive/Runner.xcarchive", __dir__)

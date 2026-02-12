@@ -62,7 +62,7 @@ class NotificationService {
     );
 
     await _notifications.initialize(
-      settings,
+      settings: settings,
       onDidReceiveNotificationResponse: _onNotificationTap,
     );
 
@@ -163,7 +163,7 @@ class NotificationService {
     required int hour,
     required int minute,
   }) async {
-    await _notifications.cancel(_syncReminderNotificationId);
+    await _notifications.cancel(id: _syncReminderNotificationId);
 
     const androidDetails = AndroidNotificationDetails(
       _syncReminderChannelId,
@@ -184,11 +184,11 @@ class NotificationService {
     final scheduledTime = _nextInstanceOfTime(hour, minute);
 
     await _notifications.zonedSchedule(
-      _syncReminderNotificationId,
-      'Wealth Tracker',
-      'Time to sync your accounts',
-      scheduledTime,
-      details,
+      id: _syncReminderNotificationId,
+      title: 'Wealth Tracker',
+      body: 'Time to sync your accounts',
+      scheduledDate: scheduledTime,
+      notificationDetails: details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       matchDateTimeComponents: DateTimeComponents.time, // Daily repeat
       payload: 'sync_reminder',
@@ -199,7 +199,7 @@ class NotificationService {
 
   /// Cancel the sync reminder notification.
   Future<void> cancelSyncReminder() async {
-    await _notifications.cancel(_syncReminderNotificationId);
+    await _notifications.cancel(id: _syncReminderNotificationId);
   }
 
   /// Get the next instance of the specified time.

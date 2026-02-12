@@ -40,19 +40,17 @@ class SyncAllState {
 
 /// Provider for sync-all operations with notification tracking.
 final syncAllProvider =
-    StateNotifierProvider<SyncAllNotifier, SyncAllState>((ref) {
-  return SyncAllNotifier(ref);
-});
+    NotifierProvider<SyncAllNotifier, SyncAllState>(SyncAllNotifier.new);
 
-class SyncAllNotifier extends StateNotifier<SyncAllState> {
-  final Ref _ref;
-
-  SyncAllNotifier(this._ref) : super(const SyncAllState()) {
+class SyncAllNotifier extends Notifier<SyncAllState> {
+  @override
+  SyncAllState build() {
     _loadLastSyncTime();
+    return const SyncAllState();
   }
 
   Future<void> _loadLastSyncTime() async {
-    final notificationService = _ref.read(notificationServiceProvider);
+    final notificationService = ref.read(notificationServiceProvider);
     final lastSync = await notificationService.getLastSyncAll();
     if (lastSync != null) {
       state = state.copyWith(lastSyncTime: lastSync);
@@ -68,8 +66,8 @@ class SyncAllNotifier extends StateNotifier<SyncAllState> {
     state = state.copyWith(isSyncing: true, error: null);
 
     try {
-      final repository = _ref.read(accountRepositoryProvider);
-      final notificationService = _ref.read(notificationServiceProvider);
+      final repository = ref.read(accountRepositoryProvider);
+      final notificationService = ref.read(notificationServiceProvider);
 
       final result = await repository.syncAllAccounts();
 
@@ -99,7 +97,7 @@ class SyncAllNotifier extends StateNotifier<SyncAllState> {
       );
 
       // Refresh accounts data
-      _ref.invalidate(accountsProvider);
+      ref.invalidate(accountsProvider);
     } catch (e) {
       state = state.copyWith(
         isSyncing: false,
@@ -110,13 +108,13 @@ class SyncAllNotifier extends StateNotifier<SyncAllState> {
 
   /// Check if sync should run based on suppression threshold.
   Future<bool> shouldSync() async {
-    final notificationService = _ref.read(notificationServiceProvider);
+    final notificationService = ref.read(notificationServiceProvider);
     return notificationService.shouldSync();
   }
 
   /// Try to sync on app open if enabled and not recently synced.
   Future<void> trySyncOnAppOpen() async {
-    final profile = await _ref.read(profileProvider.future);
+    final profile = await ref.read(profileProvider.future);
     if (profile == null || !profile.syncOnAppOpen) return;
 
     final shouldRun = await shouldSync();

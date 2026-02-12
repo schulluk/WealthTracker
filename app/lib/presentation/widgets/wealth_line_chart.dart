@@ -102,37 +102,37 @@ class _WealthLineChartState extends ConsumerState<WealthLineChart> {
                   label: '30d',
                   selected: chartRange == 30,
                   onTap: () =>
-                      ref.read(chartRangeProvider.notifier).state = 30,
+                      ref.read(chartRangeProvider.notifier).set(30),
                 ),
                 _RangeChip(
                   label: '90d',
                   selected: chartRange == 90,
                   onTap: () =>
-                      ref.read(chartRangeProvider.notifier).state = 90,
+                      ref.read(chartRangeProvider.notifier).set(90),
                 ),
                 _RangeChip(
                   label: '6m',
                   selected: chartRange == 180,
                   onTap: () =>
-                      ref.read(chartRangeProvider.notifier).state = 180,
+                      ref.read(chartRangeProvider.notifier).set(180),
                 ),
                 _RangeChip(
                   label: '1y',
                   selected: chartRange == 365,
                   onTap: () =>
-                      ref.read(chartRangeProvider.notifier).state = 365,
+                      ref.read(chartRangeProvider.notifier).set(365),
                 ),
                 _RangeChip(
                   label: '2y',
                   selected: chartRange == 730,
                   onTap: () =>
-                      ref.read(chartRangeProvider.notifier).state = 730,
+                      ref.read(chartRangeProvider.notifier).set(730),
                 ),
                 _RangeChip(
                   label: 'All',
                   selected: chartRange == 3650,
                   onTap: () =>
-                      ref.read(chartRangeProvider.notifier).state = 3650,
+                      ref.read(chartRangeProvider.notifier).set(3650),
                 ),
               ],
             ),
@@ -145,8 +145,7 @@ class _WealthLineChartState extends ConsumerState<WealthLineChart> {
               ],
               selected: {chartGranularity},
               onSelectionChanged: (selected) {
-                ref.read(chartGranularityProvider.notifier).state =
-                    selected.first;
+                ref.read(chartGranularityProvider.notifier).set(selected.first);
               },
               showSelectedIcon: false,
               style: ButtonStyle(

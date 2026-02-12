@@ -109,10 +109,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
       // Update local state
       if (range != null) {
-        ref.read(chartRangeProvider.notifier).state = range;
+        ref.read(chartRangeProvider.notifier).set(range);
       }
       if (granularity != null) {
-        ref.read(chartGranularityProvider.notifier).state = granularity;
+        ref.read(chartGranularityProvider.notifier).set(granularity);
       }
 
       if (mounted) {

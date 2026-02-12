@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../providers/core_providers.dart';
 
@@ -165,6 +166,14 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Text('Continue'),
+                  ),
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: () => launchUrl(
+                      Uri.parse('https://github.com/lsgd/wealth'),
+                      mode: LaunchMode.externalApplication,
+                    ),
+                    child: const Text("Don't have a server yet? Set one up"),
                   ),
                 ],
               ),

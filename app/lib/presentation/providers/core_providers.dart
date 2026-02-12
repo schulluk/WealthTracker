@@ -36,26 +36,25 @@ final biometricServiceProvider = Provider<BiometricService>((ref) {
 /// Provider for theme mode setting.
 /// Values: 'system', 'light', 'dark'
 final themeModeProvider =
-    StateNotifierProvider<ThemeModeNotifier, ThemeMode>((ref) {
-  final storage = ref.watch(secureStorageProvider);
-  return ThemeModeNotifier(storage);
-});
+    NotifierProvider<ThemeModeNotifier, ThemeMode>(ThemeModeNotifier.new);
 
-class ThemeModeNotifier extends StateNotifier<ThemeMode> {
-  final SecureStorageService _storage;
-
-  ThemeModeNotifier(this._storage) : super(ThemeMode.system) {
+class ThemeModeNotifier extends Notifier<ThemeMode> {
+  @override
+  ThemeMode build() {
     _load();
+    return ThemeMode.system;
   }
 
   Future<void> _load() async {
-    final mode = await _storage.getThemeMode();
+    final storage = ref.read(secureStorageProvider);
+    final mode = await storage.getThemeMode();
     state = _parseThemeMode(mode);
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
     state = mode;
-    await _storage.setThemeMode(_themeModeToString(mode));
+    final storage = ref.read(secureStorageProvider);
+    await storage.setThemeMode(_themeModeToString(mode));
   }
 
   ThemeMode _parseThemeMode(String value) {
@@ -84,24 +83,23 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
 /// Provider for date format setting.
 /// Values: 'system', 'dmy', 'mdy', 'ymd'
 final dateFormatProvider =
-    StateNotifierProvider<DateFormatNotifier, String>((ref) {
-  final storage = ref.watch(secureStorageProvider);
-  return DateFormatNotifier(storage);
-});
+    NotifierProvider<DateFormatNotifier, String>(DateFormatNotifier.new);
 
-class DateFormatNotifier extends StateNotifier<String> {
-  final SecureStorageService _storage;
-
-  DateFormatNotifier(this._storage) : super('system') {
+class DateFormatNotifier extends Notifier<String> {
+  @override
+  String build() {
     _load();
+    return 'system';
   }
 
   Future<void> _load() async {
-    state = await _storage.getDateFormat();
+    final storage = ref.read(secureStorageProvider);
+    state = await storage.getDateFormat();
   }
 
   Future<void> setDateFormat(String format) async {
     state = format;
-    await _storage.setDateFormat(format);
+    final storage = ref.read(secureStorageProvider);
+    await storage.setDateFormat(format);
   }
 }

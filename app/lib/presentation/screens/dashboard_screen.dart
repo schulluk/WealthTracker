@@ -381,7 +381,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                   data: (history) => WealthLineChart(
                     history: history,
                     currency:
-                        wealthSummary.valueOrNull?.baseCurrency ?? 'CHF',
+                        wealthSummary.value?.baseCurrency ?? 'CHF',
                   ),
                   loading: () => const _LoadingCard(height: 250),
                   error: (e, _) => _ErrorCard(message: e.toString()),
@@ -410,16 +410,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                       'Accounts',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
-                    if (accounts.valueOrNull != null) ...[
+                    if (accounts.value != null) ...[
                       const SizedBox(width: 8),
                       Text(
-                        '(${accounts.valueOrNull!.length})',
+                        '(${accounts.value!.length})',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
                     const Spacer(),
-                    if (accounts.valueOrNull != null &&
-                        _hasAutoSyncAccounts(accounts.valueOrNull!))
+                    if (accounts.value != null &&
+                        _hasAutoSyncAccounts(accounts.value!))
                       TextButton.icon(
                         onPressed: _syncingAll ? null : _syncAllAccounts,
                         icon: _syncingAll
@@ -465,7 +465,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                           child: AccountCard(
                             account: account,
                             baseCurrency:
-                                wealthSummary.valueOrNull?.baseCurrency ??
+                                wealthSummary.value?.baseCurrency ??
                                     'CHF',
                             onSnapshotAdded: _refresh,
                             onSync: canSync

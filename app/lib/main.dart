@@ -40,7 +40,7 @@ Future<void> _initializeNotifications() async {
   );
 
   await notifications.initialize(
-    settings,
+    settings: settings,
     onDidReceiveNotificationResponse: (response) {
       debugPrint('Notification tapped: ${response.payload}');
       if (response.payload != null) {
@@ -55,38 +55,38 @@ Future<void> _initializeNotifications() async {
       details?.notificationResponse != null) {
     initialNotificationResponse = details!.notificationResponse;
     debugPrint(
-        'App launched from notification: ${initialNotificationResponse?.payload}');
+      'App launched from notification: ${initialNotificationResponse?.payload}',
+    );
   }
 }
 
 void main() async {
-  await runZonedGuarded(() async {
-    WidgetsFlutterBinding.ensureInitialized();
+  await runZonedGuarded(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
 
-    // Initialize Firebase
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+      // Initialize Firebase
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
 
-    // Initialize notifications early to handle launch notifications
-    await _initializeNotifications();
+      // Initialize notifications early to handle launch notifications
+      await _initializeNotifications();
 
-    // Configure Crashlytics
-    if (!kDebugMode) {
-      // Pass all uncaught Flutter errors to Crashlytics
-      FlutterError.onError =
-          FirebaseCrashlytics.instance.recordFlutterFatalError;
-    }
+      // Configure Crashlytics
+      if (!kDebugMode) {
+        // Pass all uncaught Flutter errors to Crashlytics
+        FlutterError.onError =
+            FirebaseCrashlytics.instance.recordFlutterFatalError;
+      }
 
-    runApp(
-      const ProviderScope(
-        child: WealthApp(),
-      ),
-    );
-  }, (error, stack) {
-    // Pass all uncaught async errors to Crashlytics
-    if (!kDebugMode) {
-      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-    }
-  });
+      runApp(const ProviderScope(child: WealthApp()));
+    },
+    (error, stack) {
+      // Pass all uncaught async errors to Crashlytics
+      if (!kDebugMode) {
+        FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      }
+    },
+  );
 }
