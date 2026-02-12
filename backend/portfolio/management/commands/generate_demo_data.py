@@ -325,41 +325,47 @@ class Command(BaseCommand):
 
     def _generate_balances(self, count):
         """
-        Generate a list of balances with the specified trend logic.
+        Generate a list of balances with monthly trend logic.
 
-        Per 4 snapshots, money either grows monotonically or decreases monotonically.
-        70% probability of growth in a "month" (treated as 4 snapshots here).
+        Each "month" (4 snapshots), a total growth/decrease rate is picked.
+        Snapshots within that month interpolate monotonically toward the target.
         """
         balances = []
         current_balance = STARTING_BALANCE
 
         i = 0
         while i < count:
-            # Determine trend for next 4 snapshots
+            # Determine trend and total rate for this month
             is_growing = random.random() < GROWTH_PROBABILITY
 
-            # Generate 4 snapshots with this trend
-            for j in range(4):
-                if i + j >= count:
-                    break
+            if is_growing:
+                monthly_rate = GROWTH_RATE_MIN + Decimal(str(random.random())) * (
+                    GROWTH_RATE_MAX - GROWTH_RATE_MIN
+                )
+                end_balance = current_balance * (1 + monthly_rate)
+            else:
+                monthly_rate = DECREASE_RATE_MIN + Decimal(str(random.random())) * (
+                    DECREASE_RATE_MAX - DECREASE_RATE_MIN
+                )
+                end_balance = current_balance * (1 - monthly_rate)
 
-                balances.append(current_balance)
+            # How many snapshots in this chunk
+            chunk_size = min(4, count - i)
 
-                # Calculate next balance
-                if is_growing:
-                    rate = GROWTH_RATE_MIN + Decimal(str(random.random())) * (
-                        GROWTH_RATE_MAX - GROWTH_RATE_MIN
-                    )
-                    current_balance = current_balance * (1 + rate)
-                else:
-                    rate = DECREASE_RATE_MIN + Decimal(str(random.random())) * (
-                        DECREASE_RATE_MAX - DECREASE_RATE_MIN
-                    )
-                    current_balance = current_balance * (1 - rate)
+            # Pick random split points to distribute the move monotonically
+            # Generate sorted random fractions for intermediate steps
+            if chunk_size == 1:
+                fractions = [Decimal('1')]
+            else:
+                raw = sorted(random.random() for _ in range(chunk_size - 1))
+                fractions = [Decimal(str(r)) for r in raw] + [Decimal('1')]
 
-                # Round to 4 decimal places
-                current_balance = current_balance.quantize(Decimal('0.0001'))
+            delta = end_balance - current_balance
+            for f in fractions:
+                balance = current_balance + delta * f
+                balances.append(balance.quantize(Decimal('0.0001')))
 
-            i += 4
+            current_balance = end_balance.quantize(Decimal('0.0001'))
+            i += chunk_size
 
         return balances[:count]
