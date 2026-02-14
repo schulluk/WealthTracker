@@ -528,4 +528,4 @@ python manage.py send_wealth_report --users user1 user2
 
 ## License
 
-Private - All rights reserved
+MIT
