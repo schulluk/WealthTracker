@@ -31,8 +31,8 @@ wealth/
 
 ### Prerequisites
 
-- Python 3.9+
-- Node.js 18+
+- Python 3.14+
+- Node.js 22+
 - npm or yarn
 
 ### Backend Setup
