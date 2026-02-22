@@ -47,8 +47,8 @@ dependencies:
   cryptography: ^2.9.0
 
   # Local Notifications (for sync reminders)
-  flutter_local_notifications: ^20.1.0
-  timezone: ^0.10.1
+  flutter_local_notifications: ^21.0.0-dev.2
+  timezone: ^0.11.0
 
   # Shared Preferences (for last sync timestamp)
   shared_preferences: ^2.3.1
