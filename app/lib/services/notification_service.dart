@@ -7,6 +7,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
+import '../core/config/app_config.dart';
+import '../main.dart' show notificationTapStream;
+
 /// Result of a notification permission request.
 enum NotificationPermissionResult {
   /// Permission was granted.
@@ -32,8 +35,9 @@ class NotificationService {
       'Daily reminders to sync your accounts';
 
   /// Suppression threshold in hours. If last sync was within this time,
-  /// skip the notification.
-  static const int suppressionThresholdHours = 20;
+  /// skip the sync-on-app-open.
+  static const int suppressionThresholdHours =
+      AppConfig.syncSuppressionThresholdHours;
 
   final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
@@ -70,8 +74,10 @@ class NotificationService {
   }
 
   void _onNotificationTap(NotificationResponse response) {
-    // Notification tap handling - app will open automatically
     debugPrint('Notification tapped: ${response.payload}');
+    if (response.payload != null) {
+      notificationTapStream.add(response.payload!);
+    }
   }
 
   /// Check the current notification permission status.
@@ -235,12 +241,12 @@ class NotificationService {
 
   Future<int> getSyncReminderHour() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt(_syncReminderHourKey) ?? 9;
+    return prefs.getInt(_syncReminderHourKey) ?? AppConfig.defaultSyncReminderHour;
   }
 
   Future<int> getSyncReminderMinute() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt(_syncReminderMinuteKey) ?? 0;
+    return prefs.getInt(_syncReminderMinuteKey) ?? AppConfig.defaultSyncReminderMinute;
   }
 
   Future<void> setSyncReminderTime(int hour, int minute) async {

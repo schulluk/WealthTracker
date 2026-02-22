@@ -1,5 +1,7 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../core/config/app_config.dart';
+
 /// Service for securely storing sensitive data like tokens and server URL.
 class SecureStorageService {
   static const _serverUrlKey = 'server_url';
@@ -76,7 +78,7 @@ class SecureStorageService {
 
   Future<String> getThemeMode() async {
     final value = await _storage.read(key: _themeModeKey);
-    return value ?? 'system';
+    return value ?? AppConfig.defaultThemeMode;
   }
 
   Future<void> setThemeMode(String mode) =>
@@ -86,7 +88,7 @@ class SecureStorageService {
 
   Future<String> getDateFormat() async {
     final value = await _storage.read(key: _dateFormatKey);
-    return value ?? 'system';
+    return value ?? AppConfig.defaultDateFormat;
   }
 
   Future<void> setDateFormat(String format) =>

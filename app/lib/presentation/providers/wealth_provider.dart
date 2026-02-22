@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/config/app_config.dart';
 import '../../data/models/wealth_summary.dart';
 import '../../data/repositories/wealth_repository.dart';
 import 'core_providers.dart';
@@ -24,7 +25,7 @@ class ChartRangeNotifier extends Notifier<int> {
   @override
   int build() {
     final profile = ref.watch(profileProvider);
-    return profile.whenOrNull(data: (p) => p?.defaultChartRange) ?? 365;
+    return profile.whenOrNull(data: (p) => p?.defaultChartRange) ?? AppConfig.defaultChartRange;
   }
 
   void set(int value) => state = value;
@@ -37,7 +38,7 @@ class ChartGranularityNotifier extends Notifier<String> {
   @override
   String build() {
     final profile = ref.watch(profileProvider);
-    return profile.whenOrNull(data: (p) => p?.defaultChartGranularity) ?? 'daily';
+    return profile.whenOrNull(data: (p) => p?.defaultChartGranularity) ?? AppConfig.defaultChartGranularity;
   }
 
   void set(String value) => state = value;

@@ -99,7 +99,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   }
 
   Future<void> _checkSyncOnAppOpen() async {
-    if (!mounted) return;
+    if (!mounted || _syncingAll) return;
 
     try {
       await ref.read(syncAllProvider.notifier).trySyncOnAppOpen();
