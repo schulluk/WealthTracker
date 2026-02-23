@@ -60,6 +60,9 @@ Thumbs.db
 *.pem
 *.key
 credentials.json
+key.properties
+*.jks
+*.keystore
 
 # Data directory
 data/

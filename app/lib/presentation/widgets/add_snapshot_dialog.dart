@@ -21,6 +21,7 @@ class AddSnapshotDialog extends ConsumerStatefulWidget {
 class _AddSnapshotDialogState extends ConsumerState<AddSnapshotDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _balanceController;
+  late final FocusNode _balanceFocusNode;
   late String _currency;
   late DateTime _date;
   bool _loading = false;
@@ -31,8 +32,18 @@ class _AddSnapshotDialogState extends ConsumerState<AddSnapshotDialog> {
   @override
   void initState() {
     super.initState();
-    // Start with empty balance field
-    _balanceController = TextEditingController();
+    _balanceController = TextEditingController(
+      text: widget.account.latestSnapshot?.balance ?? '',
+    );
+    _balanceFocusNode = FocusNode();
+    _balanceFocusNode.addListener(() {
+      if (_balanceFocusNode.hasFocus && _balanceController.text.isNotEmpty) {
+        _balanceController.selection = TextSelection(
+          baseOffset: 0,
+          extentOffset: _balanceController.text.length,
+        );
+      }
+    });
     _currency = widget.account.currency;
     _date = DateTime.now();
   }
@@ -40,6 +51,7 @@ class _AddSnapshotDialogState extends ConsumerState<AddSnapshotDialog> {
   @override
   void dispose() {
     _balanceController.dispose();
+    _balanceFocusNode.dispose();
     super.dispose();
   }
 
@@ -126,6 +138,7 @@ class _AddSnapshotDialogState extends ConsumerState<AddSnapshotDialog> {
               ],
               TextFormField(
                 controller: _balanceController,
+                focusNode: _balanceFocusNode,
                 decoration: InputDecoration(
                   labelText: 'Balance',
                   prefixText: '$_currency ',

@@ -23,6 +23,7 @@ class QuickSnapshotSheet extends ConsumerStatefulWidget {
 class _QuickSnapshotSheetState extends ConsumerState<QuickSnapshotSheet>
     with SingleTickerProviderStateMixin {
   final Map<int, TextEditingController> _controllers = {};
+  final Map<int, FocusNode> _focusNodes = {};
   final Set<int> _submitting = {};
   final Set<int> _completed = {};
   final Map<int, String> _errors = {};
@@ -34,8 +35,21 @@ class _QuickSnapshotSheetState extends ConsumerState<QuickSnapshotSheet>
     super.initState();
     _visibleAccounts = List.from(widget.accounts);
     for (final account in widget.accounts) {
-      // Empty field - user must enter the balance
-      _controllers[account.id] = TextEditingController();
+      final controller = TextEditingController(
+        text: account.latestSnapshot?.balance ?? '',
+      );
+      _controllers[account.id] = controller;
+
+      final focusNode = FocusNode();
+      focusNode.addListener(() {
+        if (focusNode.hasFocus && controller.text.isNotEmpty) {
+          controller.selection = TextSelection(
+            baseOffset: 0,
+            extentOffset: controller.text.length,
+          );
+        }
+      });
+      _focusNodes[account.id] = focusNode;
     }
   }
 
@@ -43,6 +57,9 @@ class _QuickSnapshotSheetState extends ConsumerState<QuickSnapshotSheet>
   void dispose() {
     for (final controller in _controllers.values) {
       controller.dispose();
+    }
+    for (final focusNode in _focusNodes.values) {
+      focusNode.dispose();
     }
     super.dispose();
   }
@@ -84,6 +101,7 @@ class _QuickSnapshotSheetState extends ConsumerState<QuickSnapshotSheet>
                     Expanded(
                       child: TextField(
                         controller: _controllers[account.id],
+                        focusNode: _focusNodes[account.id],
                         keyboardType:
                             const TextInputType.numberWithOptions(decimal: true),
                         decoration: InputDecoration(
