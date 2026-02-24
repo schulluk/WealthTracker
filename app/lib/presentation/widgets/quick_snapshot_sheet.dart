@@ -24,6 +24,7 @@ class _QuickSnapshotSheetState extends ConsumerState<QuickSnapshotSheet>
     with SingleTickerProviderStateMixin {
   final Map<int, TextEditingController> _controllers = {};
   final Map<int, FocusNode> _focusNodes = {};
+  final Map<int, GlobalKey> _cardKeys = {};
   final Set<int> _submitting = {};
   final Set<int> _completed = {};
   final Map<int, String> _errors = {};
@@ -40,13 +41,29 @@ class _QuickSnapshotSheetState extends ConsumerState<QuickSnapshotSheet>
       );
       _controllers[account.id] = controller;
 
+      final cardKey = GlobalKey();
+      _cardKeys[account.id] = cardKey;
+
       final focusNode = FocusNode();
       focusNode.addListener(() {
-        if (focusNode.hasFocus && controller.text.isNotEmpty) {
-          controller.selection = TextSelection(
-            baseOffset: 0,
-            extentOffset: controller.text.length,
-          );
+        if (focusNode.hasFocus) {
+          if (controller.text.isNotEmpty) {
+            controller.selection = TextSelection(
+              baseOffset: 0,
+              extentOffset: controller.text.length,
+            );
+          }
+          // Scroll to keep the focused field visible above the keyboard
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            final ctx = cardKey.currentContext;
+            if (ctx != null) {
+              Scrollable.ensureVisible(
+                ctx,
+                alignment: 0.5,
+                duration: const Duration(milliseconds: 300),
+              );
+            }
+          });
         }
       });
       _focusNodes[account.id] = focusNode;
@@ -77,6 +94,7 @@ class _QuickSnapshotSheetState extends ConsumerState<QuickSnapshotSheet>
       child: FadeTransition(
         opacity: animation,
         child: Card(
+          key: isRemoving ? null : _cardKeys[account.id],
           margin: const EdgeInsets.only(bottom: 12),
           child: Padding(
             padding: const EdgeInsets.all(16),

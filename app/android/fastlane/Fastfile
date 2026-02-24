@@ -15,7 +15,7 @@ platform :android do
       skip_upload_metadata: true,
       skip_upload_images: true,
       skip_upload_screenshots: true,
-      json_key: ENV['PLAY_STORE_JSON_KEY'] || File.join(__dir__, "play-store-key.json")
+      json_key: ENV['PLAY_STORE_JSON_KEY'] || File.expand_path("play-store-key.json", __dir__)
     )
   end
 
@@ -33,7 +33,7 @@ platform :android do
       skip_upload_metadata: true,
       skip_upload_images: true,
       skip_upload_screenshots: true,
-      json_key: ENV['PLAY_STORE_JSON_KEY'] || File.join(__dir__, "play-store-key.json")
+      json_key: ENV['PLAY_STORE_JSON_KEY'] || File.expand_path("play-store-key.json", __dir__)
     )
   end
 
@@ -51,7 +51,7 @@ platform :android do
       skip_upload_metadata: true,
       skip_upload_images: true,
       skip_upload_screenshots: true,
-      json_key: ENV['PLAY_STORE_JSON_KEY'] || File.join(__dir__, "play-store-key.json")
+      json_key: ENV['PLAY_STORE_JSON_KEY'] || File.expand_path("play-store-key.json", __dir__)
     )
   end
 
@@ -77,7 +77,7 @@ platform :android do
       skip_upload_metadata: true,
       skip_upload_images: true,
       skip_upload_screenshots: true,
-      json_key: ENV['PLAY_STORE_JSON_KEY'] || File.join(__dir__, "play-store-key.json")
+      json_key: ENV['PLAY_STORE_JSON_KEY'] || File.expand_path("play-store-key.json", __dir__)
     )
   end
 
@@ -90,7 +90,7 @@ platform :android do
       skip_upload_metadata: true,
       skip_upload_images: true,
       skip_upload_screenshots: true,
-      json_key: ENV['PLAY_STORE_JSON_KEY'] || File.join(__dir__, "play-store-key.json")
+      json_key: ENV['PLAY_STORE_JSON_KEY'] || File.expand_path("play-store-key.json", __dir__)
     )
   end
 end
