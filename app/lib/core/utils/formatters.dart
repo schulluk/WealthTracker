@@ -24,7 +24,10 @@ String formatCurrencyCompact(double value, String currency) {
 /// Compact number formatter for chart axis (no currency symbol).
 String formatChartAxisValue(double value) {
   if (value >= 1000000) {
-    return '${(value / 1000000).toStringAsFixed(1)}M';
+    final m = value / 1000000;
+    // Use enough decimals to avoid duplicate labels (e.g. 1.05M vs 1.1M)
+    final s = m.toStringAsFixed(2).replaceFirst(RegExp(r'\.?0+$'), '');
+    return '${s}M';
   } else if (value >= 1000) {
     return '${(value / 1000).toStringAsFixed(0)}K';
   }

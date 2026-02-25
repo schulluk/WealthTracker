@@ -32,9 +32,11 @@ class _AddSnapshotDialogState extends ConsumerState<AddSnapshotDialog> {
   @override
   void initState() {
     super.initState();
-    _balanceController = TextEditingController(
-      text: widget.account.latestSnapshot?.balance ?? '',
-    );
+    final rawBalance = widget.account.latestSnapshot?.balance;
+    final prefill = rawBalance != null
+        ? (double.tryParse(rawBalance)?.toStringAsFixed(2) ?? rawBalance)
+        : '';
+    _balanceController = TextEditingController(text: prefill);
     _balanceFocusNode = FocusNode();
     _balanceFocusNode.addListener(() {
       if (_balanceFocusNode.hasFocus && _balanceController.text.isNotEmpty) {

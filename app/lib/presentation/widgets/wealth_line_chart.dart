@@ -237,7 +237,7 @@ class _WealthLineChartState extends ConsumerState<WealthLineChart> {
                     leftTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
-                        reservedSize: 50,
+                        reservedSize: 55,
                         interval: gridInterval,
                         getTitlesWidget: (value, meta) {
                           return Text(
@@ -328,7 +328,7 @@ class _WealthLineChartState extends ConsumerState<WealthLineChart> {
                     },
                     // Disable tooltip overlay - info shown above chart
                     touchTooltipData: LineTouchTooltipData(
-                      getTooltipItems: (_) => [],
+                      getTooltipItems: (spots) => spots.map((_) => null).toList(),
                     ),
                     getTouchedSpotIndicator: (barData, spotIndexes) {
                       return spotIndexes.map((index) {

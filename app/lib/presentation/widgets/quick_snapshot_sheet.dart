@@ -21,7 +21,7 @@ class QuickSnapshotSheet extends ConsumerStatefulWidget {
 }
 
 class _QuickSnapshotSheetState extends ConsumerState<QuickSnapshotSheet>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final Map<int, TextEditingController> _controllers = {};
   final Map<int, FocusNode> _focusNodes = {};
   final Map<int, GlobalKey> _cardKeys = {};
@@ -34,11 +34,14 @@ class _QuickSnapshotSheetState extends ConsumerState<QuickSnapshotSheet>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _visibleAccounts = List.from(widget.accounts);
     for (final account in widget.accounts) {
-      final controller = TextEditingController(
-        text: account.latestSnapshot?.balance ?? '',
-      );
+      final rawBalance = account.latestSnapshot?.balance;
+      final prefill = rawBalance != null
+          ? (double.tryParse(rawBalance)?.toStringAsFixed(2) ?? rawBalance)
+          : '';
+      final controller = TextEditingController(text: prefill);
       _controllers[account.id] = controller;
 
       final cardKey = GlobalKey();
@@ -53,17 +56,8 @@ class _QuickSnapshotSheetState extends ConsumerState<QuickSnapshotSheet>
               extentOffset: controller.text.length,
             );
           }
-          // Scroll to keep the focused field visible above the keyboard
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            final ctx = cardKey.currentContext;
-            if (ctx != null) {
-              Scrollable.ensureVisible(
-                ctx,
-                alignment: 0.5,
-                duration: const Duration(milliseconds: 300),
-              );
-            }
-          });
+          // Scroll when switching fields while keyboard is already open
+          _scrollToFocusedField();
         }
       });
       _focusNodes[account.id] = focusNode;
@@ -72,6 +66,7 @@ class _QuickSnapshotSheetState extends ConsumerState<QuickSnapshotSheet>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     for (final controller in _controllers.values) {
       controller.dispose();
     }
@@ -79,6 +74,32 @@ class _QuickSnapshotSheetState extends ConsumerState<QuickSnapshotSheet>
       focusNode.dispose();
     }
     super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    // Called when system metrics change (keyboard appears/disappears).
+    // Fires during the animation, so the scroll adjusts progressively.
+    _scrollToFocusedField();
+  }
+
+  void _scrollToFocusedField() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      for (final entry in _focusNodes.entries) {
+        if (entry.value.hasFocus) {
+          final ctx = _cardKeys[entry.key]?.currentContext;
+          if (ctx != null) {
+            Scrollable.ensureVisible(
+              ctx,
+              alignment: 0.5,
+              duration: const Duration(milliseconds: 200),
+            );
+          }
+          break;
+        }
+      }
+    });
   }
 
   Widget _buildAccountCard(
