@@ -12,18 +12,16 @@
 #   ./release.sh all beta      # Upload both to beta channels
 #   ./release.sh ios build     # Build iOS IPA locally
 #   ./release.sh android build # Build Android APK/AAB locally
+#
+# Version is read from CHANGELOG.md (## Next: X.Y.Z heading).
+# Build numbers are auto-generated:
+#   Android: seconds since 2026-03-01 UTC
+#   iOS: latest TestFlight build number + 1
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
-
-# Load environment variables from .env if it exists
-if [ -f ".env" ]; then
-    set -a
-    source .env
-    set +a
-fi
 
 # Colors for output
 RED='\033[0;31m'
@@ -69,25 +67,6 @@ check_dependencies() {
     fi
     print_success "Fastlane found: $(fastlane --version | head -1)"
 
-}
-
-increment_version() {
-    print_header "Incrementing Build Number"
-
-    # Read current version from pubspec.yaml
-    CURRENT_VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //')
-    VERSION_NAME=$(echo "$CURRENT_VERSION" | cut -d'+' -f1)
-    BUILD_NUMBER=$(echo "$CURRENT_VERSION" | cut -d'+' -f2)
-
-    # Increment build number
-    NEW_BUILD_NUMBER=$((BUILD_NUMBER + 1))
-    NEW_VERSION="${VERSION_NAME}+${NEW_BUILD_NUMBER}"
-
-    # Update pubspec.yaml
-    sed -i '' "s/^version: .*/version: ${NEW_VERSION}/" pubspec.yaml
-
-    print_success "Version updated: $CURRENT_VERSION → $NEW_VERSION"
-    export BUILD_NUMBER=$NEW_BUILD_NUMBER
 }
 
 prepare_flutter() {
@@ -186,11 +165,6 @@ echo "Lane: $LANE"
 echo ""
 
 check_dependencies
-
-if [ "$LANE" != "build" ]; then
-    increment_version
-fi
-
 prepare_flutter
 
 case $PLATFORM in

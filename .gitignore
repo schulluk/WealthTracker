@@ -64,5 +64,8 @@ key.properties
 *.jks
 *.keystore
 
+# Release artifacts
+app/_releases/
+
 # Data directory
 data/
