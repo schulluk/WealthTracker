@@ -36,7 +36,9 @@ mixin _$Profile {
   @JsonKey(name: 'push_weekly_report')
   bool get pushWeeklyReport => throw _privateConstructorUsedError;
   @JsonKey(name: 'sync_on_app_open')
-  bool get syncOnAppOpen => throw _privateConstructorUsedError; // Encryption status
+  bool get syncOnAppOpen => throw _privateConstructorUsedError;
+  @JsonKey(name: 'monthly_aggregation')
+  String get monthlyAggregation => throw _privateConstructorUsedError; // Encryption status
   @JsonKey(name: 'encryption_migrated')
   bool get encryptionMigrated => throw _privateConstructorUsedError;
 
@@ -63,6 +65,7 @@ abstract class $ProfileCopyWith<$Res> {
     @JsonKey(name: 'push_notifications_enabled') bool pushNotificationsEnabled,
     @JsonKey(name: 'push_weekly_report') bool pushWeeklyReport,
     @JsonKey(name: 'sync_on_app_open') bool syncOnAppOpen,
+    @JsonKey(name: 'monthly_aggregation') String monthlyAggregation,
     @JsonKey(name: 'encryption_migrated') bool encryptionMigrated,
   });
 }
@@ -90,6 +93,7 @@ class _$ProfileCopyWithImpl<$Res, $Val extends Profile>
     Object? pushNotificationsEnabled = null,
     Object? pushWeeklyReport = null,
     Object? syncOnAppOpen = null,
+    Object? monthlyAggregation = null,
     Object? encryptionMigrated = null,
   }) {
     return _then(
@@ -126,6 +130,10 @@ class _$ProfileCopyWithImpl<$Res, $Val extends Profile>
                 ? _value.syncOnAppOpen
                 : syncOnAppOpen // ignore: cast_nullable_to_non_nullable
                       as bool,
+            monthlyAggregation: null == monthlyAggregation
+                ? _value.monthlyAggregation
+                : monthlyAggregation // ignore: cast_nullable_to_non_nullable
+                      as String,
             encryptionMigrated: null == encryptionMigrated
                 ? _value.encryptionMigrated
                 : encryptionMigrated // ignore: cast_nullable_to_non_nullable
@@ -153,6 +161,7 @@ abstract class _$$ProfileImplCopyWith<$Res> implements $ProfileCopyWith<$Res> {
     @JsonKey(name: 'push_notifications_enabled') bool pushNotificationsEnabled,
     @JsonKey(name: 'push_weekly_report') bool pushWeeklyReport,
     @JsonKey(name: 'sync_on_app_open') bool syncOnAppOpen,
+    @JsonKey(name: 'monthly_aggregation') String monthlyAggregation,
     @JsonKey(name: 'encryption_migrated') bool encryptionMigrated,
   });
 }
@@ -179,6 +188,7 @@ class __$$ProfileImplCopyWithImpl<$Res>
     Object? pushNotificationsEnabled = null,
     Object? pushWeeklyReport = null,
     Object? syncOnAppOpen = null,
+    Object? monthlyAggregation = null,
     Object? encryptionMigrated = null,
   }) {
     return _then(
@@ -215,6 +225,10 @@ class __$$ProfileImplCopyWithImpl<$Res>
             ? _value.syncOnAppOpen
             : syncOnAppOpen // ignore: cast_nullable_to_non_nullable
                   as bool,
+        monthlyAggregation: null == monthlyAggregation
+            ? _value.monthlyAggregation
+            : monthlyAggregation // ignore: cast_nullable_to_non_nullable
+                  as String,
         encryptionMigrated: null == encryptionMigrated
             ? _value.encryptionMigrated
             : encryptionMigrated // ignore: cast_nullable_to_non_nullable
@@ -238,6 +252,7 @@ class _$ProfileImpl implements _Profile {
     this.pushNotificationsEnabled = true,
     @JsonKey(name: 'push_weekly_report') this.pushWeeklyReport = false,
     @JsonKey(name: 'sync_on_app_open') this.syncOnAppOpen = false,
+    @JsonKey(name: 'monthly_aggregation') this.monthlyAggregation = 'last',
     @JsonKey(name: 'encryption_migrated') this.encryptionMigrated = false,
   });
 
@@ -268,6 +283,9 @@ class _$ProfileImpl implements _Profile {
   @override
   @JsonKey(name: 'sync_on_app_open')
   final bool syncOnAppOpen;
+  @override
+  @JsonKey(name: 'monthly_aggregation')
+  final String monthlyAggregation;
   // Encryption status
   @override
   @JsonKey(name: 'encryption_migrated')
@@ -275,7 +293,7 @@ class _$ProfileImpl implements _Profile {
 
   @override
   String toString() {
-    return 'Profile(baseCurrency: $baseCurrency, autoSyncEnabled: $autoSyncEnabled, sendWeeklyReport: $sendWeeklyReport, defaultChartRange: $defaultChartRange, defaultChartGranularity: $defaultChartGranularity, pushNotificationsEnabled: $pushNotificationsEnabled, pushWeeklyReport: $pushWeeklyReport, syncOnAppOpen: $syncOnAppOpen, encryptionMigrated: $encryptionMigrated)';
+    return 'Profile(baseCurrency: $baseCurrency, autoSyncEnabled: $autoSyncEnabled, sendWeeklyReport: $sendWeeklyReport, defaultChartRange: $defaultChartRange, defaultChartGranularity: $defaultChartGranularity, pushNotificationsEnabled: $pushNotificationsEnabled, pushWeeklyReport: $pushWeeklyReport, syncOnAppOpen: $syncOnAppOpen, monthlyAggregation: $monthlyAggregation, encryptionMigrated: $encryptionMigrated)';
   }
 
   @override
@@ -305,6 +323,8 @@ class _$ProfileImpl implements _Profile {
                 other.pushWeeklyReport == pushWeeklyReport) &&
             (identical(other.syncOnAppOpen, syncOnAppOpen) ||
                 other.syncOnAppOpen == syncOnAppOpen) &&
+            (identical(other.monthlyAggregation, monthlyAggregation) ||
+                other.monthlyAggregation == monthlyAggregation) &&
             (identical(other.encryptionMigrated, encryptionMigrated) ||
                 other.encryptionMigrated == encryptionMigrated));
   }
@@ -321,6 +341,7 @@ class _$ProfileImpl implements _Profile {
     pushNotificationsEnabled,
     pushWeeklyReport,
     syncOnAppOpen,
+    monthlyAggregation,
     encryptionMigrated,
   );
 
@@ -350,6 +371,7 @@ abstract class _Profile implements Profile {
     final bool pushNotificationsEnabled,
     @JsonKey(name: 'push_weekly_report') final bool pushWeeklyReport,
     @JsonKey(name: 'sync_on_app_open') final bool syncOnAppOpen,
+    @JsonKey(name: 'monthly_aggregation') final String monthlyAggregation,
     @JsonKey(name: 'encryption_migrated') final bool encryptionMigrated,
   }) = _$ProfileImpl;
 
@@ -378,7 +400,10 @@ abstract class _Profile implements Profile {
   bool get pushWeeklyReport;
   @override
   @JsonKey(name: 'sync_on_app_open')
-  bool get syncOnAppOpen; // Encryption status
+  bool get syncOnAppOpen;
+  @override
+  @JsonKey(name: 'monthly_aggregation')
+  String get monthlyAggregation; // Encryption status
   @override
   @JsonKey(name: 'encryption_migrated')
   bool get encryptionMigrated;

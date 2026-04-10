@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/models/account.dart';
+import '../../data/repositories/account_repository.dart';
 import 'dart:async';
 
 import '../../main.dart' show initialNotificationResponse, notificationTapStream;
@@ -147,20 +148,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     if (_syncingAccounts.contains(account.id)) return;
 
     setState(() => _syncingAccounts.add(account.id));
-
-    // Show hint that some banks may require 2FA approval
     _showSyncHint();
 
     try {
       final repo = ref.read(accountRepositoryProvider);
-      final result = await repo.syncAccount(account.id);
-      await _refresh();
+      final startResult = await repo.syncAccount(account.id);
+      final taskId = startResult['task_id'] as String?;
 
-      if (mounted) {
-        final status = result['status'] as String?;
-        final message = result['message'] as String?;
-        if (status == 'success' && message != null) {
-          _showSuccessSnackBar(message);
+      if (taskId != null) {
+        final result = await _pollSyncTask(repo, taskId);
+        await _refresh();
+        if (mounted) {
+          final message = result?['message'] as String?;
+          if (message != null) _showSuccessSnackBar(message);
         }
       }
     } catch (e) {
@@ -180,27 +180,42 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     if (_syncingAll || !mounted) return;
 
     setState(() => _syncingAll = true);
-
-    // Show hint that some banks may require approval
     if (mounted) _showSyncHint();
 
     try {
       final repo = ref.read(accountRepositoryProvider);
-      final result = await repo.syncAllAccounts();
+      final startResult = await repo.syncAllAccounts();
+      final taskId = startResult['task_id'] as String?;
+
+      if (taskId == null) {
+        // No task created (e.g. no accounts to sync)
+        await _refresh();
+        if (mounted) {
+          _showSuccessSnackBar(startResult['message'] as String? ?? 'Done');
+        }
+        return;
+      }
+
+      final result = await _pollSyncTask(repo, taskId);
       await _refresh();
 
-      if (mounted) {
-        final syncedCount = (result['synced'] as List?)?.length ?? 0;
-        final errors = result['errors'] as List? ?? [];
-        final skippedCount = (result['skipped'] as List?)?.length ?? 0;
+      if (mounted && result != null) {
+        final details = result['result'] as Map<String, dynamic>?;
+        if (details != null) {
+          final syncedCount = details['synced_count'] as int? ?? 0;
+          final errors = (details['details'] as Map?)?['errors'] as List? ?? [];
 
-        if (errors.isNotEmpty) {
-          // Show error dialog with summary
-          _showSyncErrorsDialog(errors, syncedCount: syncedCount);
-        } else if (syncedCount > 0) {
-          _showSuccessSnackBar('Synced $syncedCount account${syncedCount == 1 ? '' : 's'}');
-        } else {
-          _showSuccessSnackBar(skippedCount > 0 ? 'All accounts up to date' : 'No accounts to sync');
+          if (errors.isNotEmpty) {
+            _showSyncErrorsDialog(errors, syncedCount: syncedCount);
+          } else if (syncedCount > 0) {
+            _showSuccessSnackBar('Synced $syncedCount account${syncedCount == 1 ? '' : 's'}');
+          } else {
+            _showSuccessSnackBar('All accounts up to date');
+          }
+        } else if (result['error'] != null) {
+          _showSyncErrorsDialog([
+            {'name': 'Sync', 'error': result['error']}
+          ]);
         }
       }
     } catch (e) {
@@ -214,6 +229,32 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         setState(() => _syncingAll = false);
       }
     }
+  }
+
+  /// Poll a sync task until it completes or fails.
+  Future<Map<String, dynamic>?> _pollSyncTask(
+    AccountRepository repo,
+    String taskId,
+  ) async {
+    const pollInterval = Duration(seconds: 2);
+    const maxPolls = 180; // 6 minutes max
+
+    for (var i = 0; i < maxPolls; i++) {
+      await Future.delayed(pollInterval);
+      if (!mounted) return null;
+
+      try {
+        final status = await repo.getSyncTaskStatus(taskId);
+        final taskStatus = status['status'] as String?;
+
+        if (taskStatus == 'completed' || taskStatus == 'failed') {
+          return status;
+        }
+      } catch (_) {
+        // Status endpoint failed — keep polling
+      }
+    }
+    return null;
   }
 
   void _showSuccessSnackBar(String message) {

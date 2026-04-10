@@ -17,6 +17,7 @@ class Profile with _$Profile {
     bool pushNotificationsEnabled,
     @JsonKey(name: 'push_weekly_report') @Default(false) bool pushWeeklyReport,
     @JsonKey(name: 'sync_on_app_open') @Default(false) bool syncOnAppOpen,
+    @JsonKey(name: 'monthly_aggregation') @Default('last') String monthlyAggregation,
     // Encryption status
     @JsonKey(name: 'encryption_migrated')
     @Default(false)

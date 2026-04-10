@@ -28,20 +28,57 @@ class ChartRangeNotifier extends Notifier<int> {
     return profile.whenOrNull(data: (p) => p?.defaultChartRange) ?? AppConfig.defaultChartRange;
   }
 
-  void set(int value) => state = value;
+  void set(int value) {
+    final granularity = ref.read(chartGranularityProvider.notifier);
+    if (value <= 30) {
+      // Force daily for short ranges; remember previous granularity
+      granularity.forceDaily();
+    } else {
+      // Restore previous granularity when leaving short range
+      granularity.restorePrevious();
+    }
+    state = value;
+  }
 }
 
 /// Provider for chart granularity setting.
 final chartGranularityProvider = NotifierProvider<ChartGranularityNotifier, String>(ChartGranularityNotifier.new);
 
 class ChartGranularityNotifier extends Notifier<String> {
+  String? _savedGranularity;
+  bool _forced = false;
+
   @override
   String build() {
     final profile = ref.watch(profileProvider);
     return profile.whenOrNull(data: (p) => p?.defaultChartGranularity) ?? AppConfig.defaultChartGranularity;
   }
 
-  void set(String value) => state = value;
+  void set(String value) {
+    _forced = false;
+    _savedGranularity = null;
+    state = value;
+  }
+
+  /// Force daily granularity (e.g. for 30d range). Saves previous value.
+  void forceDaily() {
+    if (!_forced && state != 'daily') {
+      _savedGranularity = state;
+    }
+    _forced = true;
+    state = 'daily';
+  }
+
+  /// Restore the granularity saved before forceDaily was called.
+  void restorePrevious() {
+    if (_forced && _savedGranularity != null) {
+      state = _savedGranularity!;
+      _savedGranularity = null;
+    }
+    _forced = false;
+  }
+
+  bool get isForced => _forced;
 }
 
 /// Provider for wealth history based on current chart settings.

@@ -32,4 +32,7 @@ class ApiConfig {
       '/api/accounts/$accountId/sync/';
 
   static const String syncAllPath = '/api/accounts/sync/';
+
+  static String syncTaskStatusPath(String taskId) =>
+      '/api/accounts/sync/$taskId/';
 }

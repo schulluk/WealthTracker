@@ -57,8 +57,9 @@ class SyncAllNotifier extends Notifier<SyncAllState> {
     }
   }
 
-  /// Sync all accounts.
+  /// Sync all accounts via background task queue.
   ///
+  /// Starts sync (returns immediately), then polls for completion.
   /// Records the sync timestamp for notification suppression.
   Future<void> syncAll() async {
     if (state.isSyncing) return;
@@ -69,24 +70,33 @@ class SyncAllNotifier extends Notifier<SyncAllState> {
       final repository = ref.read(accountRepositoryProvider);
       final notificationService = ref.read(notificationServiceProvider);
 
-      final result = await repository.syncAllAccounts();
+      final startResult = await repository.syncAllAccounts();
+      final taskId = startResult['task_id'] as String?;
 
-      // Extract results
-      final results = result['results'] as List<dynamic>?;
+      if (taskId == null) {
+        // No task created (e.g. no accounts to sync)
+        await notificationService.recordSyncAll();
+        state = state.copyWith(
+          isSyncing: false,
+          lastSyncTime: DateTime.now(),
+        );
+        return;
+      }
+
+      // Poll for completion
+      final result = await _pollTask(repository, taskId);
+
       int successCount = 0;
       int failureCount = 0;
 
-      if (results != null) {
-        for (final r in results) {
-          if (r['status'] == 'success') {
-            successCount++;
-          } else {
-            failureCount++;
-          }
+      if (result != null) {
+        final details = result['result'] as Map<String, dynamic>?;
+        if (details != null) {
+          successCount = details['synced_count'] as int? ?? 0;
+          failureCount = details['error_count'] as int? ?? 0;
         }
       }
 
-      // Record sync timestamp
       await notificationService.recordSyncAll();
 
       state = state.copyWith(
@@ -96,7 +106,6 @@ class SyncAllNotifier extends Notifier<SyncAllState> {
         failureCount: failureCount,
       );
 
-      // Refresh accounts data
       ref.invalidate(accountsProvider);
     } catch (e) {
       state = state.copyWith(
@@ -104,6 +113,29 @@ class SyncAllNotifier extends Notifier<SyncAllState> {
         error: e.toString(),
       );
     }
+  }
+
+  /// Poll a sync task until completion.
+  Future<Map<String, dynamic>?> _pollTask(
+    dynamic repository,
+    String taskId,
+  ) async {
+    const pollInterval = Duration(seconds: 2);
+    const maxPolls = 180; // 6 minutes
+
+    for (var i = 0; i < maxPolls; i++) {
+      await Future.delayed(pollInterval);
+      try {
+        final status = await repository.getSyncTaskStatus(taskId);
+        final taskStatus = status['status'] as String?;
+        if (taskStatus == 'completed' || taskStatus == 'failed') {
+          return status;
+        }
+      } catch (_) {
+        // Keep polling
+      }
+    }
+    return null;
   }
 
   /// Check if sync should run based on suppression threshold.

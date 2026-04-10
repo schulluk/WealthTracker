@@ -221,9 +221,10 @@ class _QuickSnapshotSheetState extends ConsumerState<QuickSnapshotSheet>
       // Refresh the accounts provider so the banner updates
       ref.invalidate(accountsProvider);
 
-      // Check if all done
+      // Auto-close after last account is submitted
       if (_visibleAccounts.isEmpty) {
-        setState(() {});
+        widget.onSnapshotsAdded();
+        return;
       }
     } catch (e) {
       setState(() {

@@ -72,23 +72,24 @@ class AccountRepository {
     await _apiClient.delete(ApiConfig.snapshotDetailPath(snapshotId));
   }
 
-  /// Trigger sync for a single account.
-  /// Uses extended timeout for 2FA approval (up to 5 minutes for banking app).
+  /// Start sync for a single account (returns immediately with task ID).
   Future<Map<String, dynamic>> syncAccount(int accountId) async {
     final response = await _apiClient.post(
       ApiConfig.accountSyncPath(accountId),
-      timeout: ApiConfig.syncTimeout,
     );
     return response.data as Map<String, dynamic>;
   }
 
-  /// Trigger sync for all accounts that support auto-sync.
-  /// Uses extended timeout for 2FA approval (up to 5 minutes for banking app).
-  /// Returns sync results including pending_2fa accounts.
+  /// Start sync for all accounts (returns immediately with task ID).
   Future<Map<String, dynamic>> syncAllAccounts() async {
-    final response = await _apiClient.post(
-      ApiConfig.syncAllPath,
-      timeout: ApiConfig.syncTimeout,
+    final response = await _apiClient.post(ApiConfig.syncAllPath);
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Poll for the status of a background sync task.
+  Future<Map<String, dynamic>> getSyncTaskStatus(String taskId) async {
+    final response = await _apiClient.get(
+      ApiConfig.syncTaskStatusPath(taskId),
     );
     return response.data as Map<String, dynamic>;
   }

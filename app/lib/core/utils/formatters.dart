@@ -25,9 +25,7 @@ String formatCurrencyCompact(double value, String currency) {
 String formatChartAxisValue(double value) {
   if (value >= 1000000) {
     final m = value / 1000000;
-    // Use enough decimals to avoid duplicate labels (e.g. 1.05M vs 1.1M)
-    final s = m.toStringAsFixed(2).replaceFirst(RegExp(r'\.?0+$'), '');
-    return '${s}M';
+    return '${m.toStringAsFixed(2)}M';
   } else if (value >= 1000) {
     return '${(value / 1000).toStringAsFixed(0)}K';
   }

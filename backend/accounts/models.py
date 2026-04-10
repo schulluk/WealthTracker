@@ -28,6 +28,13 @@ class UserProfile(models.Model):
         ('monthly', 'Monthly'),
     ]
 
+    MONTHLY_AGGREGATION_CHOICES = [
+        ('last', 'Last value'),
+        ('min', 'Minimum'),
+        ('max', 'Maximum'),
+        ('avg', 'Average'),
+    ]
+
     user = models.OneToOneField(
         User,
         on_delete=models.CASCADE,
@@ -57,6 +64,12 @@ class UserProfile(models.Model):
         choices=CHART_GRANULARITY_CHOICES,
         default='daily',
         help_text='Default granularity for wealth chart'
+    )
+    monthly_aggregation = models.CharField(
+        max_length=4,
+        choices=MONTHLY_AGGREGATION_CHOICES,
+        default='last',
+        help_text='How to pick the representative value for each month'
     )
 
     # KEK-based encryption fields

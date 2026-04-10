@@ -17,6 +17,7 @@ _$ProfileImpl _$$ProfileImplFromJson(Map<String, dynamic> json) =>
           json['push_notifications_enabled'] as bool? ?? true,
       pushWeeklyReport: json['push_weekly_report'] as bool? ?? false,
       syncOnAppOpen: json['sync_on_app_open'] as bool? ?? false,
+      monthlyAggregation: json['monthly_aggregation'] as String? ?? 'last',
       encryptionMigrated: json['encryption_migrated'] as bool? ?? false,
     );
 
@@ -30,5 +31,6 @@ Map<String, dynamic> _$$ProfileImplToJson(_$ProfileImpl instance) =>
       'push_notifications_enabled': instance.pushNotificationsEnabled,
       'push_weekly_report': instance.pushWeeklyReport,
       'sync_on_app_open': instance.syncOnAppOpen,
+      'monthly_aggregation': instance.monthlyAggregation,
       'encryption_migrated': instance.encryptionMigrated,
     };

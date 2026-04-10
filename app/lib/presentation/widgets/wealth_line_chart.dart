@@ -46,7 +46,10 @@ class _WealthLineChartState extends ConsumerState<WealthLineChart> {
       );
     }
 
-    final spots = widget.history.asMap().entries.map((entry) {
+    // Downsample to max 150 points for rendering performance
+    final history = _downsample(widget.history, 150);
+
+    final spots = history.asMap().entries.map((entry) {
       return FlSpot(
         entry.key.toDouble(),
         entry.value.totalWealth,
@@ -85,7 +88,7 @@ class _WealthLineChartState extends ConsumerState<WealthLineChart> {
     // Get the point to display (current touch or marked)
     final displayIndex = _lastTouchedIndex ?? _markedIndex;
     final displayPoint =
-        displayIndex != null ? widget.history[displayIndex] : null;
+        displayIndex != null ? history[displayIndex] : null;
 
     return Card(
       child: Padding(
@@ -137,22 +140,23 @@ class _WealthLineChartState extends ConsumerState<WealthLineChart> {
               ],
             ),
             const SizedBox(height: 8),
-            // Granularity selector
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'daily', label: Text('Daily')),
-                ButtonSegment(value: 'monthly', label: Text('Monthly')),
-              ],
-              selected: {chartGranularity},
-              onSelectionChanged: (selected) {
-                ref.read(chartGranularityProvider.notifier).set(selected.first);
-              },
-              showSelectedIcon: false,
-              style: ButtonStyle(
-                visualDensity: VisualDensity.compact,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            // Granularity selector (hidden when forced to daily for short ranges)
+            if (!ref.watch(chartGranularityProvider.notifier).isForced)
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'daily', label: Text('Daily')),
+                  ButtonSegment(value: 'monthly', label: Text('Monthly')),
+                ],
+                selected: {chartGranularity},
+                onSelectionChanged: (selected) {
+                  ref.read(chartGranularityProvider.notifier).set(selected.first);
+                },
+                showSelectedIcon: false,
+                style: ButtonStyle(
+                  visualDensity: VisualDensity.compact,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
               ),
-            ),
             const SizedBox(height: 12),
             // Selected point display (fixed position above chart)
             Container(
@@ -205,14 +209,14 @@ class _WealthLineChartState extends ConsumerState<WealthLineChart> {
                         interval: (spots.length / 4).ceilToDouble(),
                         getTitlesWidget: (value, meta) {
                           final index = value.toInt();
-                          if (index < 0 || index >= widget.history.length) {
+                          if (index < 0 || index >= history.length) {
                             return const SizedBox.shrink();
                           }
                           // Skip first and last to avoid edge cutoff
-                          if (index == 0 || index == widget.history.length - 1) {
+                          if (index == 0 || index == history.length - 1) {
                             return const SizedBox.shrink();
                           }
-                          final date = widget.history[index].dateTime;
+                          final date = history[index].dateTime;
                           // Use day.month.year format for daily, month+year for monthly
                           final dateFmt = chartGranularity == 'daily'
                               ? DateFormat('d.M.yy')
@@ -376,6 +380,60 @@ class _WealthLineChartState extends ConsumerState<WealthLineChart> {
       ),
     );
   }
+}
+
+/// Largest-Triangle-Three-Buckets downsampling.
+/// Preserves visual shape while reducing point count.
+List<WealthHistoryPoint> _downsample(List<WealthHistoryPoint> data, int threshold) {
+  if (data.length <= threshold) return data;
+
+  final result = <WealthHistoryPoint>[data.first];
+  final bucketSize = (data.length - 2) / (threshold - 2);
+
+  var lastSelected = 0;
+
+  for (var i = 0; i < threshold - 2; i++) {
+    final bucketStart = ((i + 1) * bucketSize + 1).floor();
+    final bucketEnd = ((i + 2) * bucketSize + 1).floor().clamp(0, data.length);
+    final nextStart = bucketEnd;
+    final nextEnd = ((i + 3) * bucketSize + 1).floor().clamp(0, data.length);
+
+    // Average of next bucket
+    var avgX = 0.0;
+    var avgY = 0.0;
+    final nextCount = nextEnd - nextStart;
+    if (nextCount > 0) {
+      for (var j = nextStart; j < nextEnd; j++) {
+        avgX += j;
+        avgY += data[j].totalWealth;
+      }
+      avgX /= nextCount;
+      avgY /= nextCount;
+    }
+
+    // Find point in current bucket with largest triangle area
+    var maxArea = -1.0;
+    var maxIndex = bucketStart;
+    final pointAX = lastSelected.toDouble();
+    final pointAY = data[lastSelected].totalWealth;
+
+    for (var j = bucketStart; j < bucketEnd; j++) {
+      final area = ((pointAX - avgX) * (data[j].totalWealth - pointAY) -
+                  (pointAX - j.toDouble()) * (avgY - pointAY))
+              .abs() *
+          0.5;
+      if (area > maxArea) {
+        maxArea = area;
+        maxIndex = j;
+      }
+    }
+
+    result.add(data[maxIndex]);
+    lastSelected = maxIndex;
+  }
+
+  result.add(data.last);
+  return result;
 }
 
 class _RangeChip extends StatelessWidget {

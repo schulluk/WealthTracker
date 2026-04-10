@@ -89,291 +89,128 @@ class FinancialAccountDetailView(generics.RetrieveUpdateDestroyAPIView):
         return FinancialAccount.objects.filter(user=self.request.user)
 
 
-class AccountSyncView(KEKAuthenticationMixin, APIView):
-    """Trigger a sync for an account."""
-    permission_classes = [IsAuthenticated]
+def _sync_single_account(*, account_id, credentials, base_currency):
+    """Run on the sync worker thread. Syncs a single account."""
+    import django
+    django.db.connections.close_all()  # Get fresh DB connections for this thread
 
-    def post(self, request, pk):
-        from brokers.integrations import get_broker_integration
+    from brokers.integrations import get_broker_integration
 
-        try:
-            account = FinancialAccount.objects.get(pk=pk, user=request.user)
-        except FinancialAccount.DoesNotExist:
-            return Response({'error': 'Account not found'}, status=status.HTTP_404_NOT_FOUND)
+    account = FinancialAccount.objects.get(pk=account_id)
+    integration = get_broker_integration(account.broker, credentials)
 
-        if account.is_manual:
-            return Response({'error': 'Cannot sync manual accounts'}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        auth_result = integration.authenticate()
 
-        if not account.encrypted_credentials:
-            return Response({'error': 'No credentials configured'}, status=status.HTTP_400_BAD_REQUEST)
+        if not auth_result.success:
+            if auth_result.requires_2fa:
+                account.status = 'pending_auth'
+                account.pending_auth_state = {
+                    'two_fa_type': auth_result.two_fa_type,
+                    'session_data': auth_result.session_data,
+                }
+                account.save()
+                return {
+                    'status': 'pending_auth',
+                    'message': 'Two-factor authentication required',
+                    'two_fa_type': auth_result.two_fa_type,
+                    'challenge': auth_result.challenge_data,
+                }
+            else:
+                account.status = 'error'
+                account.last_sync_error = auth_result.error_message
+                account.save()
+                return {'status': 'error', 'error': auth_result.error_message}
 
-        try:
-            # Decrypt credentials (supports both legacy and KEK-based encryption)
-            credentials = self.decrypt_account_credentials(request, account)
+        # Auth successful — fetch balance
+        balance_info = integration.get_balance(account.account_identifier)
 
-            # Get broker integration
-            integration = get_broker_integration(account.broker, credentials)
+        existing = AccountSnapshot.objects.filter(
+            account=account,
+            balance=balance_info.balance,
+            currency=balance_info.currency,
+            snapshot_date=balance_info.balance_date,
+        ).first()
 
-            # Authenticate
-            auth_result = integration.authenticate()
-
-            if not auth_result.success:
-                if auth_result.requires_2fa:
-                    # Store pending auth state and return challenge info
-                    account.status = 'pending_auth'
-                    account.pending_auth_state = {
-                        'two_fa_type': auth_result.two_fa_type,
-                        'session_data': auth_result.session_data,
-                    }
-                    account.save()
-
-                    return Response({
-                        'status': 'pending_auth',
-                        'message': 'Two-factor authentication required',
-                        'two_fa_type': auth_result.two_fa_type,
-                        'challenge': auth_result.challenge_data,
-                    })
-                else:
-                    account.status = 'error'
-                    account.last_sync_error = auth_result.error_message
-                    account.save()
-                    return Response(
-                        {'error': auth_result.error_message},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-
-            # Authentication successful, fetch balance
-            return self._complete_sync(account, integration, request)
-
-        except ValueError as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            logger.exception("Sync failed for account %s", pk)
-            account.status = 'error'
-            account.last_sync_error = str(e) or repr(e)
-            account.save()
-            return Response(
-                {'error': f'Sync failed: {str(e) or repr(e)}'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-    def _complete_sync(self, account, integration, request):
-        """Complete the sync after successful authentication."""
-        try:
-            # Get balance
-            balance_info = integration.get_balance(account.account_identifier)
-
-            # Check for existing snapshot with same date, currency, and balance
-            existing = AccountSnapshot.objects.filter(
+        if existing:
+            snapshot = existing
+            created = False
+        else:
+            snapshot = AccountSnapshot.objects.create(
                 account=account,
                 balance=balance_info.balance,
                 currency=balance_info.currency,
-                snapshot_date=balance_info.balance_date
-            ).first()
+                snapshot_date=balance_info.balance_date,
+                snapshot_source='auto',
+                raw_data=balance_info.raw_data,
+            )
+            created = True
 
-            if existing:
-                snapshot = existing
-                created = False
-            else:
-                snapshot = AccountSnapshot.objects.create(
-                    account=account,
-                    balance=balance_info.balance,
-                    currency=balance_info.currency,
-                    snapshot_date=balance_info.balance_date,
-                    snapshot_source='auto',
-                    raw_data=balance_info.raw_data
-                )
-                created = True
+        # Convert to base currency
+        if balance_info.currency != base_currency:
+            from exchange_rates.services import ExchangeRateService
+            rate = ExchangeRateService.get_rate(
+                balance_info.currency, base_currency, balance_info.balance_date,
+            )
+            if rate and rate != Decimal('1.0'):
+                snapshot.balance_base_currency = balance_info.balance * rate
+                snapshot.base_currency = base_currency
+                snapshot.exchange_rate_used = rate
+                snapshot.save()
 
-            # Convert to base currency (only if newly created or missing conversion)
-            user_profile = request.user.profile
-            if balance_info.currency != user_profile.base_currency:
-                from exchange_rates.services import ExchangeRateService
-                rate = ExchangeRateService.get_rate(
-                    balance_info.currency,
-                    user_profile.base_currency,
-                    balance_info.balance_date
-                )
-                if rate and rate != Decimal('1.0'):
-                    snapshot.balance_base_currency = balance_info.balance * rate
-                    snapshot.base_currency = user_profile.base_currency
-                    snapshot.exchange_rate_used = rate
-                    snapshot.save()
-
-            # Try to backfill historical data if supported
-            backfilled_count = 0
-            if integration.supports_historical_data():
-                backfilled_count = self._backfill_historical(
-                    account, integration, user_profile.base_currency
-                )
-
-            # Update account status
-            account.status = 'active'
-            account.last_sync_at = timezone.now()
-            account.last_sync_error = ''
-            account.pending_auth_state = None
-            account.save()
-
-            integration.close()
-
-            message = 'Sync completed' if created else 'No change (snapshot already exists)'
-            if backfilled_count > 0:
-                message += f' + {backfilled_count} historical snapshots backfilled'
-
-            return Response({
-                'status': 'success',
-                'message': message,
-                'snapshot': {
-                    'id': snapshot.id,
-                    'balance': float(snapshot.balance),
-                    'currency': snapshot.currency,
-                    'date': snapshot.snapshot_date.isoformat(),
-                    'created': created,
-                },
-                'backfilled': backfilled_count
-            })
-
-        except Exception as e:
-            integration.close()
-            raise
-
-    def _backfill_historical(self, account, integration, base_currency):
-        """
-        Backfill historical snapshots from broker if available.
-        Returns the number of snapshots created.
-
-        Strategy:
-        - Look at past HISTORICAL_BACKFILL_MAX_LOOKBACK_DAYS (365) days
-        - Find oldest missing date (gap) in that window
-        - Request from that date + HISTORICAL_BACKFILL_BUFFER_DAYS (5) buffer
-        - Max request is 365 + 5 = 370 days
-        - Skip if already have good recent coverage
-        """
-        import logging
-        from django.conf import settings as django_settings
-        logger = logging.getLogger(__name__)
-
-        try:
-            # Get configurable settings
-            max_lookback = getattr(django_settings, 'HISTORICAL_BACKFILL_MAX_LOOKBACK_DAYS', 365)
-            buffer_days = getattr(django_settings, 'HISTORICAL_BACKFILL_BUFFER_DAYS', 5)
-            skip_if_recent_days = getattr(django_settings, 'HISTORICAL_BACKFILL_SKIP_IF_RECENT_DAYS', 2)
-
-            # Check existing snapshot coverage
-            existing_dates = set(
-                AccountSnapshot.objects.filter(account=account)
-                .values_list('snapshot_date', flat=True)
+        # Backfill historical data if supported
+        backfilled_count = 0
+        if integration.supports_historical_data():
+            backfilled_count = _backfill_historical(
+                account, integration, base_currency,
             )
 
-            end_date = date.today()
+        account.status = 'active'
+        account.last_sync_at = timezone.now()
+        account.last_sync_error = ''
+        account.pending_auth_state = None
+        account.save()
 
-            # For integrations requiring extra requests, find oldest gap to minimize API load
-            if integration.historical_data_requires_extra_request():
-                # Find oldest missing date in the lookback window
-                # Skip the most recent N days (gaps there are acceptable/expected)
-                # Only look from day (skip_if_recent_days + 1) to day max_lookback
-                oldest_gap = None
-                for days_ago in range(max_lookback, skip_if_recent_days, -1):
-                    check_date = end_date - timedelta(days=days_ago)
-                    if check_date not in existing_dates:
-                        oldest_gap = check_date
-                        break
+        message = 'Sync completed' if created else 'No change (snapshot already exists)'
+        if backfilled_count > 0:
+            message += f' + {backfilled_count} historical snapshots backfilled'
 
-                if oldest_gap is None:
-                    logger.debug(f"No gaps found between day {skip_if_recent_days + 1} and {max_lookback} for {account.name}")
-                    return 0
-
-                # Start from oldest gap + buffer (max 365 + 5 = 370 days)
-                start_date = oldest_gap - timedelta(days=buffer_days)
-                # Ensure we don't exceed max lookback + buffer
-                max_start = end_date - timedelta(days=max_lookback + buffer_days)
-                if start_date < max_start:
-                    start_date = max_start
-            else:
-                # No extra request - import all available (use wide range, integration ignores it)
-                start_date = end_date - timedelta(days=3650)  # 10 years
-
-            logger.info(f"Backfilling {account.name} historical data from {start_date} to {end_date}")
-
-            # Get historical balances from integration
-            historical = integration.get_historical_balances(
-                account.account_identifier,
-                start_date,
-                end_date
-            )
-
-            if not historical:
-                logger.info(f"No historical data available for {account.name}")
-                return 0
-
-            # existing_dates already fetched above for coverage check
-            created_count = 0
-            for bal_info in historical:
-                if bal_info.balance_date in existing_dates:
-                    continue
-
-                # Create snapshot
-                snapshot = AccountSnapshot.objects.create(
-                    account=account,
-                    balance=bal_info.balance,
-                    currency=bal_info.currency,
-                    snapshot_date=bal_info.balance_date,
-                    snapshot_source='auto',
-                    raw_data=bal_info.raw_data
-                )
-
-                # Convert to base currency
-                if bal_info.currency != base_currency:
-                    from exchange_rates.services import ExchangeRateService
-                    rate = ExchangeRateService.get_rate(
-                        bal_info.currency, base_currency, bal_info.balance_date
-                    )
-                    if rate and rate != Decimal('1.0'):
-                        snapshot.balance_base_currency = bal_info.balance * rate
-                        snapshot.base_currency = base_currency
-                        snapshot.exchange_rate_used = rate
-                        snapshot.save()
-                else:
-                    snapshot.balance_base_currency = bal_info.balance
-                    snapshot.base_currency = base_currency
-                    snapshot.save()
-
-                created_count += 1
-                existing_dates.add(bal_info.balance_date)
-
-            logger.info(f"Backfilled {created_count} snapshots for {account.name}")
-            return created_count
-
-        except Exception as e:
-            logger.warning(f"Failed to backfill historical data for {account.name}: {e}")
-            return 0
-
-
-class SyncAllAccountsView(KEKAuthenticationMixin, APIView):
-    """Trigger sync for all accounts that support auto-sync."""
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        from brokers.integrations import get_broker_integration
-
-        # Find all syncable accounts
-        accounts = FinancialAccount.objects.filter(
-            user=request.user,
-            is_manual=False,
-            sync_enabled=True,
-        ).exclude(encrypted_credentials__isnull=True).exclude(encrypted_credentials=b'')
-
-        results = {
-            'synced': [],
-            'pending_2fa': [],
-            'errors': [],
-            'skipped': [],
+        return {
+            'status': 'success',
+            'message': message,
+            'snapshot': {
+                'id': snapshot.id,
+                'balance': float(snapshot.balance),
+                'currency': snapshot.currency,
+                'date': snapshot.snapshot_date.isoformat(),
+                'created': created,
+            },
+            'backfilled': backfilled_count,
         }
+    finally:
+        integration.close()
 
-        for account in accounts:
+
+def _sync_all_accounts(*, account_creds, base_currency):
+    """Run on the sync worker thread. Syncs all accounts sequentially."""
+    import django
+    django.db.connections.close_all()
+
+    from brokers.integrations import get_broker_integration
+
+    results = {
+        'synced': [],
+        'pending_2fa': [],
+        'errors': [],
+        'skipped': [],
+    }
+
+    for account_id, credentials in account_creds:
+        try:
+            account = FinancialAccount.objects.get(pk=account_id)
+            integration = get_broker_integration(account.broker, credentials)
+
             try:
-                credentials = self.decrypt_account_credentials(request, account)
-                integration = get_broker_integration(account.broker, credentials)
                 auth_result = integration.authenticate()
 
                 if not auth_result.success:
@@ -389,7 +226,6 @@ class SyncAllAccountsView(KEKAuthenticationMixin, APIView):
                             'name': account.name,
                             'two_fa_type': auth_result.two_fa_type,
                         })
-                        integration.close()
                         continue
                     else:
                         account.status = 'error'
@@ -400,18 +236,15 @@ class SyncAllAccountsView(KEKAuthenticationMixin, APIView):
                             'name': account.name,
                             'error': auth_result.error_message,
                         })
-                        integration.close()
                         continue
 
-                # Auth successful - sync the account
                 balance_info = integration.get_balance(account.account_identifier)
 
-                # Check for existing snapshot
                 existing = AccountSnapshot.objects.filter(
                     account=account,
                     balance=balance_info.balance,
                     currency=balance_info.currency,
-                    snapshot_date=balance_info.balance_date
+                    snapshot_date=balance_info.balance_date,
                 ).first()
 
                 if existing:
@@ -427,21 +260,18 @@ class SyncAllAccountsView(KEKAuthenticationMixin, APIView):
                         currency=balance_info.currency,
                         snapshot_date=balance_info.balance_date,
                         snapshot_source='auto',
-                        raw_data=balance_info.raw_data
+                        raw_data=balance_info.raw_data,
                     )
 
-                    # Convert to base currency
-                    user_profile = request.user.profile
-                    if balance_info.currency != user_profile.base_currency:
+                    if balance_info.currency != base_currency:
                         from exchange_rates.services import ExchangeRateService
                         rate = ExchangeRateService.get_rate(
-                            balance_info.currency,
-                            user_profile.base_currency,
-                            balance_info.balance_date
+                            balance_info.currency, base_currency,
+                            balance_info.balance_date,
                         )
                         if rate and rate != Decimal('1.0'):
                             snapshot.balance_base_currency = balance_info.balance * rate
-                            snapshot.base_currency = user_profile.base_currency
+                            snapshot.base_currency = base_currency
                             snapshot.exchange_rate_used = rate
                             snapshot.save()
 
@@ -452,33 +282,270 @@ class SyncAllAccountsView(KEKAuthenticationMixin, APIView):
                         'currency': balance_info.currency,
                     })
 
-                # Update account status
                 account.status = 'active'
                 account.last_sync_at = timezone.now()
                 account.last_sync_error = ''
                 account.pending_auth_state = None
                 account.save()
 
+            finally:
                 integration.close()
 
-            except Exception as e:
-                logger.exception("Sync failed for account %s", account.id)
+        except Exception as e:
+            logger.exception("Sync failed for account %s", account_id)
+            try:
+                account = FinancialAccount.objects.get(pk=account_id)
                 account.status = 'error'
                 account.last_sync_error = str(e) or repr(e)
                 account.save()
-                results['errors'].append({
-                    'id': account.id,
-                    'name': account.name,
-                    'error': str(e) or repr(e),
-                })
+            except Exception:
+                pass
+            results['errors'].append({
+                'id': account_id,
+                'name': getattr(account, 'name', str(account_id)),
+                'error': str(e) or repr(e),
+            })
+
+    return {
+        'status': 'success',
+        'synced_count': len(results['synced']),
+        'pending_2fa_count': len(results['pending_2fa']),
+        'error_count': len(results['errors']),
+        'skipped_count': len(results['skipped']),
+        'details': results,
+    }
+
+
+def _backfill_historical(account, integration, base_currency):
+    """
+    Backfill historical snapshots from broker if available.
+    Returns the number of snapshots created.
+
+    Strategy:
+    - Look at past HISTORICAL_BACKFILL_MAX_LOOKBACK_DAYS (365) days
+    - Find oldest missing date (gap) in that window
+    - Request from that date + HISTORICAL_BACKFILL_BUFFER_DAYS (5) buffer
+    - Max request is 365 + 5 = 370 days
+    - Skip if already have good recent coverage
+    """
+    from django.conf import settings as django_settings
+
+    try:
+        max_lookback = getattr(django_settings, 'HISTORICAL_BACKFILL_MAX_LOOKBACK_DAYS', 365)
+        buffer_days = getattr(django_settings, 'HISTORICAL_BACKFILL_BUFFER_DAYS', 5)
+        skip_if_recent_days = getattr(django_settings, 'HISTORICAL_BACKFILL_SKIP_IF_RECENT_DAYS', 2)
+
+        existing_dates = set(
+            AccountSnapshot.objects.filter(account=account)
+            .values_list('snapshot_date', flat=True)
+        )
+
+        end_date = date.today()
+
+        if integration.historical_data_requires_extra_request():
+            oldest_gap = None
+            for days_ago in range(max_lookback, skip_if_recent_days, -1):
+                check_date = end_date - timedelta(days=days_ago)
+                if check_date not in existing_dates:
+                    oldest_gap = check_date
+                    break
+
+            if oldest_gap is None:
+                return 0
+
+            start_date = oldest_gap - timedelta(days=buffer_days)
+            max_start = end_date - timedelta(days=max_lookback + buffer_days)
+            if start_date < max_start:
+                start_date = max_start
+        else:
+            start_date = end_date - timedelta(days=3650)
+
+        logger.info(f"Backfilling {account.name} historical data from {start_date} to {end_date}")
+
+        historical = integration.get_historical_balances(
+            account.account_identifier, start_date, end_date
+        )
+
+        if not historical:
+            return 0
+
+        created_count = 0
+        for bal_info in historical:
+            if bal_info.balance_date in existing_dates:
+                continue
+
+            snapshot = AccountSnapshot.objects.create(
+                account=account,
+                balance=bal_info.balance,
+                currency=bal_info.currency,
+                snapshot_date=bal_info.balance_date,
+                snapshot_source='auto',
+                raw_data=bal_info.raw_data,
+            )
+
+            if bal_info.currency != base_currency:
+                from exchange_rates.services import ExchangeRateService
+                rate = ExchangeRateService.get_rate(
+                    bal_info.currency, base_currency, bal_info.balance_date
+                )
+                if rate and rate != Decimal('1.0'):
+                    snapshot.balance_base_currency = bal_info.balance * rate
+                    snapshot.base_currency = base_currency
+                    snapshot.exchange_rate_used = rate
+                    snapshot.save()
+            else:
+                snapshot.balance_base_currency = bal_info.balance
+                snapshot.base_currency = base_currency
+                snapshot.save()
+
+            created_count += 1
+            existing_dates.add(bal_info.balance_date)
+
+        logger.info(f"Backfilled {created_count} snapshots for {account.name}")
+        return created_count
+
+    except Exception as e:
+        logger.warning(f"Failed to backfill historical data for {account.name}: {e}")
+        return 0
+
+
+class AccountSyncView(KEKAuthenticationMixin, APIView):
+    """Trigger a sync for an account.
+
+    Decrypts credentials on the request thread, then enqueues the actual
+    sync work to a dedicated background thread so other API requests
+    (graphs, snapshots) are not blocked.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        from .sync_queue import sync_queue
+
+        try:
+            account = FinancialAccount.objects.get(pk=pk, user=request.user)
+        except FinancialAccount.DoesNotExist:
+            return Response({'error': 'Account not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if account.is_manual:
+            return Response({'error': 'Cannot sync manual accounts'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not account.encrypted_credentials:
+            return Response({'error': 'No credentials configured'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check for already-running sync for this user
+        existing = sync_queue.has_pending_task(request.user.id)
+        if existing:
+            return Response({
+                'status': 'queued',
+                'task_id': existing,
+                'message': 'A sync is already in progress',
+            })
+
+        try:
+            # Decrypt credentials on the request thread (needs KEK header)
+            credentials = self.decrypt_account_credentials(request, account)
+            base_currency = request.user.profile.base_currency
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Enqueue sync work to background thread
+        task_id = sync_queue.enqueue(
+            request.user.id,
+            _sync_single_account,
+            account_id=account.id,
+            credentials=credentials,
+            base_currency=base_currency,
+        )
+
         return Response({
-            'status': 'success',
-            'synced_count': len(results['synced']),
-            'pending_2fa_count': len(results['pending_2fa']),
-            'error_count': len(results['errors']),
-            'skipped_count': len(results['skipped']),
-            'details': results,
+            'status': 'queued',
+            'task_id': task_id,
+            'message': 'Sync started',
         })
+
+
+class SyncAllAccountsView(KEKAuthenticationMixin, APIView):
+    """Trigger sync for all accounts that support auto-sync.
+
+    Decrypts all credentials on the request thread, then enqueues the
+    sync work to run sequentially on the background thread.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from .sync_queue import sync_queue
+
+        # Check for already-running sync for this user
+        existing = sync_queue.has_pending_task(request.user.id)
+        if existing:
+            return Response({
+                'status': 'queued',
+                'task_id': existing,
+                'message': 'A sync is already in progress',
+            })
+
+        # Find all syncable accounts
+        accounts = FinancialAccount.objects.filter(
+            user=request.user,
+            is_manual=False,
+            sync_enabled=True,
+        ).exclude(encrypted_credentials__isnull=True).exclude(encrypted_credentials=b'')
+
+        if not accounts.exists():
+            return Response({
+                'status': 'success',
+                'message': 'No accounts to sync',
+                'synced_count': 0,
+                'pending_2fa_count': 0,
+                'error_count': 0,
+                'skipped_count': 0,
+                'details': {'synced': [], 'pending_2fa': [], 'errors': [], 'skipped': []},
+            })
+
+        # Decrypt all credentials on the request thread (needs KEK header)
+        base_currency = request.user.profile.base_currency
+        account_creds = []
+        for account in accounts:
+            try:
+                creds = self.decrypt_account_credentials(request, account)
+                account_creds.append((account.id, creds))
+            except Exception as e:
+                logger.warning("Failed to decrypt credentials for account %s: %s", account.id, e)
+
+        if not account_creds:
+            return Response({
+                'error': 'Failed to decrypt credentials for all accounts',
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Enqueue sync work to background thread
+        task_id = sync_queue.enqueue(
+            request.user.id,
+            _sync_all_accounts,
+            account_creds=account_creds,
+            base_currency=base_currency,
+        )
+
+        return Response({
+            'status': 'queued',
+            'task_id': task_id,
+            'message': f'Sync started for {len(account_creds)} accounts',
+        })
+
+
+class SyncTaskStatusView(APIView):
+    """Poll for the status of a background sync task."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, task_id):
+        from .sync_queue import sync_queue
+
+        result = sync_queue.get_status(task_id)
+        if result is None:
+            return Response(
+                {'error': 'Task not found or expired'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(result)
 
 
 class AccountAuthView(KEKAuthenticationMixin, APIView):
@@ -872,35 +939,42 @@ class WealthHistoryView(APIView):
         # Aggregate to monthly if requested
         if granularity == 'monthly':
             import calendar
-            # Use today's day-of-month as the reference day for each month
-            reference_day = end_date.day
+            aggregation = user_profile.monthly_aggregation  # last, min, max, avg
 
-            monthly_totals = {}
+            # Group daily values by (year, month)
+            monthly_buckets = {}  # (year, month) -> list of (date_str, total)
             for date_str, total in daily_totals.items():
                 d = date.fromisoformat(date_str)
-                year, month = d.year, d.month
+                key = (d.year, d.month)
+                monthly_buckets.setdefault(key, []).append((date_str, total))
 
-                # Calculate target day for this month (handle months with fewer days)
+            monthly_totals = {}
+            reference_day = end_date.day
+            for (year, month), entries in monthly_buckets.items():
                 last_day_of_month = calendar.monthrange(year, month)[1]
                 target_day = min(reference_day, last_day_of_month)
-                target_date = date(year, month, target_day)
-                month_key = target_date.isoformat()
+                month_key = date(year, month, target_day).isoformat()
 
-                # Keep the value closest to (but not after) target_day
-                # Prefer exact match, otherwise take the closest earlier date
-                if month_key not in monthly_totals:
-                    monthly_totals[month_key] = (date_str, total)
-                else:
-                    existing_date_str = monthly_totals[month_key][0]
-                    existing_date = date.fromisoformat(existing_date_str)
-
-                    # If this date is closer to target (but not after), use it
-                    if d <= target_date and (existing_date > target_date or d > existing_date):
-                        monthly_totals[month_key] = (date_str, total)
+                values = [v for _, v in entries]
+                if aggregation == 'min':
+                    monthly_totals[month_key] = min(values)
+                elif aggregation == 'max':
+                    monthly_totals[month_key] = max(values)
+                elif aggregation == 'avg':
+                    monthly_totals[month_key] = sum(values) / len(values)
+                else:  # 'last' — pick the value closest to target_day
+                    best = entries[0]
+                    target_date = date(year, month, target_day)
+                    for date_str, total in entries:
+                        d = date.fromisoformat(date_str)
+                        best_d = date.fromisoformat(best[0])
+                        if d <= target_date and (best_d > target_date or d > best_d):
+                            best = (date_str, total)
+                    monthly_totals[month_key] = best[1]
 
             history = [
-                {'date': month_key, 'total_wealth': float(data[1])}
-                for month_key, data in sorted(monthly_totals.items())
+                {'date': mk, 'total_wealth': float(v)}
+                for mk, v in sorted(monthly_totals.items())
             ]
         else:
             history = [

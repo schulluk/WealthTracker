@@ -99,6 +99,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  Future<void> _updateMonthlyAggregation(String value) async {
+    try {
+      final repository = ref.read(profileRepositoryProvider);
+      await repository.updateProfile(monthlyAggregation: value);
+      ref.invalidate(profileProvider);
+      ref.invalidate(wealthHistoryProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Settings saved')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save: $e')),
+        );
+      }
+    }
+  }
+
   Future<void> _updateChartSettings(int? range, String? granularity) async {
     try {
       final repository = ref.read(profileRepositoryProvider);
@@ -217,6 +237,36 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       onSelected: (_) => _updateChartSettings(null, 'monthly'),
                       showCheckmark: false,
                     ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Monthly Aggregation',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'How to pick the representative value for each month',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final entry in {
+                      'last': 'Last',
+                      'min': 'Min',
+                      'max': 'Max',
+                      'avg': 'Average',
+                    }.entries)
+                      FilterChip(
+                        label: Text(entry.value),
+                        selected: (profile.value?.monthlyAggregation ?? 'last') == entry.key,
+                        onSelected: (_) => _updateMonthlyAggregation(entry.key),
+                        showCheckmark: false,
+                      ),
                   ],
                 ),
               ],

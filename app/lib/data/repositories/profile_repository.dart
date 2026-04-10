@@ -20,6 +20,7 @@ class ProfileRepository {
     bool? sendWeeklyReport,
     int? defaultChartRange,
     String? defaultChartGranularity,
+    String? monthlyAggregation,
     bool? pushNotificationsEnabled,
     bool? pushWeeklyReport,
     bool? syncOnAppOpen,
@@ -34,6 +35,9 @@ class ProfileRepository {
     }
     if (defaultChartGranularity != null) {
       data['default_chart_granularity'] = defaultChartGranularity;
+    }
+    if (monthlyAggregation != null) {
+      data['monthly_aggregation'] = monthlyAggregation;
     }
     if (pushNotificationsEnabled != null) {
       data['push_notifications_enabled'] = pushNotificationsEnabled;
