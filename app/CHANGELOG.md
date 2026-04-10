@@ -1,6 +1,10 @@
 # Changelog
 
-## Next: 1.3.4
+## Next: 1.3.5
+
+- Stability improvements
+
+## 1.3.4
 
 - Upgrade dependencies to the latest versions
 - Quick snapshot sheet auto-closes after the last account is submitted
