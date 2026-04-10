@@ -881,11 +881,15 @@ class WealthHistoryView(APIView):
         if oldest_snapshot and oldest_snapshot.snapshot_date > start_date:
             start_date = oldest_snapshot.snapshot_date
 
-        # Get all snapshots up to end_date (including before start_date for carry-forward)
+        # Get all snapshots up to end_date (including before start_date for carry-forward).
+        # Use only the fields we need to reduce memory and transfer.
         snapshots = AccountSnapshot.objects.filter(
             account__user=request.user,
             snapshot_date__lte=end_date
-        ).order_by('snapshot_date', 'created_at')
+        ).order_by('snapshot_date', 'created_at').only(
+            'account_id', 'snapshot_date', 'balance',
+            'balance_base_currency', 'currency',
+        )
 
         # Build a timeline of the latest balance for each account on each date
         # For each account, track all snapshots in chronological order
@@ -908,31 +912,37 @@ class WealthHistoryView(APIView):
 
             account_snapshots[account_id].append((snapshot.snapshot_date, amount))
 
-        # For each account, keep only the latest snapshot per date
+        # For each account, deduplicate by date (keep last per date due to
+        # ordering by created_at) and build a sorted list.
         for account_id in account_snapshots:
-            snapshots_list = account_snapshots[account_id]
-            # Group by date, keep last (most recent created_at due to ordering)
             by_date = {}
-            for snap_date, amount in snapshots_list:
+            for snap_date, amount in account_snapshots[account_id]:
                 by_date[snap_date] = amount
             account_snapshots[account_id] = sorted(by_date.items())
 
-        # Generate daily totals for all dates in range
-        # For each date, sum the last known balance for each account
+        # Generate daily totals using carry-forward with bisect.
+        # For each account, binary-search for the latest snapshot <= current_date
+        # instead of scanning all snapshots linearly.
+        from bisect import bisect_right
+
+        # Pre-extract date arrays for fast bisect lookup
+        account_dates = {}   # account_id -> [date1, date2, ...]
+        account_values = {}  # account_id -> [amount1, amount2, ...]
+        for account_id, snapshots_list in account_snapshots.items():
+            dates = [s[0] for s in snapshots_list]
+            values = [s[1] for s in snapshots_list]
+            account_dates[account_id] = dates
+            account_values[account_id] = values
+
         daily_totals = {}
         current_date = start_date
         while current_date <= end_date:
             total = Decimal('0')
-            for account_id, snapshots_list in account_snapshots.items():
-                # Find the most recent snapshot for this account on or before current_date
-                last_amount = None
-                for snap_date, amount in snapshots_list:
-                    if snap_date <= current_date:
-                        last_amount = amount
-                    else:
-                        break
-                if last_amount is not None:
-                    total += last_amount
+            for account_id in account_snapshots:
+                dates = account_dates[account_id]
+                idx = bisect_right(dates, current_date) - 1
+                if idx >= 0:
+                    total += account_values[account_id][idx]
             daily_totals[current_date.isoformat()] = total
             current_date += timedelta(days=1)
 
