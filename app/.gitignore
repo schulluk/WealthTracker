@@ -51,19 +51,16 @@ app.*.map.json
 **/fastlane/test_output
 **/fastlane/README.md
 
-# Play Store key (sensitive)
-android/fastlane/play-store-key.json
-android/play-store-key.json
-
-# App Store Connect API Key (sensitive)
-ios/fastlane/AuthKey*.p8
-
-# iOS Certificates and Provisioning Profiles (sensitive)
-ios/*.cer
-ios/*.p12
-ios/*.mobileprovision
-ios/*.certSigningRequest
-
-# Environment variables
+# Secrets
 .env
 .env.local
+*.p8
+*.p12
+*.jks
+*.key
+key.properties
+play-store-key.json
+*-service-account.json
+
+# Release builds
+_releases/

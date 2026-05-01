@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,11 +13,13 @@ import '../providers/wealth_provider.dart';
 class WealthLineChart extends ConsumerStatefulWidget {
   final List<WealthHistoryPoint> history;
   final String currency;
+  final bool showGranularitySelector;
 
   const WealthLineChart({
     super.key,
     required this.history,
     required this.currency,
+    this.showGranularitySelector = true,
   });
 
   @override
@@ -59,28 +63,27 @@ class _WealthLineChartState extends ConsumerState<WealthLineChart> {
     final minY = spots.map((s) => s.y).reduce((a, b) => a < b ? a : b);
     final maxY = spots.map((s) => s.y).reduce((a, b) => a > b ? a : b);
 
-    // Calculate step size for exactly 5 ticks (4 intervals)
-    // Step must be a multiple of 50k
-    const baseStep = 50000.0;
+    // Calculate step size for exactly 5 ticks (4 intervals).
+    // Step is rounded to a "nice" value: 100, 250, 500, 1k, 2.5k, 5k, 10k, ...
     final range = maxY - minY;
-    // Calculate step that covers range in ~4 intervals, rounded up to 50k multiple
-    var stepSize = ((range / 4 / baseStep).ceil()) * baseStep;
-    if (stepSize < baseStep) stepSize = baseStep;
+    var stepSize = _niceStep(range / 4);
 
-    // Calculate bounds that cover the data with whole step increments
     var roundedMin = (minY / stepSize).floor() * stepSize;
     var roundedMax = (maxY / stepSize).ceil() * stepSize;
+    var intervals = ((roundedMax - roundedMin) / stepSize).round();
 
-    // Ensure we have exactly 4 intervals (5 ticks) by adjusting bounds
-    final intervals = ((roundedMax - roundedMin) / stepSize).round();
-    if (intervals < 4) {
-      // Extend max to get 4 intervals
-      roundedMax = roundedMin + (stepSize * 4);
-    } else if (intervals > 4) {
-      // Increase step size to fit in 4 intervals
-      stepSize = ((roundedMax - roundedMin) / 4 / baseStep).ceil() * baseStep;
+    // Bump to next nice step if floor/ceil pushed us over 4 intervals
+    while (intervals > 4) {
+      stepSize = _nextNiceStep(stepSize);
       roundedMin = (minY / stepSize).floor() * stepSize;
-      roundedMax = roundedMin + (stepSize * 4);
+      roundedMax = (maxY / stepSize).ceil() * stepSize;
+      intervals = ((roundedMax - roundedMin) / stepSize).round();
+    }
+
+    // Extend max to fill exactly 4 intervals
+    while (intervals < 4) {
+      roundedMax += stepSize;
+      intervals++;
     }
 
     final gridInterval = stepSize;
@@ -141,7 +144,8 @@ class _WealthLineChartState extends ConsumerState<WealthLineChart> {
             ),
             const SizedBox(height: 8),
             // Granularity selector (hidden when forced to daily for short ranges)
-            if (!ref.watch(chartGranularityProvider.notifier).isForced)
+            if (widget.showGranularitySelector &&
+                !ref.watch(chartGranularityProvider.notifier).isForced)
               SegmentedButton<String>(
                 segments: const [
                   ButtonSegment(value: 'daily', label: Text('Daily')),
@@ -380,6 +384,36 @@ class _WealthLineChartState extends ConsumerState<WealthLineChart> {
       ),
     );
   }
+}
+
+/// Round up to a "nice" step in the 1-2.5-5 sequence at each decade,
+/// floored at 100. Produces clean axis labels: 100, 250, 500, 1k, 2.5k, 5k, 10k, ...
+double _niceStep(double rawStep) {
+  if (rawStep <= 100) return 100;
+  final magnitude =
+      math.pow(10, (math.log(rawStep) / math.ln10).floor()).toDouble();
+  final normalized = rawStep / magnitude;
+  final double mantissa;
+  if (normalized <= 1) {
+    mantissa = 1;
+  } else if (normalized <= 2.5) {
+    mantissa = 2.5;
+  } else if (normalized <= 5) {
+    mantissa = 5;
+  } else {
+    mantissa = 10;
+  }
+  return mantissa * magnitude;
+}
+
+/// Next nice step after the given one (e.g. 250 -> 500, 500 -> 1000).
+double _nextNiceStep(double step) {
+  final magnitude =
+      math.pow(10, (math.log(step) / math.ln10).floor()).toDouble();
+  final normalized = step / magnitude;
+  if (normalized < 2.5) return 2.5 * magnitude;
+  if (normalized < 5) return 5 * magnitude;
+  return 10 * magnitude;
 }
 
 /// Largest-Triangle-Three-Buckets downsampling.

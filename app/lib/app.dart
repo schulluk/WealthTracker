@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'presentation/providers/auth_provider.dart';
 import 'presentation/providers/core_providers.dart';
+import 'presentation/screens/account_detail_screen.dart';
 import 'presentation/screens/dashboard_screen.dart';
 import 'presentation/screens/imprint_screen.dart';
 import 'presentation/screens/login_screen.dart';
@@ -61,6 +62,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/dashboard',
         builder: (context, state) => const DashboardScreen(),
+      ),
+      GoRoute(
+        path: '/accounts/:id',
+        builder: (context, state) {
+          final id = int.parse(state.pathParameters['id']!);
+          return AccountDetailScreen(accountId: id);
+        },
       ),
       GoRoute(
         path: '/settings',

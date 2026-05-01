@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/utils/formatters.dart';
 import '../../data/models/account.dart';
@@ -45,7 +46,7 @@ class AccountCard extends ConsumerWidget {
 
     return Card(
       child: InkWell(
-        onTap: () => _showAddSnapshotDialog(context),
+        onTap: () => context.push('/accounts/${account.id}'),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),

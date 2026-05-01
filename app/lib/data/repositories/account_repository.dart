@@ -18,15 +18,22 @@ class AccountRepository {
         .toList();
   }
 
-  /// Fetch snapshots for a specific account.
+  /// Fetch snapshots for a specific account. Follows pagination links so the
+  /// caller gets the full history (the chart needs every snapshot, not just
+  /// the most recent page).
   Future<List<AccountSnapshot>> getSnapshots(int accountId) async {
-    final response =
-        await _apiClient.get(ApiConfig.accountSnapshotsPath(accountId));
-    final results = response.data['results'] as List<dynamic>?;
-    if (results == null) return [];
-    return results
-        .map((json) => AccountSnapshot.fromJson(json as Map<String, dynamic>))
-        .toList();
+    final all = <AccountSnapshot>[];
+    String? url = ApiConfig.accountSnapshotsPath(accountId);
+    while (url != null) {
+      final response = await _apiClient.get(url);
+      final data = response.data as Map<String, dynamic>;
+      final results = data['results'] as List<dynamic>? ?? [];
+      all.addAll(results
+          .map((json) => AccountSnapshot.fromJson(json as Map<String, dynamic>)));
+      final next = data['next'] as String?;
+      url = next; // DRF returns absolute URL; ApiClient handles it
+    }
+    return all;
   }
 
   /// Add a new snapshot to an account.

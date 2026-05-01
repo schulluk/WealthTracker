@@ -1,5 +1,5 @@
-# Load .env from app/ directory
-env_file = File.expand_path("../../.env", __dir__)
+APP_ROOT = File.expand_path("../../", __dir__)
+env_file = File.join(APP_ROOT, ".env")
 if File.exist?(env_file)
   File.readlines(env_file).each do |line|
     line.strip!
@@ -9,82 +9,21 @@ if File.exist?(env_file)
   end
 end
 
+# Resolve relative paths in .env to absolute paths
+%w[ASC_KEY_PATH PLAY_STORE_JSON_KEY].each do |key|
+  if ENV[key] && !File.absolute_path?(ENV[key])
+    ENV[key] = File.join(APP_ROOT, ENV[key])
+  end
+end
+
 default_platform(:ios)
 
-# Helper to get absolute path for ASC key (ASC_KEY_PATH is relative to app/ directory)
-def asc_key_path
-  return nil unless ENV['ASC_KEY_PATH']
-  # __dir__ is ios/fastlane, go up two levels to app/
-  File.expand_path(ENV['ASC_KEY_PATH'], File.expand_path("../..", __dir__))
-end
+APP_IDENTIFIER = "ch.miniapps.wealthtracker"
+TEAM_ID = "7PSHT7LSVZ"
+RELEASES_DIR = File.expand_path("../../_releases", __dir__)
 
-# Helper to setup ASC API key
-def setup_asc_key
-  key_path = asc_key_path
-  if ENV['ASC_KEY_ID'] && ENV['ASC_ISSUER_ID'] && key_path
-    app_store_connect_api_key(
-      key_id: ENV['ASC_KEY_ID'],
-      issuer_id: ENV['ASC_ISSUER_ID'],
-      key_filepath: key_path
-    )
-  end
-end
+# --- CHANGELOG helpers ---
 
-# Helper to setup signing
-def setup_signing
-  get_certificates(platform: "ios")
-
-  get_provisioning_profile(
-    app_identifier: "ch.miniapps.wealthtracker",
-    platform: "ios"
-  )
-  install_provisioning_profile(path: lane_context[SharedValues::SIGH_PROFILE_PATH])
-  @app_profile_name = lane_context[SharedValues::SIGH_NAME]
-end
-
-# Helper to build Flutter and export IPA
-def build_ipa(build_number:, version:)
-  Dir.chdir("..") do
-    sh("env -u GEM_HOME -u GEM_PATH -u BUNDLE_GEMFILE -u BUNDLE_BIN_PATH flutter build ios --release --no-codesign --build-name=#{version} --build-number=#{build_number}")
-  end
-
-  archive_path = File.expand_path("../build/ios/archive/Runner.xcarchive", __dir__)
-  output_dir = File.expand_path("../build/ios/ipa", __dir__)
-
-  gym(
-    workspace: "Runner.xcworkspace",
-    scheme: "Runner",
-    configuration: "Release",
-    archive_path: archive_path,
-    output_directory: output_dir,
-    output_name: "wealth_tracker",
-    export_method: "app-store",
-    export_options: {
-      provisioningProfiles: {
-        "ch.miniapps.wealthtracker" => @app_profile_name
-      }
-    }
-  )
-
-  ipa_path = "#{output_dir}/wealth_tracker.ipa"
-  unless File.exist?(ipa_path)
-    UI.user_error!("IPA not found at #{ipa_path}")
-  end
-
-  ipa_path
-end
-
-# Helper to get next build number from ASC
-def next_build_number
-  build_num = latest_testflight_build_number(
-    app_identifier: "ch.miniapps.wealthtracker"
-  ) + 1
-  UI.message("Next build number: #{build_num}")
-  build_num
-end
-
-# Read version and release notes from CHANGELOG.md.
-# Expects a "## Next: X.Y.Z" heading with bullet points below it.
 def changelog_path
   File.expand_path("../../CHANGELOG.md", __dir__)
 end
@@ -92,16 +31,14 @@ end
 def changelog_version
   path = changelog_path
   UI.user_error!("CHANGELOG.md not found at #{path}") unless File.exist?(path)
-
   content = File.read(path)
-  match = content.match(/^## Next:\s*(\d+\.\d+\.\d+)/)
+  match = content.match(/^## Next:?\s+(\d+\.\d+\.\d+)/)
   unless match
     UI.user_error!(
       "No '## Next: X.Y.Z' heading found in CHANGELOG.md. " \
       "Add one (e.g. '## Next: 1.4.0') before running beta."
     )
   end
-
   version = match[1]
   UI.message("CHANGELOG version: #{version}")
   version
@@ -109,33 +46,135 @@ end
 
 def changelog_notes
   content = File.read(changelog_path)
-  section = content.match(/^## Next:\s*\d+\.\d+\.\d+\s*\n(.*?)(?=^## |\z)/m)
+  section = content.match(/^## Next:?\s+\d+\.\d+\.\d+\s*\n(.*?)(?=^## |\z)/m)
   return "" unless section
   section[1].strip
 end
 
-# Write release notes from CHANGELOG.md to fastlane metadata files.
-def write_release_notes
-  version = changelog_version
-  notes = changelog_notes
+# --- Auto-bump version (iOS: iTunes API only) ---
 
-  if notes.empty?
-    UI.important("No release notes found under '## Next: #{version}' in CHANGELOG.md")
-    return version
+def auto_bump_version
+  content = File.read(changelog_path)
+  if content.match?(/^## Next:?\s+\d+\.\d+\.\d+\s*!/)
+    UI.message("Version is pinned (!) — skipping auto-bump")
+    return
   end
 
-  # iOS: no emoji, max 4000 chars
-  metadata_dir = File.expand_path("metadata", __dir__)
+  current = changelog_version
+  production_versions = []
 
-  en_path = File.join(metadata_dir, "en-US", "release_notes.txt")
-  File.write(en_path, notes[0, 4000])
-  UI.message("Wrote release notes to #{en_path}")
+  begin
+    require 'net/http'
+    require 'json'
+    uri = URI("https://itunes.apple.com/lookup?bundleId=ch.miniapps.wealthtracker&country=CH")
+    response = Net::HTTP.get(uri)
+    data = JSON.parse(response)
+    if data["resultCount"].to_i > 0
+      ios_version = data["results"][0]["version"]
+      production_versions << ios_version if ios_version
+    end
+  rescue => e
+    UI.important("Could not check App Store production: #{e.message}")
+  end
 
-  version
+  if production_versions.include?(current)
+    major, minor, patch = current.split('.').map(&:to_i)
+    new_version = "#{major}.#{minor}.#{patch + 1}"
+    UI.important("Version #{current} already in production. Bumping to #{new_version}")
+
+    content = File.read(changelog_path)
+    content.sub!(
+      /^## Next:?\s+#{Regexp.escape(current)}/,
+      "## Next: #{new_version}\n\n- Bug fixes and improvements.\n\n## #{current}"
+    )
+    File.write(changelog_path, content)
+    UI.success("CHANGELOG.md updated: #{current} -> #{new_version}")
+  end
 end
 
-# Directory for saving build artifacts when store upload fails.
-RELEASES_DIR = File.expand_path("../../_releases", __dir__)
+# --- Certificate validation ---
+
+def validate_signing_cert
+  p12_path = File.join(APP_ROOT, "keys/apple-distribution.p12")
+
+  unless File.exist?(p12_path)
+    UI.user_error!(
+      "Distribution certificate not found at keys/apple-distribution.p12\n" \
+      "To create a new one:\n" \
+      "  1. Generate a CSR: openssl req -new -newkey rsa:2048 -nodes -keyout keys/apple-distribution.key -out /tmp/CSR.certSigningRequest -subj \"/emailAddress=lukas@schulze.uno/CN=Lukas Schulze/C=CH\"\n" \
+      "  2. Upload CSR at https://developer.apple.com/account/resources/certificates/add (select 'Apple Distribution')\n" \
+      "  3. Download the .cer file\n" \
+      "  4. Convert to PEM: openssl x509 -in distribution.cer -inform DER -out /tmp/distribution.pem\n" \
+      "  5. Create .p12: openssl pkcs12 -export -out keys/apple-distribution.p12 -inkey keys/apple-distribution.key -in /tmp/distribution.pem -passout pass:\"<password>\"\n" \
+      "  6. Set CERT_P12_PASSWORD=<password> in .env"
+    )
+  end
+
+  password = ENV['CERT_P12_PASSWORD'] || ""
+
+  # Try openssl first, fall back to security tool for Apple-format p12 files
+  cert_info = `openssl pkcs12 -in "#{p12_path}" -nokeys -passin pass:"#{password}" 2>/dev/null | openssl x509 -noout -enddate -subject 2>/dev/null`.strip
+  if cert_info.empty?
+    cert_info = `openssl pkcs12 -in "#{p12_path}" -nokeys -passin pass:"#{password}" -legacy 2>/dev/null | openssl x509 -noout -enddate -subject 2>/dev/null`.strip
+  end
+  if cert_info.empty?
+    # Apple-exported p12 — verify it's importable via security tool
+    test_kc = "fastlane_test_#{Process.pid}.keychain"
+    test_kc_path = File.expand_path("~/Library/Keychains/#{test_kc}-db")
+    test_pw = SecureRandom.hex(8)
+    begin
+      system("security", "create-keychain", "-p", test_pw, test_kc, out: File::NULL, err: File::NULL)
+      result = system("security", "import", p12_path, "-k", test_kc_path, "-P", password, "-T", "/usr/bin/codesign", out: File::NULL, err: File::NULL)
+      unless result
+        UI.user_error!(
+          "Cannot read certificate at keys/apple-distribution.p12\n" \
+          "Check that CERT_P12_PASSWORD in .env matches the password used when creating the .p12"
+        )
+      end
+      UI.message("Distribution certificate validated (Apple format p12)")
+    ensure
+      system("security", "delete-keychain", test_kc_path, out: File::NULL, err: File::NULL)
+    end
+    return
+  end
+
+  if cert_info =~ /notAfter=(.+)/
+    expiry = Time.parse($1)
+    days_left = ((expiry - Time.now) / 86400).to_i
+    if days_left < 0
+      UI.user_error!(
+        "Distribution certificate expired #{-days_left} days ago (#{expiry.strftime('%Y-%m-%d')}).\n" \
+        "Create a new one at https://developer.apple.com/account/resources/certificates/add"
+      )
+    elsif days_left < 30
+      UI.important("Distribution certificate expires in #{days_left} days (#{expiry.strftime('%Y-%m-%d')})")
+    end
+  end
+end
+
+# --- ASC key helper ---
+
+def asc_key_path
+  ENV.fetch('ASC_KEY_PATH')
+end
+
+def setup_asc_key
+  app_store_connect_api_key(
+    key_id: ENV.fetch("ASC_KEY_ID"),
+    issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+    key_filepath: asc_key_path,
+  )
+end
+
+# --- Build number ---
+
+def next_build_number
+  build_num = latest_testflight_build_number(app_identifier: APP_IDENTIFIER) + 1
+  UI.message("Next build number: #{build_num}")
+  build_num
+end
+
+# --- Release artifact helpers ---
 
 def save_release(artifact_path, version, ext)
   FileUtils.mkdir_p(RELEASES_DIR)
@@ -153,9 +192,124 @@ def clean_old_release(version, ext)
   end
 end
 
+# --- Release notes ---
+
+def write_release_notes
+  version = changelog_version
+  notes = changelog_notes
+  if notes.empty?
+    UI.important("No release notes found under '## Next: #{version}' in CHANGELOG.md")
+    return version
+  end
+
+  metadata_dir = File.expand_path("metadata", __dir__)
+
+  en_path = File.join(metadata_dir, "en-US", "release_notes.txt")
+  File.write(en_path, notes[0, 4000])
+
+  # Copyright — read holder from METADATA.md, prepend current year
+  metadata_md = File.expand_path("../../METADATA.md", __dir__)
+  if File.exist?(metadata_md)
+    match = File.read(metadata_md).match(/\*\*Copyright\*\*.*?\n```\n(.+?)\n```/m)
+    if match
+      copyright_path = File.join(metadata_dir, "en-US", "copyright.txt")
+      File.write(copyright_path, "#{Time.now.year} #{match[1].strip}")
+    end
+  end
+
+  version
+end
+
+# --- Signing setup ---
+#
+# We don't use xcodebuild's "automatic / cloud signing" because it requires the
+# ASC API key to have provisioning-profile management permissions, which our key
+# does not have (results in "Cloud signing permission error" + "No profiles
+# found"). Instead we fetch the profile via Spaceship (sigh), install it, and
+# switch the Xcode project to manual signing — same approach as cakeday.
+
+def setup_signing
+  get_provisioning_profile(
+    app_identifier: APP_IDENTIFIER,
+    platform: "ios",
+  )
+  install_provisioning_profile(path: lane_context[SharedValues::SIGH_PROFILE_PATH])
+  @app_profile_name = lane_context[SharedValues::SIGH_NAME]
+
+  update_code_signing_settings(
+    use_automatic_signing: false,
+    path: File.join(APP_ROOT, "ios/Runner.xcodeproj"),
+    team_id: TEAM_ID,
+    code_sign_identity: "iPhone Distribution",
+    targets: ["Runner"],
+    profile_name: @app_profile_name,
+    bundle_identifier: APP_IDENTIFIER,
+  )
+end
+
+# --- Build IPA (temp keychain + manual signing) ---
+
+def build_ipa(build_number:, version:)
+  archive_path = File.join(APP_ROOT, "build/ios/archive/Runner.xcarchive")
+  export_path = File.join(APP_ROOT, "build/ios/ipa")
+  releases_dir = File.join(APP_ROOT, "_releases")
+  p12_path = File.join(APP_ROOT, "keys/apple-distribution.p12")
+  FileUtils.rm_rf(export_path)
+  FileUtils.rm_rf(archive_path)
+  FileUtils.mkdir_p(releases_dir)
+
+  keychain_name = "fastlane_build_#{Process.pid}.keychain"
+  keychain_path = File.expand_path("~/Library/Keychains/#{keychain_name}-db")
+  keychain_password = SecureRandom.hex(16)
+  begin
+    sh("security", "create-keychain", "-p", keychain_password, keychain_name)
+    sh("security", "set-keychain-settings", "-lut", "3600", keychain_path)
+    sh("security", "unlock-keychain", "-p", keychain_password, keychain_path)
+    existing = `security list-keychains -d user`.scan(/"(.+?)"/).flatten
+    sh("security", "list-keychains", "-d", "user", "-s", *existing, keychain_path)
+    sh("security", "import", p12_path, "-k", keychain_path, "-P", ENV['CERT_P12_PASSWORD'] || "",
+       "-T", "/usr/bin/codesign", "-T", "/usr/bin/security")
+    sh("security", "set-key-partition-list", "-S", "apple-tool:,apple:", "-s", "-k", keychain_password, keychain_path)
+
+    Dir.chdir(APP_ROOT) do
+      sh("env -u GEM_HOME -u GEM_PATH -u BUNDLE_GEMFILE -u BUNDLE_BIN_PATH " \
+         "flutter build ios --release " \
+         "--build-name=#{version} --build-number=#{build_number} --no-codesign")
+    end
+
+    gym(
+      workspace: File.join(APP_ROOT, "ios/Runner.xcworkspace"),
+      scheme: "Runner",
+      configuration: "Release",
+      archive_path: archive_path,
+      output_directory: export_path,
+      output_name: "wealth-tracker",
+      export_method: "app-store",
+      export_options: {
+        provisioningProfiles: {
+          APP_IDENTIFIER => @app_profile_name
+        }
+      }
+    )
+
+    ipa = Dir["#{export_path}/*.ipa"].first
+    UI.user_error!("No IPA found after gym") unless ipa
+
+    dest = File.join(releases_dir, "wealth-tracker-#{version}.ipa")
+    FileUtils.cp(ipa, dest)
+    dest
+  ensure
+    sh("security", "delete-keychain", keychain_path) rescue nil
+  end
+end
+
+# === LANES ===
+
 platform :ios do
   desc "Build and upload to TestFlight"
   lane :beta do
+    validate_signing_cert
+    auto_bump_version
     version = write_release_notes
     clean_old_release(version, "ipa")
     setup_ci if ENV['CI']
@@ -168,8 +322,20 @@ platform :ios do
       upload_to_testflight(
         ipa: ipa_path,
         skip_waiting_for_build_processing: true,
-        app_identifier: "ch.miniapps.wealthtracker",
+        app_identifier: APP_IDENTIFIER,
         changelog: changelog_notes
+      )
+
+      deliver(
+        skip_binary_upload: true,
+        skip_screenshots: true,
+        force: true,
+        precheck_include_in_app_purchases: false,
+        app_identifier: APP_IDENTIFIER,
+        app_version: version,
+        build_number: build_num.to_s,
+        metadata_path: "fastlane/metadata",
+        skip_metadata: false
       )
     rescue => e
       UI.error("App Store upload failed: #{e.message}")
@@ -178,8 +344,40 @@ platform :ios do
     end
   end
 
+  desc "Submit latest TestFlight build for App Store review"
+  lane :submit do
+    version = changelog_version
+    setup_asc_key
+    deliver(
+      skip_binary_upload: true,
+      skip_screenshots: true,
+      skip_metadata: true,
+      submit_for_review: true,
+      automatic_release: false,
+      force: true,
+      precheck_include_in_app_purchases: false,
+      app_identifier: APP_IDENTIFIER,
+      app_version: version
+    )
+  end
+
+  desc "Upload metadata from METADATA.md to App Store Connect"
+  lane :metadata do
+    sh(File.expand_path("../../sync_store_listings.sh", __dir__))
+    setup_asc_key
+    deliver(
+      skip_binary_upload: true,
+      skip_screenshots: true,
+      force: true,
+      precheck_include_in_app_purchases: false,
+      app_identifier: APP_IDENTIFIER,
+      metadata_path: "fastlane/metadata"
+    )
+  end
+
   desc "Build and upload to App Store"
   lane :release do
+    validate_signing_cert
     version = changelog_version
     setup_ci if ENV['CI']
     setup_asc_key
@@ -194,16 +392,33 @@ platform :ios do
       force: true,
       skip_metadata: true,
       skip_screenshots: true,
-      app_identifier: "ch.miniapps.wealthtracker"
+      app_identifier: APP_IDENTIFIER
+    )
+  end
+
+  desc "Upload screenshots to App Store Connect"
+  lane :screenshots do
+    setup_asc_key
+    deliver(
+      skip_binary_upload: true,
+      skip_metadata: true,
+      overwrite_screenshots: true,
+      force: true,
+      app_identifier: APP_IDENTIFIER,
+      screenshots_path: "fastlane/screenshots"
     )
   end
 
   desc "Build IPA locally without uploading"
   lane :build do
+    validate_signing_cert
     version = changelog_version
     setup_asc_key
-    build_num = next_build_number
     setup_signing
+
+    pubspec = File.read(File.expand_path("../../pubspec.yaml", __dir__))
+    build_num = pubspec.match(/version:\s*\S+\+(\d+)/)[1]
+
     ipa_path = build_ipa(build_number: build_num, version: version)
     UI.success("Built: #{ipa_path}")
   end

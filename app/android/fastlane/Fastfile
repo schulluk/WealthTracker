@@ -1,5 +1,5 @@
-# Load .env from app/ directory
-env_file = File.expand_path("../../.env", __dir__)
+APP_ROOT = File.expand_path("../../", __dir__)
+env_file = File.join(APP_ROOT, ".env")
 if File.exist?(env_file)
   File.readlines(env_file).each do |line|
     line.strip!
@@ -9,17 +9,27 @@ if File.exist?(env_file)
   end
 end
 
-# Generate a unique, ever-increasing build number from the current UTC time.
-# Format: seconds since 2026-03-01 (fits well within the 2_100_000_000 limit).
-def build_number
-  epoch = Time.new(2026, 3, 1, 0, 0, 0, "+00:00").to_i
-  (Time.now.utc.to_i - epoch).to_s
+# Resolve relative paths in .env to absolute paths
+%w[ASC_KEY_PATH PLAY_STORE_JSON_KEY].each do |key|
+  if ENV[key] && !File.absolute_path?(ENV[key])
+    ENV[key] = File.join(APP_ROOT, ENV[key])
+  end
 end
 
 default_platform(:android)
 
-# Read version and release notes from CHANGELOG.md.
-# Expects a "## Next: X.Y.Z" heading with bullet points below it.
+PACKAGE_NAME = "ch.miniapps.wealthtracker"
+RELEASES_DIR = File.expand_path("../../_releases", __dir__)
+
+# --- Build number ---
+
+def build_number
+  epoch = Time.new(2026, 1, 1, 0, 0, 0, "+00:00").to_i
+  (Time.now.utc.to_i - epoch).to_s
+end
+
+# --- CHANGELOG helpers ---
+
 def changelog_path
   File.expand_path("../../CHANGELOG.md", __dir__)
 end
@@ -27,16 +37,14 @@ end
 def changelog_version
   path = changelog_path
   UI.user_error!("CHANGELOG.md not found at #{path}") unless File.exist?(path)
-
   content = File.read(path)
-  match = content.match(/^## Next:\s*(\d+\.\d+\.\d+)/)
+  match = content.match(/^## Next:?\s+(\d+\.\d+\.\d+)/)
   unless match
     UI.user_error!(
       "No '## Next: X.Y.Z' heading found in CHANGELOG.md. " \
       "Add one (e.g. '## Next: 1.4.0') before running beta."
     )
   end
-
   version = match[1]
   UI.message("CHANGELOG version: #{version}")
   version
@@ -44,36 +52,87 @@ end
 
 def changelog_notes
   content = File.read(changelog_path)
-  section = content.match(/^## Next:\s*\d+\.\d+\.\d+\s*\n(.*?)(?=^## |\z)/m)
+  section = content.match(/^## Next:?\s+\d+\.\d+\.\d+\s*\n(.*?)(?=^## |\z)/m)
   return "" unless section
   section[1].strip
 end
 
-# Write release notes from CHANGELOG.md to fastlane metadata files.
+# --- Auto-bump version (Android: checks both stores) ---
+
+def auto_bump_version
+  content = File.read(changelog_path)
+  if content.match?(/^## Next:?\s+\d+\.\d+\.\d+\s*!/)
+    UI.message("Version is pinned (!) — skipping auto-bump")
+    return
+  end
+
+  current = changelog_version
+  production_versions = []
+
+  # Check Google Play production
+  begin
+    json_key = ENV['PLAY_STORE_JSON_KEY']
+    if json_key && File.exist?(json_key)
+      names = google_play_track_release_names(
+        track: "production",
+        json_key: json_key,
+        package_name: PACKAGE_NAME
+      )
+      production_versions.concat(names) if names
+    end
+  rescue => e
+    UI.important("Could not check Play Store production: #{e.message}")
+  end
+
+  # Check App Store production via public iTunes API
+  begin
+    require 'net/http'
+    require 'json'
+    uri = URI("https://itunes.apple.com/lookup?bundleId=ch.miniapps.wealthtracker&country=CH")
+    response = Net::HTTP.get(uri)
+    data = JSON.parse(response)
+    if data["resultCount"].to_i > 0
+      ios_version = data["results"][0]["version"]
+      production_versions << ios_version if ios_version
+    end
+  rescue => e
+    UI.important("Could not check App Store production: #{e.message}")
+  end
+
+  if production_versions.include?(current)
+    major, minor, patch = current.split('.').map(&:to_i)
+    new_version = "#{major}.#{minor}.#{patch + 1}"
+    UI.important("Version #{current} already in production. Bumping to #{new_version}")
+
+    content = File.read(changelog_path)
+    content.sub!(
+      /^## Next:?\s+#{Regexp.escape(current)}/,
+      "## Next: #{new_version}\n\n- Bug fixes and improvements.\n\n## #{current}"
+    )
+    File.write(changelog_path, content)
+    UI.success("CHANGELOG.md updated: #{current} -> #{new_version}")
+  end
+end
+
+# --- Release notes ---
+
 def write_release_notes
   version = changelog_version
   notes = changelog_notes
-
   if notes.empty?
     UI.important("No release notes found under '## Next: #{version}' in CHANGELOG.md")
     return version
   end
 
-  # Android: emoji OK, max 500 chars
   metadata_dir = File.expand_path("metadata/android", __dir__)
-
-  # English — full notes (truncated to 500 chars)
   en_path = File.join(metadata_dir, "en-US", "changelogs", "default.txt")
   File.write(en_path, notes[0, 500])
-  UI.message("Wrote release notes to #{en_path}")
 
   version
 end
 
-# Directory for saving build artifacts when store upload fails.
-RELEASES_DIR = File.expand_path("../../_releases", __dir__)
+# --- Release artifact helpers ---
 
-# Save a build artifact to _releases with version-stamped name.
 def save_release(artifact_path, version, ext)
   FileUtils.mkdir_p(RELEASES_DIR)
   dest = File.join(RELEASES_DIR, "wealth-tracker-#{version}.#{ext}")
@@ -82,7 +141,6 @@ def save_release(artifact_path, version, ext)
   dest
 end
 
-# Remove any existing release artifact for this version.
 def clean_old_release(version, ext)
   path = File.join(RELEASES_DIR, "wealth-tracker-#{version}.#{ext}")
   if File.exist?(path)
@@ -91,27 +149,28 @@ def clean_old_release(version, ext)
   end
 end
 
+# === LANES ===
+
 platform :android do
   desc "Build and upload to Google Play internal testing"
   lane :beta do
+    auto_bump_version
     version = write_release_notes
     clean_old_release(version, "aab")
 
-    # Build the Flutter app
     Dir.chdir("..") do
       sh("flutter build appbundle --release --build-name=#{version} --build-number=#{build_number}")
     end
 
     aab_path = "../build/app/outputs/bundle/release/app-release.aab"
-
-    # Upload to Play Store internal testing
     begin
       upload_to_play_store(
+        package_name: PACKAGE_NAME,
         track: "internal",
         aab: aab_path,
         skip_upload_images: true,
         skip_upload_screenshots: true,
-        json_key: ENV['PLAY_STORE_JSON_KEY'] || File.expand_path("play-store-key.json", __dir__)
+        json_key: ENV['PLAY_STORE_JSON_KEY']
       )
     rescue => e
       UI.error("Play Store upload failed: #{e.message}")
@@ -124,19 +183,18 @@ platform :android do
   lane :release do
     version = changelog_version
 
-    # Build the Flutter app
     Dir.chdir("..") do
       sh("flutter build appbundle --release --build-name=#{version} --build-number=#{build_number}")
     end
 
-    # Upload to Play Store production
     upload_to_play_store(
+      package_name: PACKAGE_NAME,
       track: "production",
       aab: "../build/app/outputs/bundle/release/app-release.aab",
       skip_upload_metadata: true,
       skip_upload_images: true,
       skip_upload_screenshots: true,
-      json_key: ENV['PLAY_STORE_JSON_KEY'] || File.expand_path("play-store-key.json", __dir__)
+      json_key: ENV['PLAY_STORE_JSON_KEY']
     )
   end
 
@@ -144,27 +202,73 @@ platform :android do
   lane :beta_public do
     version = changelog_version
 
-    # Build the Flutter app
     Dir.chdir("..") do
       sh("flutter build appbundle --release --build-name=#{version} --build-number=#{build_number}")
     end
 
-    # Upload to Play Store beta track
     upload_to_play_store(
+      package_name: PACKAGE_NAME,
       track: "beta",
       aab: "../build/app/outputs/bundle/release/app-release.aab",
       skip_upload_metadata: true,
       skip_upload_images: true,
       skip_upload_screenshots: true,
-      json_key: ENV['PLAY_STORE_JSON_KEY'] || File.expand_path("play-store-key.json", __dir__)
+      json_key: ENV['PLAY_STORE_JSON_KEY']
     )
+  end
+
+  desc "Submit latest internal build for production (triggers Google review)"
+  lane :submit do
+    upload_to_play_store(
+      package_name: PACKAGE_NAME,
+      track: "internal",
+      track_promote_to: "production",
+      skip_upload_aab: true,
+      skip_upload_apk: true,
+      skip_upload_metadata: true,
+      skip_upload_changelogs: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      json_key: ENV['PLAY_STORE_JSON_KEY']
+    )
+  end
+
+  desc "Upload metadata from METADATA.md to Google Play"
+  lane :metadata do |options|
+    sh(File.expand_path("../../sync_store_listings.sh", __dir__))
+    params = {
+      package_name: PACKAGE_NAME,
+      track: "internal",
+      skip_upload_aab: true,
+      skip_upload_apk: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      skip_upload_changelogs: true,
+      metadata_path: "fastlane/metadata/android",
+      json_key: ENV["PLAY_STORE_JSON_KEY"],
+    }
+    params[:version_code] = options[:version_code].to_i if options[:version_code]
+    supply(params)
+  end
+
+  desc "Upload screenshots to Google Play"
+  lane :screenshots do |options|
+    params = {
+      package_name: PACKAGE_NAME,
+      skip_upload_aab: true,
+      skip_upload_apk: true,
+      skip_upload_changelogs: true,
+      metadata_path: "fastlane/metadata/android",
+      json_key: ENV["PLAY_STORE_JSON_KEY"],
+    }
+    params[:version_code] = options[:version_code].to_i if options[:version_code]
+    supply(params)
   end
 
   desc "Build APK and AAB locally without uploading"
   lane :build do
     version = changelog_version
 
-    # Build the Flutter app
     Dir.chdir("..") do
       sh("flutter build appbundle --release --build-name=#{version} --build-number=#{build_number}")
       sh("flutter build apk --release --build-name=#{version} --build-number=#{build_number}")
@@ -178,26 +282,32 @@ platform :android do
   desc "Promote internal to beta"
   lane :promote_to_beta do
     upload_to_play_store(
+      package_name: PACKAGE_NAME,
       track: "internal",
       track_promote_to: "beta",
       skip_upload_aab: true,
+      skip_upload_apk: true,
       skip_upload_metadata: true,
+      skip_upload_changelogs: true,
       skip_upload_images: true,
       skip_upload_screenshots: true,
-      json_key: ENV['PLAY_STORE_JSON_KEY'] || File.expand_path("play-store-key.json", __dir__)
+      json_key: ENV['PLAY_STORE_JSON_KEY']
     )
   end
 
   desc "Promote beta to production"
   lane :promote_to_production do
     upload_to_play_store(
+      package_name: PACKAGE_NAME,
       track: "beta",
       track_promote_to: "production",
       skip_upload_aab: true,
+      skip_upload_apk: true,
       skip_upload_metadata: true,
+      skip_upload_changelogs: true,
       skip_upload_images: true,
       skip_upload_screenshots: true,
-      json_key: ENV['PLAY_STORE_JSON_KEY'] || File.expand_path("play-store-key.json", __dir__)
+      json_key: ENV['PLAY_STORE_JSON_KEY']
     )
   end
 end
