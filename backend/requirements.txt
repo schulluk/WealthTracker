@@ -31,6 +31,7 @@ psycopg2-binary==2.9.11
 pycparser==3.0
 Pygments==2.19.2
 PyJWT==2.12.1
+playwright==1.60.0
 pyotp==2.9.0
 python-dotenv==1.2.2
 python-json-logger==4.0.0

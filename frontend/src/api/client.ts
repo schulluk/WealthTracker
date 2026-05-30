@@ -457,7 +457,18 @@ export async function deleteSnapshot(snapshotId: number) {
   }
 }
 
-export async function updateAccount(accountId: number, fields: { name?: string; sync_enabled?: boolean }) {
+export async function updateAccount(
+  accountId: number,
+  fields: {
+    name?: string;
+    sync_enabled?: boolean;
+    broker_code?: string;
+    is_manual?: boolean;
+    account_identifier?: string;
+    account_type?: string;
+    currency?: string;
+  },
+) {
   const res = await fetchWithAuth(`/api/accounts/${accountId}/`, {
     method: 'PATCH',
     body: JSON.stringify(fields),

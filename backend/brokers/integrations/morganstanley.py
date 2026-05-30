@@ -17,6 +17,7 @@ Chrome's TLS fingerprint and carefully replicates browser behavior.
 import base64
 import json
 import logging
+import os
 import re
 from datetime import date
 from decimal import Decimal
@@ -49,11 +50,16 @@ class MorganStanleyIntegration(BrokerIntegrationBase):
     BASE_URL = "https://atwork.morganstanley.com"
     GRAPHQL_URL = "https://atwork.morganstanley.com/graphql"
 
-    def __init__(self, credentials: Dict[str, Any]):
+    def __init__(self, credentials: Dict[str, Any], account_id: Any = None):
         super().__init__(credentials)
+        self.account_id = account_id
         self.account_number = credentials.get('account_number') or credentials.get('username')
         self.password = credentials.get('password')
+        self.totp_secret = credentials.get('totp_secret')
         self.employee_id = credentials.get('employee_id')
+        # Whether to count unvested shares in the balance. Default False: only
+        # vested value (shares that actually belong to the user).
+        self.include_unvested = str(credentials.get('include_unvested', '')).lower() in ('1', 'true', 'yes', 'on')
         # Use curl_cffi session with Chrome impersonation for TLS fingerprint
         self._session = curl_requests.Session(impersonate="chrome")
         self._setup_session()
@@ -147,6 +153,14 @@ class MorganStanleyIntegration(BrokerIntegrationBase):
 
         Note: JWT expires after ~1 hour. Credentials need periodic refresh.
         """
+        # Preferred path: full programmatic login in a headless browser using
+        # username + password + TOTP seed. Falls through to the manual JWT path
+        # if the browser/Playwright isn't available in this environment.
+        if self.account_number and self.password and self.totp_secret:
+            browser_result = self._browser_authenticate()
+            if browser_result is not None:
+                return browser_result
+
         # JWT token and employee_id are required
         if self._jwt_token and self.employee_id:
             self._authenticated = True
@@ -180,6 +194,62 @@ class MorganStanleyIntegration(BrokerIntegrationBase):
                          "6) Copy 'employeeid' header → Employee ID. "
                          "Note: JWT expires after ~1 hour."
         )
+
+    def _browser_authenticate(self) -> Optional[AuthResult]:
+        """
+        Run the headless-browser login (username + password + TOTP seed).
+
+        Returns an AuthResult on a definitive outcome (success or failure), or
+        None when the browser path is unavailable so the caller falls back to the
+        manual JWT path. On success, sets self._jwt_token + self.employee_id; the
+        rest of the integration (GraphQL fetch) then works unchanged.
+        """
+        from . import morganstanley_browser as msb
+
+        try:
+            result = msb.browser_login(
+                username=self.account_number,
+                password=self.password,
+                totp_secret=self.totp_secret,
+                state_dir=self._browser_state_dir(),
+                account_id=self.account_id,
+            )
+        except msb.BrowserLoginUnavailable as exc:
+            logger.warning(
+                "Morgan Stanley: browser login unavailable (%s); "
+                "falling back to manual JWT if provided.", exc,
+            )
+            return None
+        except msb.BrowserLoginError as exc:
+            logger.error("Morgan Stanley: browser login failed: %s", exc)
+            return AuthResult(success=False, error_message=str(exc))
+
+        self._jwt_token = result['jwt_token']
+        self.employee_id = result['employee_id']
+        self._authenticated = True
+        logger.info(
+            "Morgan Stanley: authenticated via headless browser "
+            "(employee_id=%s, device-trust persisted=%s)",
+            self.employee_id, result.get('state_persisted'),
+        )
+        return AuthResult(success=True)
+
+    @staticmethod
+    def _browser_state_dir() -> str:
+        """Directory for persisted device-trust state (storage_state per account).
+
+        Override with the MS_BROWSER_STATE_DIR setting/env var to point at a
+        persistent volume (recommended for Docker so device-trust survives
+        container rebuilds). Defaults to <BASE_DIR>/ms_browser_state.
+        """
+        from django.conf import settings
+        configured = (
+            getattr(settings, 'MS_BROWSER_STATE_DIR', None)
+            or os.environ.get('MS_BROWSER_STATE_DIR')
+        )
+        if configured:
+            return configured
+        return os.path.join(str(getattr(settings, 'BASE_DIR', '.')), 'ms_browser_state')
 
     def _do_login(self) -> AuthResult:
         """Perform the actual login with credentials.
@@ -971,20 +1041,26 @@ class MorganStanleyIntegration(BrokerIntegrationBase):
             available = portfolio.get('availableValue', {})
             unavailable = portfolio.get('unavailableValue', {})
 
-            # Only count vested (available) value - unvested shares aren't truly owned yet
             available_amount = Decimal(str(available.get('amount', 0)))
             unavailable_amount = Decimal(str(unavailable.get('amount', 0)))
 
             currency = available.get('currency', 'USD') or unavailable.get('currency', 'USD')
 
+            # Default: only vested (available) value — unvested shares aren't truly
+            # owned yet. Opt in to include unvested via the include_unvested credential.
+            balance_amount = available_amount
+            if self.include_unvested:
+                balance_amount = available_amount + unavailable_amount
+
             return BalanceInfo(
-                balance=available_amount,  # Only vested/available value
+                balance=balance_amount,
                 currency=currency,
                 balance_date=date.today(),
                 available_balance=available_amount,
                 raw_data={
                     'vestedValue': float(available_amount),
                     'unvestedValue': float(unavailable_amount),
+                    'includeUnvested': self.include_unvested,
                     'currency': currency
                 }
             )

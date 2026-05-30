@@ -19,6 +19,7 @@ interface Broker {
       title: string;
       format?: string;
       description?: string;
+      default?: boolean;
     }>;
     required?: string[];
   };
@@ -385,22 +386,38 @@ export default function AddAccountModal({ onClose, onCreated }: Props) {
               <fieldset className="form-fieldset">
                 <legend>Credentials</legend>
                 {credentialFields.map(([key, field]) => (
-                  <div className="form-group" key={key}>
-                    <label htmlFor={`cred-${key}`}>
-                      {field.title}
-                      {requiredCreds.includes(key) ? '' : ' (optional)'}
-                    </label>
-                    <input
-                      id={`cred-${key}`}
-                      type={field.format === 'password' ? 'password' : 'text'}
-                      required={requiredCreds.includes(key)}
-                      value={credentials[key] ?? ''}
-                      onChange={(e) =>
-                        setCredentials((prev) => ({ ...prev, [key]: e.target.value }))
-                      }
-                      placeholder={field.description}
-                    />
-                  </div>
+                  field.type === 'boolean' ? (
+                    <div className="form-group" key={key}>
+                      <label className="toggle-label">
+                        <input
+                          type="checkbox"
+                          checked={String(credentials[key] ?? field.default ?? false).toLowerCase() === 'true'}
+                          onChange={(e) =>
+                            setCredentials((prev) => ({ ...prev, [key]: e.target.checked ? 'true' : 'false' }))
+                          }
+                        />
+                        <span>{field.title}</span>
+                      </label>
+                      {field.description && <small className="form-hint">{field.description}</small>}
+                    </div>
+                  ) : (
+                    <div className="form-group" key={key}>
+                      <label htmlFor={`cred-${key}`}>
+                        {field.title}
+                        {requiredCreds.includes(key) ? '' : ' (optional)'}
+                      </label>
+                      <input
+                        id={`cred-${key}`}
+                        type={field.format === 'password' ? 'password' : 'text'}
+                        required={requiredCreds.includes(key)}
+                        value={credentials[key] ?? ''}
+                        onChange={(e) =>
+                          setCredentials((prev) => ({ ...prev, [key]: e.target.value }))
+                        }
+                        placeholder={field.description}
+                      />
+                    </div>
+                  )
                 ))}
                 <p className="form-hint" style={{ marginTop: 8 }}>
                   Don't have credentials?{' '}

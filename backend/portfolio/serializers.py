@@ -61,6 +61,24 @@ class FinancialAccountSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'status', 'last_sync_at', 'last_sync_error',
                            'created_at', 'updated_at']
 
+    def update(self, instance, validated_data):
+        old_broker_id = instance.broker_id
+        account = super().update(instance, validated_data)
+
+        # Security: changing the broker (incl. switching to/from manual) must never
+        # carry stored credentials across. Drop them entirely so the user has to
+        # re-enter them, even if they later migrate back to the original broker.
+        if account.broker_id != old_broker_id:
+            account.encrypted_credentials = None
+            account.pending_auth_state = None
+            account.last_sync_error = ''
+            account.status = 'active' if account.is_manual else 'pending_auth'
+            account.save(update_fields=[
+                'encrypted_credentials', 'pending_auth_state',
+                'last_sync_error', 'status',
+            ])
+        return account
+
 
 class FinancialAccountCreateSerializer(serializers.ModelSerializer):
     broker_code = serializers.SlugRelatedField(

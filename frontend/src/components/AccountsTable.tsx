@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, Plus, PlusCircle, AlertCircle, CheckCircle2, Clock, X, Key, Trash2, History, MinusCircle, Settings, Upload, Download } from 'lucide-react';
+import { RefreshCw, Plus, PlusCircle, AlertCircle, CheckCircle2, Clock, X, Key, Trash2, History, MinusCircle, Settings, Upload, Download, Repeat } from 'lucide-react';
 import { syncAccount, completeAccountAuth, deleteAccount, updateAccount, updateAccountCredentials, getAccountCredentials, getBroker } from '../api/client';
 import AddSnapshotModal from './AddSnapshotModal';
 import AddAccountModal from './AddAccountModal';
+import MigrateAccountModal from './MigrateAccountModal';
 import SnapshotsModal from './SnapshotsModal';
 import ImportModal from './ImportModal';
 import ExportModal from './ExportModal';
@@ -129,6 +130,16 @@ export default function AccountsTable({ accounts, baseCurrency, onRefresh }: Pro
   const [credentialsError, setCredentialsError] = useState('');
   const [settingsAccountName, setSettingsAccountName] = useState('');
   const [settingsSyncEnabled, setSettingsSyncEnabled] = useState(true);
+
+  // Change-account-type (migration) workflow
+  const [migrateAccount, setMigrateAccount] = useState<Account | null>(null);
+
+  const openMigrate = (account: Account) => {
+    setCredentialsAccount(null);
+    setCredentialsRetrySync(false);
+    setCredentialsError('');
+    setMigrateAccount(account);
+  };
 
   // Toast notifications
   const [toasts, setToasts] = useState<ToastData[]>([]);
@@ -735,19 +746,35 @@ export default function AccountsTable({ accounts, baseCurrency, onRefresh }: Pro
                   />
                 </div>
                 {Object.entries(credentialSchema.properties).map(([key, field]: [string, any]) => (
-                  <div className="form-group" key={key}>
-                    <label htmlFor={`cred-${key}`}>{field.title || key}</label>
-                    <input
-                      id={`cred-${key}`}
-                      type={field.format === 'password' ? 'password' : 'text'}
-                      value={credentialValues[key] || ''}
-                      onChange={(e) => setCredentialValues(prev => ({ ...prev, [key]: e.target.value }))}
-                      placeholder={field.description || ''}
-                    />
-                    {field.description && (
-                      <small className="form-hint">{field.description}</small>
-                    )}
-                  </div>
+                  field.type === 'boolean' ? (
+                    <div className="form-group" key={key}>
+                      <label className="toggle-label">
+                        <input
+                          type="checkbox"
+                          checked={String(credentialValues[key] ?? field.default ?? false).toLowerCase() === 'true'}
+                          onChange={(e) => setCredentialValues(prev => ({ ...prev, [key]: e.target.checked ? 'true' : 'false' }))}
+                        />
+                        <span>{field.title || key}</span>
+                      </label>
+                      {field.description && (
+                        <small className="form-hint">{field.description}</small>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="form-group" key={key}>
+                      <label htmlFor={`cred-${key}`}>{field.title || key}</label>
+                      <input
+                        id={`cred-${key}`}
+                        type={field.format === 'password' ? 'password' : 'text'}
+                        value={credentialValues[key] || ''}
+                        onChange={(e) => setCredentialValues(prev => ({ ...prev, [key]: e.target.value }))}
+                        placeholder={field.description || ''}
+                      />
+                      {field.description && (
+                        <small className="form-hint">{field.description}</small>
+                      )}
+                    </div>
+                  )
                 ))}
 
                 {credentialsAccount.broker.supports_auto_sync && (
@@ -779,6 +806,14 @@ export default function AccountsTable({ accounts, baseCurrency, onRefresh }: Pro
                   >
                     <Trash2 size={14} style={{ marginRight: 6 }} />
                     Delete
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => openMigrate(credentialsAccount)}
+                  >
+                    <Repeat size={14} style={{ marginRight: 6 }} />
+                    Change type
                   </button>
                   <button
                     type="button"
@@ -854,6 +889,14 @@ export default function AccountsTable({ accounts, baseCurrency, onRefresh }: Pro
                   <button
                     type="button"
                     className="btn btn-ghost"
+                    onClick={() => openMigrate(credentialsAccount)}
+                  >
+                    <Repeat size={14} style={{ marginRight: 6 }} />
+                    Change type
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
                     onClick={() => { setCredentialsAccount(null); setCredentialsRetrySync(false); setCredentialsError(''); }}
                   >
                     Cancel
@@ -872,6 +915,19 @@ export default function AccountsTable({ accounts, baseCurrency, onRefresh }: Pro
             )}
           </div>
         </div>
+      )}
+
+      {/* Change Account Type (migration) workflow */}
+      {migrateAccount && (
+        <MigrateAccountModal
+          account={migrateAccount}
+          onClose={() => setMigrateAccount(null)}
+          onMigrated={(message) => {
+            setMigrateAccount(null);
+            addToast('success', message);
+            onRefresh();
+          }}
+        />
       )}
 
       {/* Toast notifications */}

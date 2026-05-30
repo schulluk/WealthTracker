@@ -19,14 +19,16 @@ cd frontend && npm run dev
 ### Key Documentation
 - **Morgan Stanley Integration**: See [docs/morgan-stanley-integration.md](docs/morgan-stanley-integration.md)
   - CRITICAL: `employeeid` header uses `employeePK` (NOT JWT `sub` claim!)
-  - JWT tokens expire in ~1 hour
+  - JWT tokens expire in ~15 min; mint fresh per sync via `POST /rest/participant/v2/auth/tokens`
+  - Auth is fully programmatic (no manual JWT paste needed) — see the "Programmatic Authentication (Solved)" section
 
 ## Broker Integrations
 
 ### Morgan Stanley at Work
-- Uses GraphQL API at `https://atwork.morganstanley.com/graphql`
-- Requires: JWT token + employee_id (from `employeePK`, not JWT sub!)
-- Bot detection may block login - use DevTools to get JWT manually
+- Uses GraphQL API at `https://atwork.morganstanley.com/graphql` (or REST `/rest/participant/v2/...`)
+- Requires: username + password + TOTP secret (auth is fully programmatic)
+- Flow: `userLogin.do` -> scrape `SW.initialData` -> mint JWT at `/rest/participant/v2/auth/tokens` -> fetch
+- `employeeid` header uses `employeePK` (NOT JWT `sub`!). Manual DevTools JWT paste remains a fallback.
 - See full docs: [docs/morgan-stanley-integration.md](docs/morgan-stanley-integration.md)
 
 ### Interactive Brokers (IBKR)

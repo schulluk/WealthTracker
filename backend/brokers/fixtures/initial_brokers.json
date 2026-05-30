@@ -88,35 +88,47 @@
       "country": "US",
       "is_active": true,
       "supports_2fa": true,
-      "supports_auto_sync": false,
+      "supports_auto_sync": true,
       "credential_schema": {
         "type": "object",
-        "required": ["jwt_token", "employee_id"],
+        "required": ["username", "password", "totp_secret"],
         "properties": {
-          "jwt_token": {
-            "type": "string",
-            "title": "JWT Token",
-            "format": "password",
-            "description": "Required. From browser DevTools > Network > filter 'graphql' > Headers > 'authorization' value"
-          },
-          "employee_id": {
-            "type": "string",
-            "title": "Employee ID",
-            "description": "Required. From same request's 'employeeid' header (NOT the JWT 'sub' claim)"
-          },
           "username": {
             "type": "string",
-            "title": "Username (optional)",
-            "description": "Your Morgan Stanley at Work login - for reference only, login disabled due to JWT generation"
+            "title": "Username",
+            "description": "Your Morgan Stanley at Work login (account number / username)"
           },
           "password": {
             "type": "string",
-            "title": "Password (optional)",
+            "title": "Password",
             "format": "password",
-            "description": "Your password - for reference only, login disabled due to JWT generation"
+            "description": "Your Morgan Stanley at Work password"
+          },
+          "totp_secret": {
+            "type": "string",
+            "title": "Authenticator Secret (TOTP)",
+            "format": "password",
+            "description": "Base32 seed from your MS authenticator-app setup ('can't scan? enter this key'). Used to generate 2FA codes automatically."
+          },
+          "include_unvested": {
+            "type": "boolean",
+            "title": "Include unvested shares",
+            "default": false,
+            "description": "Off by default: only vested shares (that actually belong to you) count toward the balance. Turn on to also include unvested shares."
+          },
+          "jwt_token": {
+            "type": "string",
+            "title": "JWT Token (fallback)",
+            "format": "password",
+            "description": "Optional. Only if automated login is unavailable: from DevTools > Network > 'graphql' > 'authorization' header"
+          },
+          "employee_id": {
+            "type": "string",
+            "title": "Employee ID (fallback)",
+            "description": "Optional. Required only with the JWT fallback: the 'employeeid' header value (NOT the JWT 'sub' claim)"
           }
         },
-        "description": "JWT Token expires after ~1 hour. To get credentials: 1) Log into atwork.morganstanley.com in browser, 2) Open DevTools (F12), 3) Go to Network tab, 4) Filter by 'graphql', 5) Copy 'authorization' and 'employeeid' header values."
+        "description": "Automated login uses username + password + TOTP secret in a headless browser. The JWT/Employee ID fields are a manual fallback only."
       },
       "created_at": "2026-01-20T00:00:00Z",
       "updated_at": "2026-01-20T00:00:00Z"

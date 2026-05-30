@@ -97,7 +97,7 @@ def _sync_single_account(*, account_id, credentials, base_currency):
     from brokers.integrations import get_broker_integration
 
     account = FinancialAccount.objects.get(pk=account_id)
-    integration = get_broker_integration(account.broker, credentials)
+    integration = get_broker_integration(account.broker, credentials, account_id=account.id)
 
     try:
         auth_result = integration.authenticate()
@@ -208,7 +208,7 @@ def _sync_all_accounts(*, account_creds, base_currency):
     for account_id, credentials in account_creds:
         try:
             account = FinancialAccount.objects.get(pk=account_id)
-            integration = get_broker_integration(account.broker, credentials)
+            integration = get_broker_integration(account.broker, credentials, account_id=account.id)
 
             try:
                 auth_result = integration.authenticate()
@@ -578,7 +578,7 @@ class AccountAuthView(KEKAuthenticationMixin, APIView):
         try:
             # Decrypt credentials and get integration
             credentials = self.decrypt_account_credentials(request, account)
-            integration = get_broker_integration(account.broker, credentials)
+            integration = get_broker_integration(account.broker, credentials, account_id=account.id)
 
             # Re-authenticate to restore session
             auth_result = integration.authenticate()

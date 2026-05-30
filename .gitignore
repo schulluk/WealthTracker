@@ -69,3 +69,7 @@ app/_releases/
 
 # Data directory
 data/
+
+# Morgan Stanley headless-login device-trust state (contains session cookies)
+ms_browser_state/
+backend/ms_browser_state/

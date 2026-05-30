@@ -16,6 +16,11 @@ RUN . /venv-python/bin/activate && python3 -m pip install -U pip
 COPY ./requirements.txt /tmp/base-requirements.txt
 RUN . /venv-python/bin/activate && python3 -m pip install -r /tmp/base-requirements.txt
 
+# Install the Chromium browser + OS deps used by the Morgan Stanley headless login.
+# PLAYWRIGHT_BROWSERS_PATH makes the install location explicit and cache-friendly.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN . /venv-python/bin/activate && python3 -m playwright install --with-deps chromium
+
 COPY ./entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

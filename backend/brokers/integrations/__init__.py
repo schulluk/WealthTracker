@@ -10,7 +10,8 @@ from .base import BrokerIntegrationBase
 
 def get_broker_integration(
     broker: Broker,
-    credentials: Dict[str, Any]
+    credentials: Dict[str, Any],
+    account_id: Any = None,
 ) -> BrokerIntegrationBase:
     """
     Factory function to get the appropriate broker integration.
@@ -18,6 +19,9 @@ def get_broker_integration(
     Args:
         broker: The Broker model instance
         credentials: Decrypted credentials dictionary
+        account_id: Optional FinancialAccount id. Used by integrations that
+            persist per-account state (e.g. Morgan Stanley's browser device-trust
+            storage). None during pre-account flows like discovery.
 
     Returns:
         BrokerIntegrationBase: The appropriate integration instance
@@ -54,6 +58,6 @@ def get_broker_integration(
 
     if broker.code == 'morganstanley':
         from .morganstanley import MorganStanleyIntegration
-        return MorganStanleyIntegration(credentials=credentials)
+        return MorganStanleyIntegration(credentials=credentials, account_id=account_id)
 
     raise ValueError(f"Broker '{broker.code}' is not yet supported for automated sync.")
