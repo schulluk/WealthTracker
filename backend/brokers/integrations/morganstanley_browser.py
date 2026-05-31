@@ -23,6 +23,7 @@ watch the flow and adjust `_TOTP_*` / `_TRUST_*` selectors if needed.
 import hashlib
 import logging
 import os
+import re
 import time
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -35,43 +36,34 @@ DASHBOARD_URL = f"{BASE_URL}/solium/servlet/ui"
 TOKEN_PATH = "/rest/participant/v2/auth/tokens"
 REGISTER_DEVICE_PATH = "/rest/participant/v2/device-registration/register-device"
 
-# Login form (high confidence — from observed userLogin.do submissions)
-_USER_SELECTORS = [
-    "input[name='account_number']",
-    "input#account_number",
-    "input[name='username']",
-]
-_PASS_SELECTORS = [
-    "input[name='password']",
-    "input#password",
-    "input[type='password']",
-]
-_SUBMIT_SELECTORS = [
-    "button[type='submit']",
-    "input[type='submit']",
-    "#loginButton",
-    "button:has-text('Log in')",
-    "button:has-text('Sign in')",
-]
-# TOTP / device-trust (best-effort — verify against the live page)
-_TOTP_SELECTORS = [
-    "input[name*='totp' i]",
-    "input[name*='code' i]",
-    "input[autocomplete='one-time-code']",
-    "input[type='tel']",
-    "input[inputmode='numeric']",
-]
-_TOTP_SUBMIT_SELECTORS = [
-    "button:has-text('Verify')",
-    "button:has-text('Submit')",
-    "button:has-text('Continue')",
-    "button[type='submit']",
-]
-_TRUST_SELECTORS = [
-    "input[type='checkbox'][name*='trust' i]",
-    "input[type='checkbox'][name*='remember' i]",
-    "label:has-text('trust this device') input[type='checkbox']",
-]
+# --- Proven selectors / JS for the live login flow (reverse-engineered 2026-05) ---
+# Hide the automation signals MS/Akamai+Symantec score on (the only one that
+# matters is navigator.webdriver; do NOT fake navigator.plugins — the RSA
+# footprint code reads plugin.filename and crashes on faked entries).
+STEALTH_JS = (
+    "Object.defineProperty(navigator,'webdriver',{get:()=>undefined});"
+    "window.chrome = window.chrome || {runtime:{}};"
+)
+_SEL_USER = "#account_number_input"
+_SEL_PASS = "#password"
+_SEL_REMEMBER = "#remember_checkbox"
+_SEL_SUBMIT = "#submit-btn"
+_SEL_TOTP = "#totp-security-code-input"
+_SEL_VERIFY = "#gwt-debug-verifyButton"
+# The 'Yes, trust this device' button's accessible name is its text (its arialabel
+# is misspelled, so ignored). Match on the distinctive 'Yes ... trust' so it can
+# never resolve to the 'Why am I being asked...' explainer (name "Link, why...") or 'No'.
+_TRUST_BUTTON_RE = re.compile(r"yes,?\s*trust", re.I)
+# The login page builds + attaches the device fingerprints in these synchronous
+# functions, then submits via Login(); a raw button click skips them and MS
+# rejects the login as invalid.
+_IADFP_READY_JS = ("() => { try { IaDfp.setEnhancedFingerprint(true);"
+                   " return (IaDfp.readFingerprint() || '').length > 0; } catch (e) { return false; } }")
+_INJECT_FP_JS = ("() => { const b = document.querySelector('#submit-btn');"
+                 " appendFootprintToForm(b); appendDeviceFingerprintToForm(b); }")
+_INITDATA_JS = ("() => { const d = (window.SW && window.SW.initialData) || {};"
+                " const a = d.activeAccount || {};"
+                " return { employeePK: a.employeePK, accountPK: a.accountPK }; }")
 
 
 class BrowserLoginUnavailable(RuntimeError):
@@ -116,42 +108,6 @@ def _write_last_otp(sp: Optional[Path]) -> None:
         os.chmod(mp, 0o600)
     except Exception as exc:
         logger.warning("MS 2FA: could not record OTP timestamp: %s", exc)
-
-
-def _fill_first(page, selectors, value, timeout_ms) -> bool:
-    """Try each selector; fill the first visible match. Returns True on success."""
-    for sel in selectors:
-        try:
-            loc = page.locator(sel).first
-            loc.wait_for(state="visible", timeout=timeout_ms)
-            loc.fill(value)
-            return True
-        except Exception:
-            continue
-    return False
-
-
-def _click_first(page, selectors, timeout_ms) -> bool:
-    for sel in selectors:
-        try:
-            loc = page.locator(sel).first
-            loc.wait_for(state="visible", timeout=timeout_ms)
-            loc.click()
-            return True
-        except Exception:
-            continue
-    return False
-
-
-def _visible_any(page, selectors, timeout_ms) -> bool:
-    """True if any selector becomes visible within the timeout (short poll)."""
-    for sel in selectors:
-        try:
-            page.locator(sel).first.wait_for(state="visible", timeout=timeout_ms)
-            return True
-        except Exception:
-            continue
-    return False
 
 
 def browser_login(
@@ -205,18 +161,23 @@ def browser_login(
 
     captured: Dict[str, Any] = {}
 
-    def _on_response(resp):
-        # Selector-independent JWT capture: the page mints the token via this POST.
+    def _on_request(req):
+        # Robust JWT capture: the SPA attaches the token as the Authorization header
+        # on its /rest and /graphql calls. Request headers aren't evicted on
+        # navigation (unlike response bodies, which break Response.json()), so this
+        # is reliable.
+        if "jwt" in captured:
+            return
         try:
-            if resp.request.method == "POST" and TOKEN_PATH in resp.url:
-                data = resp.json()
-                token = (data.get("accessToken") or {}).get("accessToken")
-                if token:
-                    captured["jwt"] = token
+            auth = req.headers.get("authorization", "")
+            tok = auth[7:] if auth[:7].lower() == "bearer " else auth
+            if tok.startswith("eyJ") and ("/rest/participant" in req.url or "/graphql" in req.url):
+                captured["jwt"] = tok
         except Exception:
             pass
-        # Selector-independent device-registration tracking: log every time MS
-        # registers/trusts this device, so we can monitor how often it happens.
+
+    def _on_response(resp):
+        # Log every device registration so we can monitor how often it happens.
         try:
             if resp.request.method == "POST" and REGISTER_DEVICE_PATH in resp.url:
                 reason = ""
@@ -234,7 +195,14 @@ def browser_login(
 
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=headless)
+            # Akamai/Symantec drop headless Chromium and flag automation, so we turn
+            # off the AutomationControlled flag and mask navigator.webdriver.
+            # NOTE: headless is reliably BLOCKED by Akamai — run headful (the server
+            # needs a display / Xvfb, or Chromium's --headless=new). See the docs.
+            browser = p.chromium.launch(
+                headless=headless,
+                args=["--disable-blink-features=AutomationControlled"],
+            )
             ctx_kwargs: Dict[str, Any] = {"locale": "en-US"}
             # Use the bundled Chromium's own UA but strip the "Headless" token so it
             # matches headful Chrome and stays consistent with every other signal the
@@ -254,26 +222,74 @@ def browser_login(
                 ctx_kwargs["storage_state"] = str(sp)
                 logger.info("MS browser: loaded device-trust state from %s", sp)
             context = browser.new_context(**ctx_kwargs)
+            context.add_init_script(STEALTH_JS)
             page = context.new_page()
+            page.on("request", _on_request)
             page.on("response", _on_response)
             page.set_default_timeout(timeout_ms)
 
             logger.info("MS browser: navigating to login (headless=%s)", headless)
-            page.goto(LOGIN_URL, wait_until="domcontentloaded")
+            page.goto(LOGIN_URL, wait_until="load")
+            page.wait_for_timeout(1500)
 
-            # If persisted session already lands us on the dashboard, skip login.
+            # If a persisted trusted session lands us on the dashboard, skip login.
             if "/servlet/ui" not in page.url:
-                if not _fill_first(page, _USER_SELECTORS, username, timeout_ms):
-                    raise BrowserLoginError("Could not find the username field on the login page.")
-                if not _fill_first(page, _PASS_SELECTORS, password, timeout_ms):
-                    raise BrowserLoginError("Could not find the password field on the login page.")
-                if not _click_first(page, _SUBMIT_SELECTORS, timeout_ms):
-                    # Fall back to submitting the form by pressing Enter in the password field.
-                    page.keyboard.press("Enter")
-                page.wait_for_load_state("networkidle")
+                # Wait until the Symantec device fingerprint can be computed.
+                for _ in range(15):
+                    try:
+                        if page.evaluate(_IADFP_READY_JS):
+                            break
+                    except Exception:
+                        pass
+                    page.wait_for_timeout(1000)
+
+                # Type like a human — this login is keystroke-driven; .fill() is rejected.
+                try:
+                    page.click(_SEL_USER)
+                    page.locator(_SEL_USER).press_sequentially(username, delay=60)
+                    page.click(_SEL_PASS)
+                    page.locator(_SEL_PASS).press_sequentially(password, delay=60)
+                except Exception as exc:
+                    raise BrowserLoginError(f"Could not fill the login form: {exc}")
+                try:
+                    page.check(_SEL_REMEMBER)
+                    logger.info("MS browser: 'remember me' checked")
+                except Exception:
+                    pass
+
+                # Build + attach the device fingerprints via the page's own functions,
+                # then submit through Login(). A raw submit omits ms_rsa_footprint /
+                # symantec_device_fingerprint and MS rejects the login.
+                try:
+                    page.evaluate(_INJECT_FP_JS)
+                    page.evaluate("() => Login()")
+                except Exception as exc:
+                    raise BrowserLoginError(f"Could not run the page login/fingerprint JS: {exc}")
+
+                # Wait for the TOTP page, the dashboard, or a login error.
+                deadline = time.monotonic() + 45
+                while time.monotonic() < deadline:
+                    if "/servlet/ui" in page.url:
+                        break
+                    if "loginError" in page.url:
+                        raise BrowserLoginError(
+                            "MS rejected the login (bad credentials, or the device "
+                            "fingerprint was not attached)."
+                        )
+                    try:
+                        if page.locator(_SEL_TOTP).first.is_visible():
+                            break
+                    except Exception:
+                        pass
+                    page.wait_for_timeout(500)
 
             # Handle a 2FA (TOTP) challenge if the device is not trusted.
-            if _visible_any(page, _TOTP_SELECTORS, timeout_ms=5_000):
+            totp_visible = False
+            try:
+                totp_visible = page.locator(_SEL_TOTP).first.is_visible()
+            except Exception:
+                pass
+            if totp_visible:
                 logger.warning("MS 2FA: OTP challenge presented (account_id=%s).", account_id)
                 if not allow_otp:
                     raise BrowserLoginError(
@@ -298,13 +314,17 @@ def browser_login(
                         "TOTP challenge presented but no totp_secret/totp_code available."
                     )
                 logger.info("MS 2FA: entering TOTP code (account_id=%s).", account_id)
-                if not _fill_first(page, _TOTP_SELECTORS, code, timeout_ms):
-                    raise BrowserLoginError("Could not fill the TOTP code field.")
-                # Trust this device so future syncs skip 2FA (best-effort selector).
-                if _click_first(page, _TRUST_SELECTORS, timeout_ms=2_000):
-                    logger.warning("MS 2FA: 'trust this device' selected (account_id=%s).", account_id)
-                _click_first(page, _TOTP_SUBMIT_SELECTORS, timeout_ms)
-                page.wait_for_load_state("networkidle")
+                page.fill(_SEL_TOTP, code)
+                page.click(_SEL_VERIFY)
+                # Accept the 'trust this device' prompt so future syncs skip OTP.
+                # Exact match — a substring on 'trust' would hit the explainer link.
+                try:
+                    trust = page.get_by_role("button", name=_TRUST_BUTTON_RE)
+                    trust.wait_for(state="visible", timeout=20_000)
+                    trust.click()
+                    logger.warning("MS 2FA: 'trust this device' accepted (account_id=%s).", account_id)
+                except Exception:
+                    logger.info("MS 2FA: no trust-device prompt appeared (account_id=%s).", account_id)
                 _write_last_otp(sp)
                 logger.warning(
                     "MS 2FA: OTP submitted (account_id=%s); next OTP throttled for ~%.0fh.",
@@ -313,9 +333,10 @@ def browser_login(
             else:
                 logger.info("MS 2FA: no OTP challenge — device trusted (account_id=%s).", account_id)
 
-            # Make sure we reached the authenticated dashboard.
+            # Make sure we reached the authenticated dashboard (or its requirements
+            # interstitial — both live under /servlet/ui).
             try:
-                page.wait_for_url("**/servlet/ui*", timeout=timeout_ms)
+                page.wait_for_url("**/servlet/ui**", timeout=timeout_ms)
             except Exception:
                 if "/servlet/ui" not in page.url:
                     raise BrowserLoginError(
@@ -323,29 +344,28 @@ def browser_login(
                         "Likely bad credentials, an unhandled challenge, or selector drift."
                     )
 
-            # Read identifiers straight from the page's SW.initialData.
-            init = page.evaluate(
-                "() => { const d = (window.SW && window.SW.initialData) || {};"
-                " const a = d.activeAccount || {};"
-                " return { employeePK: a.employeePK, accountPK: a.accountPK }; }"
-            ) or {}
-            employee_pk = init.get("employeePK")
-            account_pk = init.get("accountPK")
-
-            # The dashboard mints the token on load; nudge a reload if we missed it.
+            # Capture the JWT from an outgoing Authorization header (set by _on_request).
+            # The SPA fires authenticated /rest + /graphql calls on dashboard load; if
+            # we haven't seen one yet, (re)load the dashboard and wait for it.
             if "jwt" not in captured:
-                page.wait_for_timeout(1_500)
-            if "jwt" not in captured:
-                logger.info("MS browser: token not captured yet, reloading dashboard")
-                page.goto(DASHBOARD_URL, wait_until="networkidle")
-                page.wait_for_timeout(1_500)
-
+                try:
+                    page.goto(DASHBOARD_URL, wait_until="domcontentloaded")
+                except Exception:
+                    pass
+                wait_until = time.monotonic() + 20
+                while "jwt" not in captured and time.monotonic() < wait_until:
+                    page.wait_for_timeout(300)
             jwt_token = captured.get("jwt")
             if not jwt_token:
                 raise BrowserLoginError(
-                    "Login succeeded but no JWT was minted/captured "
-                    f"({TOKEN_PATH} response not seen)."
+                    "Login reached the dashboard but no JWT Authorization header was seen "
+                    "on any /rest or /graphql request."
                 )
+
+            # Read identifiers straight from the page's SW.initialData.
+            init = page.evaluate(_INITDATA_JS) or {}
+            employee_pk = init.get("employeePK")
+            account_pk = init.get("accountPK")
             if not employee_pk:
                 raise BrowserLoginError("Login succeeded but employeePK was not found in SW.initialData.")
 
