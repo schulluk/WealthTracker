@@ -121,6 +121,7 @@ def browser_login(
     headless: Optional[bool] = None,
     allow_otp: Optional[bool] = None,
     force_otp: bool = False,
+    proxy: Optional[str] = None,
     timeout_ms: int = 60_000,
 ) -> Dict[str, Any]:
     """
@@ -143,6 +144,11 @@ def browser_login(
 
     if headless is None:
         headless = os.environ.get("MS_HEADLESS", "1") != "0"
+
+    # Optional egress proxy (e.g. a residential/mobile exit so MS doesn't see the
+    # datacenter IP). Format: "scheme://host:port" (socks5/http). Akamai blocks the
+    # server's datacenter IP, so production routes through this.
+    proxy = proxy or os.environ.get("MS_PROXY")
 
     sp = _state_path(state_dir, account_id)
 
@@ -199,10 +205,15 @@ def browser_login(
             # off the AutomationControlled flag and mask navigator.webdriver.
             # NOTE: headless is reliably BLOCKED by Akamai — run headful (the server
             # needs a display / Xvfb, or Chromium's --headless=new). See the docs.
-            browser = p.chromium.launch(
-                headless=headless,
-                args=["--disable-blink-features=AutomationControlled"],
-            )
+            launch_args = ["--disable-blink-features=AutomationControlled"]
+            # Server mode (headful Chromium under Xvfb on a GPU-less VPS running as
+            # root): drop the sandbox and force software rendering (SwiftShader) —
+            # proven to pass Akamai. Set MS_SERVER_MODE=1 on the server only; locally
+            # the GPU path is used (also proven).
+            if os.environ.get("MS_SERVER_MODE") == "1":
+                launch_args += ["--no-sandbox", "--disable-gpu",
+                                "--use-gl=angle", "--use-angle=swiftshader"]
+            browser = p.chromium.launch(headless=headless, args=launch_args)
             ctx_kwargs: Dict[str, Any] = {"locale": "en-US"}
             # Use the bundled Chromium's own UA but strip the "Headless" token so it
             # matches headful Chrome and stays consistent with every other signal the
@@ -221,6 +232,9 @@ def browser_login(
             if sp and sp.exists():
                 ctx_kwargs["storage_state"] = str(sp)
                 logger.info("MS browser: loaded device-trust state from %s", sp)
+            if proxy:
+                ctx_kwargs["proxy"] = {"server": proxy}
+                logger.info("MS browser: routing through proxy %s", proxy)
             context = browser.new_context(**ctx_kwargs)
             context.add_init_script(STEALTH_JS)
             page = context.new_page()

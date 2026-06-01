@@ -61,9 +61,12 @@ services:
     env_file: .env
     environment:
       DJANGO_PROJECT_NAME: 'wealth'
-      # Morgan Stanley headless login: persist device-trust state across rebuilds.
-      # (Chromium itself is baked into ./backend/Dockerfile for this compose.)
+      # Morgan Stanley login: persist device-trust state across rebuilds.
+      # (Chromium + Xvfb are baked into ./backend/Dockerfile for this compose.)
+      # Run headful under Xvfb (Akamai blocks headless) with server-mode launch args.
       MS_BROWSER_STATE_DIR: '/var/ms-browser-state'
+      MS_HEADLESS: '0'
+      MS_SERVER_MODE: '1'
     volumes:
       # Git repo is at /opt/data/wealth/repo/ (monorepo with backend/ and frontend/)
       - '/opt/data/wealth/repo/backend:/var/www/app:rw'

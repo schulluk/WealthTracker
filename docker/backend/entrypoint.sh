@@ -39,6 +39,17 @@ if test -f "/crontabs"; then
     cat /crontabs | crontab -u root -
 fi
 
+# Start a virtual display for headful Chromium (MS's Akamai blocks headless) when
+# the MS browser login runs in server mode. gunicorn (below) inherits DISPLAY.
+if [ "${MS_SERVER_MODE}" = "1" ]; then
+    export DISPLAY="${DISPLAY:-:99}"
+    if ! pgrep -x Xvfb >/dev/null 2>&1; then
+        echo "Starting Xvfb on ${DISPLAY}..."
+        Xvfb "${DISPLAY}" -screen 0 1280x1024x24 -nolisten tcp &
+        sleep 1
+    fi
+fi
+
 # Start gunicorn with uvicorn worker
 # GUNICORN_WORKERS defaults to 1 for FinTS 2FA (German banks require maintaining
 # an active TCP connection during 2FA - the bank closes dialogs that are
