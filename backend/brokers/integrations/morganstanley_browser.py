@@ -233,8 +233,20 @@ def browser_login(
                 ctx_kwargs["storage_state"] = str(sp)
                 logger.info("MS browser: loaded device-trust state from %s", sp)
             if proxy:
-                ctx_kwargs["proxy"] = {"server": proxy}
-                logger.info("MS browser: routing through proxy %s", proxy)
+                from urllib.parse import urlparse
+                pu = urlparse(proxy)
+                if pu.scheme and pu.hostname:
+                    pconf: Dict[str, Any] = {
+                        "server": f"{pu.scheme}://{pu.hostname}" + (f":{pu.port}" if pu.port else "")
+                    }
+                    if pu.username:
+                        pconf["username"] = pu.username
+                    if pu.password:
+                        pconf["password"] = pu.password
+                else:
+                    pconf = {"server": proxy}
+                ctx_kwargs["proxy"] = pconf
+                logger.info("MS browser: routing through proxy %s", proxy.split("@")[-1])
             context = browser.new_context(**ctx_kwargs)
             context.add_init_script(STEALTH_JS)
             page = context.new_page()
