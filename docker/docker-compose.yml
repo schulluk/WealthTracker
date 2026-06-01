@@ -67,6 +67,7 @@ services:
       MS_BROWSER_STATE_DIR: '/var/ms-browser-state'
       MS_HEADLESS: '0'
       MS_SERVER_MODE: '1'
+      DISPLAY: ':99'
     volumes:
       # Git repo is at /opt/data/wealth/repo/ (monorepo with backend/ and frontend/)
       - '/opt/data/wealth/repo/backend:/var/www/app:rw'
