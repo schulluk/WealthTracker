@@ -6,6 +6,59 @@ Morgan Stanley at Work is an employee stock plan platform. This integration uses
 
 > **2026-05-30 UPDATE — fully programmatic auth is SOLVED.** The old conclusion in this doc ("the JWT cannot be obtained programmatically") is **wrong** and has been superseded. The JWT is minted by a plain REST call we can replicate. See [Programmatic Authentication (Solved)](#programmatic-authentication-solved) below. The manual DevTools JWT-paste flow still works as a fallback, but is no longer required.
 
+## Implementation Status (2026-06 — current, authoritative)
+
+The login is **fully working end-to-end against a live account** (login → TOTP →
+trust → JWT → GraphQL → balance). What follows supersedes the older
+reverse-engineering notes further down where they conflict.
+
+### How the working login actually works
+Implemented in [`backend/brokers/integrations/morganstanley_browser.py`](../backend/brokers/integrations/morganstanley_browser.py) (`browser_login()`), driven by `MorganStanleyIntegration` ([morganstanley.py](../backend/brokers/integrations/morganstanley.py)). Steps that each had to be reverse-engineered:
+
+1. **Headful Chromium only.** Akamai silently drops *headless* (old and `--headless=new`); only headful loads the page. Software rendering (SwiftShader) is fine, so a GPU-less VPS works under **Xvfb**.
+2. **Stealth:** launch with `--disable-blink-features=AutomationControlled` + an init script masking `navigator.webdriver`. Do **not** fake `navigator.plugins` — the RSA-footprint JS reads `plugin.filename` and crashes.
+3. **Type real keystrokes** into `#account_number_input` / `#password` (`.fill()` is rejected), check `#remember_checkbox`.
+4. **Build + attach the device fingerprints via the page's own functions**, then submit via its `Login()`:
+   `appendFootprintToForm(btn)` (→ `ms_rsa_footprint`) + `appendDeviceFingerprintToForm(btn)` (→ `symantec_device_fingerprint` from `IaDfp.readFingerprint()`), then `Login()`. A raw button click omits the fingerprints and MS returns `loginError`.
+5. **TOTP** (`pyotp` from the stored seed): fill `#totp-security-code-input`, click `#gwt-debug-verifyButton`.
+6. **Trust prompt:** click the button matched by `get_by_role("button", name=/yes,?\s*trust/i)` — the "Yes, trust this device" button (its accessible name = its text; a substring on "trust" wrongly hits the "Why…" explainer link). This registers the device (selector-independent confirm: a `POST …/device-registration/register-device` 200).
+7. **JWT capture from the SPA's outgoing `Authorization` header** on `/rest/participant` or `/graphql` requests (request headers aren't evicted on navigation, unlike `Response.json()` bodies, which fail with "No resource…").
+8. **Device-trust `storage_state` persisted** per account → trusted reloads skip OTP entirely.
+9. Data fetch unchanged: `curl_cffi` GraphQL with the JWT + `employeeid`=`employeePK`.
+
+### Two production blockers and their fixes
+- **Headless blocked → run headful under Xvfb on the VPS.** Confirmed: software-rendered headful loads + fully logs in.
+- **Datacenter IP blocked.** The VPS's IP times out to MS (Akamai drops datacenter ASNs); a residential/mobile IP works. **Confirmed end-to-end**: VPS Chromium routed through the user's home Mac (reverse SOCKS) loads MS. Fix = route the VPS browser's egress through the **user's phone** (the relay, below).
+
+### Sync is ALWAYS app-initiated (KEK)
+Credentials are stored encrypted with a **KEK the app supplies per request** ([core/kek_auth.py](../backend/core/kek_auth.py)); the server never holds it, so it **cannot decrypt MS credentials unattended**. There is no cron/background MS sync — every sync rides an app-initiated request that carries the KEK. The relay (residential exit) rides that *same* request. (Paid residential proxies were rejected by the user on principle — the phone is the user's own device.)
+
+### Production deployment (branch `main`)
+Two repos. Production deploys from **`main`** (we develop on `demo`; promote via fast-forward `git push origin demo:main`). Demo instance is only for app-review builds.
+- **App repo** (`lsgd/WealthTracker`): the module, `requirements.txt` pins `playwright==1.60.0`, the dedicated in-repo `docker/backend` image bakes Chromium+Xvfb.
+- **Infra repo** (`adliswil/docker`, at `~/git/docker/medan.schulze.uno`, deployed to `/opt/docker/medan.schulze.uno` via the `dcm` alias): a **dedicated `_gunicorn-py314-wealth` image** (bakes Chromium + Xvfb + Playwright at build) used by `wealth-py` (your-server.example.com) and `wealthdemo-py`. The shared `_gunicorn-py314` image was reverted to its clean template.
+- Service env on the wealth services: `MS_HEADLESS=0`, `MS_SERVER_MODE=1` (adds `--no-sandbox` + software-GL launch args), `DISPLAY=:99`, `MS_BROWSER_STATE_DIR=/var/ms-browser-state` (persistent volume). Browser is baked in the image (no `/var/playwright` volume). The entrypoint starts `Xvfb :99`.
+- **Confirmed on the VPS**: `dcm exec wealth-py … chromium.launch(headless=False, --no-sandbox …) → google` works; and through a residential exit, MS loads.
+
+### Module knobs (env / credentials)
+- Credential schema: `username`, `password`, `totp_secret` (required) + `include_unvested` (bool, default off = vested-only) + `jwt_token`/`employee_id` (manual fallback).
+- Env: `MS_HEADLESS` (0=headful), `MS_SERVER_MODE` (1=server args), `MS_PROXY` (`scheme://[user:pass@]host:port` egress proxy → the relay's SOCKS), `MS_BROWSER_STATE_DIR`, `MS_OTP_MIN_INTERVAL_HOURS` (default 336 = 2 weeks throttle), `MS_FORCE_OTP=1` (bypass throttle for deliberate enroll), `MS_ALLOW_OTP=0` (disable OTP).
+- Test command: `python manage.py test_ms_login --username … --balance --account-id N --state-dir DIR` (reads `MS_TEST_PASSWORD`/`MS_TEST_TOTP_SECRET` from env; forces OTP).
+
+### The Relay (phone = residential exit node)
+[`backend/brokers/ms_relay/`](../backend/brokers/ms_relay/) — routes the VPS browser's egress through the phone (residential/mobile IP). The phone is a **dumb TCP exit** relaying raw, TLS-encrypted bytes; it never sees the MS session.
+- `protocol.py` — multiplexed-TCP-over-one-WebSocket frames (`OPEN`/`OPEN_OK`/`OPEN_ERR`/`DATA`/`CLOSE`, 5-byte header: type + uint32 stream id).
+- `bridge.py` — VPS side: a local SOCKS5 server Chromium uses as `MS_PROXY=socks5://127.0.0.1:<port>`, muxing each connection to the phone via a `send_frame` coroutine + `on_frame`.
+- `exit_node.py` — reference exit (Python); the Flutter app reimplements it in Dart.
+- Transport-agnostic (works over Django ASGI WS in prod, a Dart WebSocket on the phone, or in-process queues in tests). **Phase 1 done & proven in-process** (SOCKS → bridge → exit → real host, multiplexed, HTTP 200).
+
+**Remaining work:**
+- **Phase 2 (next): backend integration.** Django ASGI WebSocket endpoint `/ws/ms-relay/` (raw, no Channels), authenticated so a user's relay binds to *their* sync; a session registry mapping the connected user → the `RelayBridge`'s SOCKS port; wire the MS sync to call `browser_login(proxy="socks5://127.0.0.1:<port>")` when a relay is connected (else skip MS sync with an "open the app" message). Add a small `run_exit` helper so the **Mac can stand in for the phone** (run `exit_node` against the VPS WS) to validate a real MS sync over the relay before any Dart.
+- **Phase 3: Flutter.** Port `exit_node.py` to Dart (WebSocket ↔ `dart:io` Socket, multiplexed by stream id) + orchestration: on sync, the app opens the relay WS, triggers the sync (KEK), tears down. Must work foregrounded on iOS + Android.
+
+### Scratch test scripts (on the dev Mac, /tmp — recreate if cleared)
+`/tmp/ms_login*.py` (login reverse-engineering), `/tmp/test_swrender*.py` (software-render proofs), `/tmp/ipproof.py` (residential-IP proof), `/tmp/test_relay.py` (relay core test). Not in the repo.
+
 ## Programmatic Authentication (Solved)
 
 The full, browser-free auth chain (reverse-engineered from HAR captures on 2026-05-29/30):
