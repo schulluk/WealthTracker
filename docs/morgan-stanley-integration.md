@@ -50,14 +50,47 @@ Two repos. Production deploys from **`main`** (we develop on `demo`; promote via
 - `protocol.py` — multiplexed-TCP-over-one-WebSocket frames (`OPEN`/`OPEN_OK`/`OPEN_ERR`/`DATA`/`CLOSE`, 5-byte header: type + uint32 stream id).
 - `bridge.py` — VPS side: a local SOCKS5 server Chromium uses as `MS_PROXY=socks5://127.0.0.1:<port>`, muxing each connection to the phone via a `send_frame` coroutine + `on_frame`.
 - `exit_node.py` — reference exit (Python); the Flutter app reimplements it in Dart.
-- Transport-agnostic (works over Django ASGI WS in prod, a Dart WebSocket on the phone, or in-process queues in tests). **Phase 1 done & proven in-process** (SOCKS → bridge → exit → real host, multiplexed, HTTP 200).
+- `server.py` — **Phase 2**: ASGI WebSocket app for `/ws/ms-relay/` (the bridge side). SimpleJWT-authenticated (`Authorization: Bearer` or `?token=`); on connect, starts a `RelayBridge` + SOCKS server and `registry.register(user_id, port)`; tears down on disconnect.
+- `registry.py` — **Phase 2**: process-global `{user_id → SOCKS port}` (thread-safe). Only the port crosses the event-loop ↔ sync-thread boundary; relies on `GUNICORN_WORKERS=1` (same single-process assumption FinTS 2FA already uses).
+- `proxy.py` — **Phase 2**: `relay_proxy_for_account(account_id)` → `socks5://127.0.0.1:<port>` for the account owner's connected relay, else None.
+- Transport-agnostic (works over Django ASGI WS in prod, a Dart WebSocket on the phone, or in-process queues in tests).
+
+**Phase 1 done & proven in-process** (`/tmp/test_relay.py`: SOCKS → bridge → exit → host, multiplexed, HTTP 200).
+
+**Phase 2 DONE (2026-06-02) & proven over a real uvicorn WS** (`/tmp/test_relay_ws.py`: unauth rejected → JWT exit connects → registry maps the SOCKS port → two hosts fetched through the exit, HTTP 200 → registry cleaned on disconnect):
+- ASGI composition in [`wealth/asgi.py`](../backend/wealth/asgi.py) routes `/ws/ms-relay/` to `ms_relay_app`, passes HTTP to Django, and answers lifespan. No Channels.
+- MS sync wiring: `MorganStanleyIntegration._browser_authenticate` calls `_resolve_relay_proxy()` and passes `proxy=` to `browser_login`. In **server mode** (`MS_SERVER_MODE=1`) with neither a relay nor `MS_PROXY`, it returns a clear *"open the app"* `AuthResult` instead of failing on the blocked datacenter IP. On a residential host (dev Mac) it just runs direct.
+- **Mac-as-phone**: `python manage.py ms_relay_exit --url wss://your-server.example.com/ws/ms-relay/ --token <access-jwt>` runs `RelayExit` as a WS client so a laptop is the residential exit. Needs `websockets` (added to requirements).
+- **Prod reachability**: `GUNICORN_WORKERS=1` already set for `wealth-py`/`wealthdemo-py`; Traefik router rules extended with `PathPrefix('/ws')`; the shared `_nginx` template gained a `map $http_upgrade` + a scoped `location /ws/` (Upgrade/Connection headers, no buffering, 1 h read timeout) — `location /` untouched, so other projects are unaffected.
+
+**To validate a real MS sync over the relay (no Dart yet):** run `ms_relay_exit` on the dev Mac (residential IP) pointed at the VPS WS with a valid access token, then trigger the MS sync on the VPS (app POST or `test_ms_login`) — the server-side headful Chromium egresses through the Mac. Confirms the full path before porting the exit to Dart.
 
 **Remaining work:**
-- **Phase 2 (next): backend integration.** Django ASGI WebSocket endpoint `/ws/ms-relay/` (raw, no Channels), authenticated so a user's relay binds to *their* sync; a session registry mapping the connected user → the `RelayBridge`'s SOCKS port; wire the MS sync to call `browser_login(proxy="socks5://127.0.0.1:<port>")` when a relay is connected (else skip MS sync with an "open the app" message). Add a small `run_exit` helper so the **Mac can stand in for the phone** (run `exit_node` against the VPS WS) to validate a real MS sync over the relay before any Dart.
-- **Phase 3: Flutter.** Port `exit_node.py` to Dart (WebSocket ↔ `dart:io` Socket, multiplexed by stream id) + orchestration: on sync, the app opens the relay WS, triggers the sync (KEK), tears down. Must work foregrounded on iOS + Android.
+- **Phase 3: Flutter.** Port `exit_node.py` to Dart (WebSocket ↔ `dart:io` Socket, multiplexed by stream id) + orchestration: on sync, the app opens the relay WS (auth with its access token), triggers the sync (KEK), tears down. Must work foregrounded on iOS + Android.
 
 ### Scratch test scripts (on the dev Mac, /tmp — recreate if cleared)
-`/tmp/ms_login*.py` (login reverse-engineering), `/tmp/test_swrender*.py` (software-render proofs), `/tmp/ipproof.py` (residential-IP proof), `/tmp/test_relay.py` (relay core test). Not in the repo.
+`/tmp/ms_login*.py` (login reverse-engineering), `/tmp/test_swrender*.py` (software-render proofs), `/tmp/ipproof.py` (residential-IP proof), `/tmp/test_relay.py` (relay core test), `/tmp/test_relay_ws.py` (Phase-2 relay over a real uvicorn WS), `/tmp/probe_atwork.py` (in-browser endpoint-existence probe, 2026-06-02). Not in the repo.
+
+### Token lifecycle & TTL (2026-06-02)
+The `/rest/participant/v2/auth/tokens` endpoint is **polymorphic on `authType`** — it is a *session→JWT exchange, not a credential login*:
+- `SWPTPAPI_TOKEN` — mint: `{sessionToken=apiKey, employeeId=employeePK, locale[, msSessionId]}` → `{accessToken}`. **`msSessionId` is optional** (the legacy SPC flow omitted it and it still minted).
+- `ACCESS_TOKEN` — refresh: `{authType:"ACCESS_TOKEN", accessToken:<old>}` (+ `Authorization: Bearer <old>`) → a fresh token.
+- `LOGOUT` — `{authType:"LOGOUT", accessToken:<jwt>}` → `{expiresIn:0,…}`.
+
+**JWT TTL = 900 s (15 min)**, hard, for both mint and refresh (decoded `exp` vs. HAR request times across all three captures). Refresh keeps the `ses` claim constant (== `apiKey`), so it rides the **same servlet session — no OTP** — bounded only by that session's own lifetime. A sync takes seconds, so refresh is rarely needed. **First mint on an untrusted device** returns a limited token (`scope:"NO_ACCESS deviceRegistration.READ_WRITE loginRequirements.READ_ONLY"`, `deviceRegistrationRequired:true`); only after the trust/2FA step does a re-mint yield `scope:"READ_WRITE"`. The follow-up data calls send the **raw token (no `Bearer ` prefix)** plus a lowercase `employeeId` header. Canonical portfolio query lives in GraphQL `{ portfolio { availableValue unavailableValue totalValue totalAvailableQuantity … } }` where **`availableValue`=vested, `unavailableValue`=unvested**.
+
+### Stack / framework fingerprint (from HAR response headers)
+- **Edge:** Akamai (Bot Manager: `_abck`/`ak_bmsc`/`bm_sz`/`bm_mi`; `x-akamai-transformed`, `x-edgeconnect-*`, AkamaiGHost/NetStorage) — the thing forcing headful+residential. Plus AppDynamics RUM (`ADRUM_BT*`), Adobe Analytics, Pendo, Qualtrics.
+- **Front:** Apache / **Oracle HTTP Server** (`Server: Apache` *with* `x-oracle-dms-rid`/`x-oracle-dms-ecid` = Oracle DMS → Oracle Fusion Middleware).
+- **Legacy app (Solium "Shareworks"):** Java servlet monolith on **Oracle WebLogic** — `/solium/servlet/userLogin.do` (Struts-era `.do`), `JSESSIONID`, `ROUTEID`/`sw_affinity` LB stickiness. Frontend = an **Angular** SPA (webpack/Angular-CLI output: `runtime.app`/`vendor.app`/`app.app` + content-hashed lazy chunks).
+- **New REST/GraphQL tier:** **Spring Boot on embedded Tomcat** — `/rest/participant/v2/auth/login-requirements` unauth → a classic **Tomcat** `HTTP Status 401` error page (distinct from the WebLogic servlet). Two JSON families: `/sw-ptpapi/v1/...` (older, holdings: `funds`/`portfolio`, pretty-printed JSON) and `/rest/participant/v2/...` (newer, compact, `{"data":…}` envelopes) + a `/graphql` facade.
+
+### Dead-ends ruled out (don't re-investigate)
+- **Public developer API (`github.com/morganstanley/api`) + `msal`** — *not* the at-work API. It's the institutional B2B platform on `api.morganstanley.com`, secured by **Azure AD** (`login.microsoftonline.com`) with **OAuth2 client-credentials + a registered cert/private key** (`msal` is *Microsoft's* lib, only because that platform sits behind Entra ID). It's app-to-app (no user/password/TOTP path at all), onboarding is contractual, and the private key is mandatory. Zero overlap with the participant SPA.
+- **MoneyMoney Lua extension** ([`sebastianstarke-asot/morganstanley-moneymoney`](https://github.com/sebastianstarke-asot/morganstanley-moneymoney)) — a password-only login via **`/app-bin/cesreg/spc/login/validateLogin`** (+ `getEnvironmentUrl`, RSA `pm_fp*` devicePrint, then a `SoliumSAMLPost`→`sso.solium.com` SAML bridge). Hardcoded for Amazon (`company_id:"1HH"`). **This entire legacy CES/SPC login path is RETIRED** on the current backend.
+- **Probe confirming the above (2026-06-02, `/tmp/probe_atwork.py`, in-browser `fetch()` after clearing Akamai):** every `/app-bin/...` path — including a deliberately-bogus control — returns **HTTP 200 with the `userLogin.do` login-page HTML** (a catch-all forward), while a real REST path returns a Tomcat **401**. So those endpoints don't exist. And **`stockplanconnect.morganstanley.com` now 302-redirects to `atwork.morganstanley.com`** (same backend; the rebrand consolidated the host and dropped the CES API). A plain `curl` to atwork **tarpits** (TCP connects, 0 bytes, timeout) on Akamai's JA3 check, while `example.com`/`www.morganstanley.com` return 200 — i.e. non-browser TLS fingerprints are dropped regardless of IP.
+
+**Conclusion:** there is no simpler password-only or public-API door. The Symantec-VIP **`userLogin.do` headful-browser flow + residential egress (phone relay)** remains the only viable path. None of this changes Phase 2.
 
 ## Programmatic Authentication (Solved)
 

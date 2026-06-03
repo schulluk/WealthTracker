@@ -206,6 +206,24 @@ class MorganStanleyIntegration(BrokerIntegrationBase):
         """
         from . import morganstanley_browser as msb
 
+        # Route the browser's egress through the user's phone relay (residential
+        # IP) when connected. In server mode (datacenter IP, blocked by Akamai)
+        # with neither a relay nor an MS_PROXY, skip rather than fail blindly —
+        # the app must open the relay first.
+        relay_proxy = self._resolve_relay_proxy()
+        if (
+            os.environ.get("MS_SERVER_MODE") == "1"
+            and not relay_proxy
+            and not os.environ.get("MS_PROXY")
+        ):
+            return AuthResult(
+                success=False,
+                error_message=(
+                    "Morgan Stanley sync needs the Wealth app's relay — your phone "
+                    "provides the network exit. Open the app and retry the sync."
+                ),
+            )
+
         try:
             result = msb.browser_login(
                 username=self.account_number,
@@ -213,6 +231,7 @@ class MorganStanleyIntegration(BrokerIntegrationBase):
                 totp_secret=self.totp_secret,
                 state_dir=self._browser_state_dir(),
                 account_id=self.account_id,
+                proxy=relay_proxy,  # None -> browser_login falls back to MS_PROXY env
             )
         except msb.BrowserLoginUnavailable as exc:
             logger.warning(
@@ -233,6 +252,18 @@ class MorganStanleyIntegration(BrokerIntegrationBase):
             self.employee_id, result.get('state_persisted'),
         )
         return AuthResult(success=True)
+
+    def _resolve_relay_proxy(self) -> Optional[str]:
+        """SOCKS proxy for this account owner's phone relay, or None.
+
+        Returns ``socks5://127.0.0.1:<port>`` when the user's relay WebSocket is
+        connected (see brokers/ms_relay), so MS sees a residential IP.
+        """
+        try:
+            from brokers.ms_relay.proxy import relay_proxy_for_account
+        except Exception:
+            return None
+        return relay_proxy_for_account(self.account_id)
 
     @staticmethod
     def _browser_state_dir() -> str:
