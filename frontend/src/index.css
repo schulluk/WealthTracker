@@ -9,6 +9,7 @@
   --color-success: #34d399;
   --color-danger: #f87171;
   --color-warning: #fbbf24;
+  --color-stale: #c98a3c;
   --radius: 10px;
   --header-height: 56px;
 }
@@ -398,6 +399,9 @@ a:hover {
 }
 .status-na {
   color: var(--color-text-muted);
+}
+.status-stale {
+  color: var(--color-stale);
 }
 .status-tip {
   display: inline-flex;

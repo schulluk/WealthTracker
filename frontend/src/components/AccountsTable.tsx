@@ -55,7 +55,18 @@ function formatCurrency(value: number, currency: string): string {
   }).format(value);
 }
 
-function StatusIcon({ status, isManual, onClick }: { status: string; isManual?: boolean; onClick?: () => void }) {
+// An active account whose last successful sync is older than this is flagged
+// amber ("stale") so a long gap is visible at a glance.
+const STALE_SYNC_DAYS = 7;
+
+function daysSince(dateStr: string | null | undefined): number | null {
+  if (!dateStr) return null;
+  const then = new Date(dateStr).getTime();
+  if (Number.isNaN(then)) return null;
+  return Math.floor((Date.now() - then) / 86_400_000);
+}
+
+function StatusIcon({ status, isManual, lastSyncAt, onClick }: { status: string; isManual?: boolean; lastSyncAt?: string | null; onClick?: () => void }) {
   if (isManual) {
     return (
       <span className="status-tip" title="Manual account — values are entered by hand and not synced automatically">
@@ -80,12 +91,22 @@ function StatusIcon({ status, isManual, onClick }: { status: string; isManual?: 
           <Clock size={14} className="status-pending" />
         </span>
       );
-    default:
+    default: {
+      // Active — but flag amber if the last successful sync is getting old.
+      const age = daysSince(lastSyncAt);
+      if (age !== null && age >= STALE_SYNC_DAYS) {
+        return (
+          <span className="status-tip" title={`Synced, but ${age} days ago — data may be out of date`}>
+            <CheckCircle2 size={14} className="status-stale" />
+          </span>
+        );
+      }
       return (
-        <span className="status-tip" title="Active — the last sync succeeded">
+        <span className="status-tip" title="Active — the last sync succeeded recently">
           <CheckCircle2 size={14} className="status-active" />
         </span>
       );
+    }
   }
 }
 
@@ -424,6 +445,7 @@ export default function AccountsTable({ accounts, baseCurrency, onRefresh }: Pro
                       <StatusIcon
                         status={a.status}
                         isManual={a.is_manual}
+                        lastSyncAt={a.last_sync_at}
                         onClick={a.status === 'error' ? () => setErrorAccount(a) : undefined}
                       />
                     </td>
