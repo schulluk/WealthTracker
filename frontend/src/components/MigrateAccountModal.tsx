@@ -68,9 +68,13 @@ export default function MigrateAccountModal({ account, onClose, onMigrated }: Pr
   const credentialFields = Object.entries(target?.credential_schema?.properties ?? {});
   // Non-manual account currently has stored credentials that will be dropped.
   const willDropCredentials = !account.is_manual;
+  // The account's *effective* current type. A manual account counts as 'manual'
+  // even if it still carries a broker FK (e.g. a manual "Morgan Stanley" account),
+  // so converting it to that same broker (Manual -> real MS) must stay allowed.
+  const currentCode = account.is_manual ? 'manual' : account.broker.code;
 
   const handleContinue = () => {
-    if (!targetCode || targetCode === account.broker.code) return;
+    if (!targetCode || targetCode === currentCode) return;
     setError('');
     if (targetIsManual || credentialFields.length === 0) {
       void doMigrate();
@@ -141,9 +145,9 @@ export default function MigrateAccountModal({ account, onClose, onMigrated }: Pr
                 >
                   <option value="">Select a type...</option>
                   {brokers.map((b) => (
-                    <option key={b.code} value={b.code} disabled={b.code === account.broker.code}>
+                    <option key={b.code} value={b.code} disabled={b.code === currentCode}>
                       {b.code === 'manual' ? 'Manual Entry' : b.name}
-                      {b.code === account.broker.code ? ' (current)' : ''}
+                      {b.code === currentCode ? ' (current)' : ''}
                     </option>
                   ))}
                 </select>
@@ -165,7 +169,7 @@ export default function MigrateAccountModal({ account, onClose, onMigrated }: Pr
               <button
                 type="submit"
                 className="btn btn-primary"
-                disabled={!targetCode || targetCode === account.broker.code || saving}
+                disabled={!targetCode || targetCode === currentCode || saving}
               >
                 {saving ? <><Loader size={14} className="spin" style={{ marginRight: 6 }} />Changing...</> : 'Continue'}
               </button>
