@@ -58,6 +58,12 @@ class Command(BaseCommand):
         ssl_ctx = None
         if url.startswith("wss://"):
             ssl_ctx = ssl.create_default_context()
+            # The python.org macOS build ships no system CAs; use certifi's bundle.
+            try:
+                import certifi
+                ssl_ctx.load_verify_locations(certifi.where())
+            except ImportError:
+                pass
             if insecure:
                 ssl_ctx.check_hostname = False
                 ssl_ctx.verify_mode = ssl.CERT_NONE
