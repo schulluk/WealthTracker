@@ -104,6 +104,35 @@ async function refreshAccessToken(): Promise<string | null> {
   return data.access;
 }
 
+// KEK recovery: the KEK lives in sessionStorage and is wiped when the tab closes
+// (or never set in a tab that got its token from another tab / a refresh). The
+// access token persists in localStorage, so the user looks logged in but
+// encrypted operations 403 with "KEK required". A handler (registered by the
+// UI) re-prompts for the password, re-derives the KEK, and we retry once. The
+// in-flight promise is shared so concurrent 403s trigger a single prompt.
+type KekRecoveryHandler = () => Promise<boolean>;
+let kekRecoveryHandler: KekRecoveryHandler | null = null;
+let kekRecoveryInFlight: Promise<boolean> | null = null;
+
+export function setKekRecoveryHandler(fn: KekRecoveryHandler | null) {
+  kekRecoveryHandler = fn;
+}
+
+function isKekRequired(body: unknown): boolean {
+  const detail = (body as { detail?: unknown } | null)?.detail;
+  return typeof detail === 'string' && /KEK required/i.test(detail);
+}
+
+function recoverKek(): Promise<boolean> {
+  if (!kekRecoveryHandler) return Promise.resolve(false);
+  if (!kekRecoveryInFlight) {
+    kekRecoveryInFlight = Promise.resolve(kekRecoveryHandler())
+      .catch(() => false)
+      .finally(() => { kekRecoveryInFlight = null; }) as Promise<boolean>;
+  }
+  return kekRecoveryInFlight;
+}
+
 export async function fetchWithAuth(
   url: string,
   options: RequestInit = {},
@@ -132,6 +161,18 @@ export async function fetchWithAuth(
     const newToken = await refreshAccessToken();
     if (newToken) {
       headers['X-Auth-Token'] = `Bearer ${newToken}`;
+      res = await fetch(url, { ...options, headers, credentials: 'include' });
+    }
+  }
+
+  // Missing KEK (sessionStorage wiped, token still valid): recover and retry once.
+  if (res.status === 403 && kekRecoveryHandler) {
+    const peeked = await res.clone().json().catch(() => null);
+    if (isKekRequired(peeked) && await recoverKek()) {
+      const freshToken = getAccessToken();
+      if (freshToken) headers['X-Auth-Token'] = `Bearer ${freshToken}`;
+      const freshKek = getKEK();
+      if (freshKek) headers['X-KEK'] = freshKek;
       res = await fetch(url, { ...options, headers, credentials: 'include' });
     }
   }
