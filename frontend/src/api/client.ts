@@ -422,6 +422,40 @@ export async function createAccount(fields: {
   return res.json();
 }
 
+export async function getSyncTaskStatus(taskId: string) {
+  const res = await fetchWithAuth(`/api/accounts/sync/${taskId}/`);
+  if (!res.ok) throw new Error('Failed to get sync status');
+  return res.json();
+}
+
+// The sync runs on a background worker thread; the POST returns immediately with
+// {status:'queued', task_id}. Poll the task to completion and resolve with the
+// real outcome ({status:'success'|'pending_auth'|'error', ...}) so the UI reflects
+// the actual result instead of refreshing stale data mid-sync.
+async function pollSyncTask(
+  taskId: string,
+  { timeoutMs = 180_000, intervalMs = 1500 } = {},
+) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, intervalMs));
+    let task;
+    try {
+      task = await getSyncTaskStatus(taskId);
+    } catch {
+      continue; // transient (e.g. brief 404 before the task registers) — keep polling
+    }
+    if (task.status === 'completed') {
+      return task.result ?? { status: 'success' };
+    }
+    if (task.status === 'failed') {
+      return { status: 'error', error: task.error || 'Sync failed' };
+    }
+    // 'pending' / 'running' — keep polling
+  }
+  return { status: 'error', error: 'Sync timed out' };
+}
+
 export async function syncAccount(accountId: number) {
   const res = await fetchWithAuth(`/api/accounts/${accountId}/sync/`, {
     method: 'POST',
@@ -429,6 +463,10 @@ export async function syncAccount(accountId: number) {
   const data = await res.json();
   if (!res.ok && !data.status) {
     throw new Error(data.error || 'Sync failed');
+  }
+  // Async queue: wait for the worker to finish, then return the real outcome.
+  if (data.status === 'queued' && data.task_id) {
+    return pollSyncTask(data.task_id);
   }
   return data;
 }

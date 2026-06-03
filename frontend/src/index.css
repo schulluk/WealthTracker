@@ -399,6 +399,11 @@ a:hover {
 .status-na {
   color: var(--color-text-muted);
 }
+.status-tip {
+  display: inline-flex;
+  align-items: center;
+  cursor: help;
+}
 
 .btn-status-error {
   background: none;

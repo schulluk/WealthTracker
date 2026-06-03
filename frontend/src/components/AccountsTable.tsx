@@ -57,7 +57,11 @@ function formatCurrency(value: number, currency: string): string {
 
 function StatusIcon({ status, isManual, onClick }: { status: string; isManual?: boolean; onClick?: () => void }) {
   if (isManual) {
-    return <MinusCircle size={14} className="status-na" />;
+    return (
+      <span className="status-tip" title="Manual account — values are entered by hand and not synced automatically">
+        <MinusCircle size={14} className="status-na" />
+      </span>
+    );
   }
   switch (status) {
     case 'error':
@@ -65,15 +69,23 @@ function StatusIcon({ status, isManual, onClick }: { status: string; isManual?: 
         <button
           className="btn-status-error"
           onClick={onClick}
-          title="Click to see error details"
+          title="Sync failed — click to see the error details"
         >
           <AlertCircle size={14} className="status-error" />
         </button>
       );
     case 'pending_auth':
-      return <Clock size={14} className="status-pending" />;
+      return (
+        <span className="status-tip" title="Action needed — finish authentication (enter a 2FA code or re-add credentials) before this account can sync">
+          <Clock size={14} className="status-pending" />
+        </span>
+      );
     default:
-      return <CheckCircle2 size={14} className="status-active" />;
+      return (
+        <span className="status-tip" title="Active — the last sync succeeded">
+          <CheckCircle2 size={14} className="status-active" />
+        </span>
+      );
   }
 }
 
