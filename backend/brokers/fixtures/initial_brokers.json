@@ -115,20 +115,9 @@
             "title": "Include unvested shares",
             "default": false,
             "description": "Off by default: only vested shares (that actually belong to you) count toward the balance. Turn on to also include unvested shares."
-          },
-          "jwt_token": {
-            "type": "string",
-            "title": "JWT Token (fallback)",
-            "format": "password",
-            "description": "Optional. Only if automated login is unavailable: from DevTools > Network > 'graphql' > 'authorization' header"
-          },
-          "employee_id": {
-            "type": "string",
-            "title": "Employee ID (fallback)",
-            "description": "Optional. Required only with the JWT fallback: the 'employeeid' header value (NOT the JWT 'sub' claim)"
           }
         },
-        "description": "Automated login uses username + password + TOTP secret in a headless browser. The JWT/Employee ID fields are a manual fallback only."
+        "description": "Automated login uses username + password + TOTP secret in a headless browser; the JWT and employee id are captured automatically."
       },
       "created_at": "2026-01-20T00:00:00Z",
       "updated_at": "2026-01-20T00:00:00Z"
