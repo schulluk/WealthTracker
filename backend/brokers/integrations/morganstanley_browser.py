@@ -110,6 +110,21 @@ def _write_last_otp(sp: Optional[Path]) -> None:
         logger.warning("MS 2FA: could not record OTP timestamp: %s", exc)
 
 
+def _dump_login_error(page, sp: Optional[Path]) -> None:
+    """Save the login-error page HTML so a failure can be diagnosed afterwards.
+
+    The login form contains no password (it's submitted, not rendered), so this is
+    low-sensitivity. Written next to the per-account state file, or /tmp otherwise.
+    """
+    try:
+        target = sp.with_suffix(".loginerror.html") if sp else Path("/tmp/ms_login_error.html")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(page.content())
+        logger.warning("MS browser: saved login-error page to %s (url=%s)", target, page.url)
+    except Exception as exc:
+        logger.warning("MS browser: could not save login-error page: %s", exc)
+
+
 def browser_login(
     *,
     username: str,
@@ -270,11 +285,16 @@ def browser_login(
                     page.wait_for_timeout(1000)
 
                 # Type like a human — this login is keystroke-driven; .fill() is rejected.
+                # Triple-click first to select any pre-filled value: a remembered/trusted
+                # device pre-fills the account number, and press_sequentially would
+                # otherwise APPEND to it (e.g. "lumaluma") -> MS rejects as bad credentials.
                 try:
-                    page.click(_SEL_USER)
-                    page.locator(_SEL_USER).press_sequentially(username, delay=60)
-                    page.click(_SEL_PASS)
-                    page.locator(_SEL_PASS).press_sequentially(password, delay=60)
+                    u = page.locator(_SEL_USER)
+                    u.click(click_count=3)
+                    u.press_sequentially(username, delay=60)
+                    p = page.locator(_SEL_PASS)
+                    p.click(click_count=3)
+                    p.press_sequentially(password, delay=60)
                 except Exception as exc:
                     raise BrowserLoginError(f"Could not fill the login form: {exc}")
                 try:
@@ -298,6 +318,7 @@ def browser_login(
                     if "/servlet/ui" in page.url:
                         break
                     if "loginError" in page.url:
+                        _dump_login_error(page, sp)
                         raise BrowserLoginError(
                             "MS rejected the login (bad credentials, or the device "
                             "fingerprint was not attached)."
