@@ -207,17 +207,23 @@ def write_release_notes
   en_path = File.join(metadata_dir, "en-US", "release_notes.txt")
   File.write(en_path, notes[0, 4000])
 
-  # Copyright — read holder from METADATA.md, prepend current year
-  metadata_md = File.expand_path("../../METADATA.md", __dir__)
-  if File.exist?(metadata_md)
-    match = File.read(metadata_md).match(/\*\*Copyright\*\*.*?\n```\n(.+?)\n```/m)
-    if match
-      copyright_path = File.join(metadata_dir, "en-US", "copyright.txt")
-      File.write(copyright_path, "#{Time.now.year} #{match[1].strip}")
-    end
-  end
+  write_copyright
 
   version
+end
+
+# Copyright — current year + holder from METADATA.md. Precheck rejects a
+# copyright whose year isn't the current year, so this must run before EVERY
+# deliver/precheck (not just in `beta` via write_release_notes) — otherwise
+# `submit`/`metadata` ship the stale committed file and fail at year rollover.
+def write_copyright
+  metadata_md = File.expand_path("../../METADATA.md", __dir__)
+  return unless File.exist?(metadata_md)
+  match = File.read(metadata_md).match(/\*\*Copyright\*\*.*?\n```\n(.+?)\n```/m)
+  return unless match
+  copyright = "#{Time.now.year} #{match[1].strip}"
+  File.write(File.expand_path("metadata/en-US/copyright.txt", __dir__), copyright)
+  UI.message("Copyright set to: #{copyright}")
 end
 
 # --- Signing setup ---
@@ -347,6 +353,7 @@ platform :ios do
   desc "Submit latest TestFlight build for App Store review"
   lane :submit do
     version = changelog_version
+    write_copyright
     setup_asc_key
     deliver(
       skip_binary_upload: true,
@@ -364,6 +371,7 @@ platform :ios do
   desc "Upload metadata from METADATA.md to App Store Connect"
   lane :metadata do
     sh(File.expand_path("../../sync_store_listings.sh", __dir__))
+    write_copyright
     setup_asc_key
     deliver(
       skip_binary_upload: true,
