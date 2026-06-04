@@ -22,12 +22,15 @@ String formatCurrencyCompact(double value, String currency) {
 }
 
 /// Compact number formatter for chart axis (no currency symbol).
-String formatChartAxisValue(double value) {
-  if (value >= 1000000) {
-    final m = value / 1000000;
-    return '${m.toStringAsFixed(2)}M';
-  } else if (value >= 1000) {
-    return '${(value / 1000).toStringAsFixed(0)}K';
+/// When [step] (the tick interval) is finer than the suffix unit, falls back
+/// to 2 decimals so adjacent ticks remain distinguishable. Never uses 1 decimal.
+String formatChartAxisValue(double value, {double? step}) {
+  if (value.abs() >= 1000000) {
+    final decimals = (step != null && step < 1000000) ? 2 : 0;
+    return '${(value / 1000000).toStringAsFixed(decimals)}M';
+  } else if (value.abs() >= 1000) {
+    final decimals = (step != null && step < 1000) ? 2 : 0;
+    return '${(value / 1000).toStringAsFixed(decimals)}K';
   }
   return value.toStringAsFixed(0);
 }

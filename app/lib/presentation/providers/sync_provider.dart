@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../services/notification_service.dart';
 import 'accounts_provider.dart';
 import 'core_providers.dart';
 import 'profile_provider.dart';
@@ -180,6 +181,9 @@ class SyncSettingsManager {
     bool? enabled,
     int? hour,
     int? minute,
+    NotificationFrequency? frequency,
+    bool? shiftWeekend,
+    bool? skipHolidays,
   }) async {
     final notificationService = _ref.read(notificationServiceProvider);
 
@@ -191,13 +195,26 @@ class SyncSettingsManager {
       final currentMinute = minute ?? await notificationService.getSyncReminderMinute();
       await notificationService.setSyncReminderTime(currentHour, currentMinute);
     }
+    if (frequency != null) {
+      await notificationService.setSyncReminderFrequency(frequency);
+    }
+    if (shiftWeekend != null) {
+      await notificationService.setSyncReminderShiftWeekend(shiftWeekend);
+    }
+    if (skipHolidays != null) {
+      await notificationService.setSyncReminderSkipHolidays(skipHolidays);
+    }
 
-    // Schedule or cancel the notification
+    // Schedule or cancel the notification using the persisted settings.
     final isEnabled = enabled ?? await notificationService.isSyncReminderEnabled();
     if (isEnabled) {
-      final h = hour ?? await notificationService.getSyncReminderHour();
-      final m = minute ?? await notificationService.getSyncReminderMinute();
-      await notificationService.scheduleSyncReminder(hour: h, minute: m);
+      await notificationService.scheduleSyncReminder(
+        hour: await notificationService.getSyncReminderHour(),
+        minute: await notificationService.getSyncReminderMinute(),
+        frequency: await notificationService.getSyncReminderFrequency(),
+        shiftWeekend: await notificationService.getSyncReminderShiftWeekend(),
+        skipHolidays: await notificationService.getSyncReminderSkipHolidays(),
+      );
     } else {
       await notificationService.cancelSyncReminder();
     }
@@ -217,11 +234,12 @@ class SyncSettingsManager {
       final hasPermission =
           await notificationService.hasNotificationPermission();
       if (hasPermission) {
-        final hour = await notificationService.getSyncReminderHour();
-        final minute = await notificationService.getSyncReminderMinute();
         await notificationService.scheduleSyncReminder(
-          hour: hour,
-          minute: minute,
+          hour: await notificationService.getSyncReminderHour(),
+          minute: await notificationService.getSyncReminderMinute(),
+          frequency: await notificationService.getSyncReminderFrequency(),
+          shiftWeekend: await notificationService.getSyncReminderShiftWeekend(),
+          skipHolidays: await notificationService.getSyncReminderSkipHolidays(),
         );
       }
     }

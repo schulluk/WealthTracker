@@ -511,6 +511,10 @@ class _SyncSettingsSectionState extends ConsumerState<_SyncSettingsSection> {
   bool _syncReminderEnabled = false;
   int _syncReminderHour = 9;
   int _syncReminderMinute = 0;
+  NotificationFrequency _syncReminderFrequency =
+      NotificationFrequency.every3Days;
+  bool _syncReminderShiftWeekend = false;
+  bool _syncReminderSkipHolidays = false;
 
   @override
   void initState() {
@@ -524,11 +528,17 @@ class _SyncSettingsSectionState extends ConsumerState<_SyncSettingsSection> {
     final enabled = await notificationService.isSyncReminderEnabled();
     final hour = await notificationService.getSyncReminderHour();
     final minute = await notificationService.getSyncReminderMinute();
+    final frequency = await notificationService.getSyncReminderFrequency();
+    final shiftWeekend = await notificationService.getSyncReminderShiftWeekend();
+    final skipHolidays = await notificationService.getSyncReminderSkipHolidays();
     if (mounted) {
       setState(() {
         _syncReminderEnabled = enabled;
         _syncReminderHour = hour;
         _syncReminderMinute = minute;
+        _syncReminderFrequency = frequency;
+        _syncReminderShiftWeekend = shiftWeekend;
+        _syncReminderSkipHolidays = skipHolidays;
       });
     }
   }
@@ -658,6 +668,64 @@ class _SyncSettingsSectionState extends ConsumerState<_SyncSettingsSection> {
     }
   }
 
+  Future<void> _updateFrequency(NotificationFrequency value) async {
+    final previous = _syncReminderFrequency;
+    setState(() => _syncReminderFrequency = value);
+    try {
+      await ref
+          .read(syncSettingsProvider)
+          .updateSyncReminder(frequency: value);
+    } catch (e) {
+      setState(() => _syncReminderFrequency = previous);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _updateShiftWeekend(bool value) async {
+    setState(() => _syncReminderShiftWeekend = value);
+    try {
+      await ref
+          .read(syncSettingsProvider)
+          .updateSyncReminder(shiftWeekend: value);
+    } catch (e) {
+      setState(() => _syncReminderShiftWeekend = !value);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _updateSkipHolidays(bool value) async {
+    setState(() => _syncReminderSkipHolidays = value);
+    try {
+      await ref
+          .read(syncSettingsProvider)
+          .updateSyncReminder(skipHolidays: value);
+    } catch (e) {
+      setState(() => _syncReminderSkipHolidays = !value);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update: $e')),
+        );
+      }
+    }
+  }
+
+  String _frequencyLabel(NotificationFrequency frequency) {
+    return switch (frequency) {
+      NotificationFrequency.daily => 'Every day',
+      NotificationFrequency.every3Days => 'Every 3 days',
+      NotificationFrequency.weekly => 'Once a week',
+      NotificationFrequency.monthly => 'Once a month',
+    };
+  }
+
   String _formatTime(int hour, int minute) {
     final h = hour.toString().padLeft(2, '0');
     final m = minute.toString().padLeft(2, '0');
@@ -679,16 +747,32 @@ class _SyncSettingsSectionState extends ConsumerState<_SyncSettingsSection> {
           onChanged: _updateSyncOnAppOpen,
         ),
         SwitchListTile(
-          title: const Text('Daily sync reminder'),
+          title: const Text('Sync reminder'),
           subtitle: Text(
             _syncReminderEnabled
-                ? 'Remind me at ${_formatTime(_syncReminderHour, _syncReminderMinute)}'
+                ? '${_frequencyLabel(_syncReminderFrequency)} at '
+                    '${_formatTime(_syncReminderHour, _syncReminderMinute)}'
                 : 'Disabled',
           ),
           value: _syncReminderEnabled,
           onChanged: _updateSyncReminder,
         ),
-        if (_syncReminderEnabled)
+        if (_syncReminderEnabled) ...[
+          ListTile(
+            leading: const Icon(Icons.repeat),
+            title: const Text('Frequency'),
+            trailing: DropdownButton<NotificationFrequency>(
+              value: _syncReminderFrequency,
+              underline: const SizedBox.shrink(),
+              onChanged: (value) {
+                if (value != null) _updateFrequency(value);
+              },
+              items: [
+                for (final f in NotificationFrequency.values)
+                  DropdownMenuItem(value: f, child: Text(_frequencyLabel(f))),
+              ],
+            ),
+          ),
           ListTile(
             leading: const Icon(Icons.schedule),
             title: const Text('Reminder time'),
@@ -697,6 +781,26 @@ class _SyncSettingsSectionState extends ConsumerState<_SyncSettingsSection> {
               child: Text(_formatTime(_syncReminderHour, _syncReminderMinute)),
             ),
           ),
+          SwitchListTile(
+            secondary: const Icon(Icons.weekend),
+            title: const Text('Shift past weekends'),
+            subtitle: const Text(
+              'Move reminders that land on a weekend to the next weekday',
+            ),
+            value: _syncReminderShiftWeekend,
+            onChanged: _updateShiftWeekend,
+          ),
+          SwitchListTile(
+            secondary: const Icon(Icons.flag_outlined),
+            title: const Text('Shift past US market holidays'),
+            subtitle: const Text(
+              'Shift reminders off US stock market holidays '
+              '(e.g. Good Friday, Christmas)',
+            ),
+            value: _syncReminderSkipHolidays,
+            onChanged: _updateSkipHolidays,
+          ),
+        ],
         if (syncState.lastSyncTime != null)
           ListTile(
             leading: const Icon(Icons.sync),

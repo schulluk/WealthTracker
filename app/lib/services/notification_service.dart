@@ -9,6 +9,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 import '../core/config/app_config.dart';
 import '../main.dart' show notificationTapStream;
+import 'us_market_holidays.dart';
 
 /// Result of a notification permission request.
 enum NotificationPermissionResult {
@@ -22,17 +23,56 @@ enum NotificationPermissionResult {
   permanentlyDenied,
 }
 
+/// How often the sync reminder repeats.
+enum NotificationFrequency {
+  daily('daily', 1),
+  every3Days('every3days', 3),
+  weekly('weekly', 7),
+  monthly('monthly', 0);
+
+  const NotificationFrequency(this.key, this.intervalDays);
+
+  /// Stable identifier persisted in SharedPreferences.
+  final String key;
+
+  /// Days between occurrences. Zero for [monthly], which is computed by
+  /// calendar month rather than a fixed day interval.
+  final int intervalDays;
+
+  static NotificationFrequency fromKey(String? key) {
+    return NotificationFrequency.values.firstWhere(
+      (f) => f.key == key,
+      orElse: () => NotificationFrequency.every3Days,
+    );
+  }
+}
+
 /// Service for managing local notifications, particularly sync reminders.
 class NotificationService {
   static const String _lastSyncAllKey = 'last_sync_all_timestamp';
   static const String _syncReminderEnabledKey = 'sync_reminder_enabled';
   static const String _syncReminderHourKey = 'sync_reminder_hour';
   static const String _syncReminderMinuteKey = 'sync_reminder_minute';
+  static const String _syncReminderFrequencyKey = 'sync_reminder_frequency';
+  static const String _syncReminderShiftWeekendKey =
+      'sync_reminder_shift_weekend';
+  static const String _syncReminderSkipHolidaysKey =
+      'sync_reminder_skip_holidays';
+
+  /// Legacy single-notification id (pre-frequency feature). Cancelled on
+  /// reschedule so old auto-repeating reminders don't linger.
   static const int _syncReminderNotificationId = 1;
+
+  /// Reminders are scheduled as a rolling window of one-shot notifications
+  /// occupying ids [_syncReminderBaseId] .. [_syncReminderBaseId] +
+  /// [_syncReminderCount] - 1, re-topped-up whenever the app opens.
+  static const int _syncReminderBaseId = 100;
+  static const int _syncReminderCount = 12;
+
   static const String _syncReminderChannelId = 'sync_reminder';
   static const String _syncReminderChannelName = 'Sync Reminders';
   static const String _syncReminderChannelDesc =
-      'Daily reminders to sync your accounts';
+      'Reminders to sync your accounts';
 
   /// Suppression threshold in hours. If last sync was within this time,
   /// skip the sync-on-app-open.
@@ -161,15 +201,28 @@ class NotificationService {
     return NotificationPermissionResult.granted;
   }
 
-  /// Schedule a daily sync reminder at the specified time.
+  /// Schedule sync reminders at [hour]:[minute] according to [frequency].
   ///
-  /// The notification will be shown daily at [hour]:[minute], but will be
-  /// suppressed if the user has synced within the last 20 hours.
+  /// Because [frequency] (and the weekend/holiday shifting) can't be expressed
+  /// with the platform's native repeat rules, the next [_syncReminderCount]
+  /// occurrences are computed here and scheduled as individual one-shot
+  /// notifications. The window is re-topped-up whenever the app opens.
+  ///
+  /// When [shiftWeekend] is set, an occurrence landing on a Saturday/Sunday is
+  /// moved forward to the next weekday; subsequent occurrences are then
+  /// re-anchored from that shifted date (so e.g. every-3-days starting Monday
+  /// yields Mon, Thu, Mon, Thu instead of Mon, Thu, Sun, Wed). When
+  /// [skipHolidays] is additionally set, US market holidays are treated the
+  /// same way. Reminders may still be suppressed on open if the user has
+  /// synced within the last 20 hours.
   Future<void> scheduleSyncReminder({
     required int hour,
     required int minute,
+    required NotificationFrequency frequency,
+    required bool shiftWeekend,
+    required bool skipHolidays,
   }) async {
-    await _notifications.cancel(id: _syncReminderNotificationId);
+    await cancelSyncReminder();
 
     const androidDetails = AndroidNotificationDetails(
       _syncReminderChannelId,
@@ -187,44 +240,131 @@ class NotificationService {
       iOS: iosDetails,
     );
 
-    final scheduledTime = _nextInstanceOfTime(hour, minute);
-
-    await _notifications.zonedSchedule(
-      id: _syncReminderNotificationId,
-      title: 'Wealth Tracker',
-      body: 'Time to sync your accounts',
-      scheduledDate: scheduledTime,
-      notificationDetails: details,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      matchDateTimeComponents: DateTimeComponents.time, // Daily repeat
-      payload: 'sync_reminder',
+    final occurrences = _computeOccurrences(
+      hour: hour,
+      minute: minute,
+      frequency: frequency,
+      shiftWeekend: shiftWeekend,
+      skipHolidays: skipHolidays,
+      count: _syncReminderCount,
     );
 
-    debugPrint('Scheduled sync reminder for $hour:$minute');
-  }
-
-  /// Cancel the sync reminder notification.
-  Future<void> cancelSyncReminder() async {
-    await _notifications.cancel(id: _syncReminderNotificationId);
-  }
-
-  /// Get the next instance of the specified time.
-  tz.TZDateTime _nextInstanceOfTime(int hour, int minute) {
-    final now = tz.TZDateTime.now(tz.local);
-    var scheduled = tz.TZDateTime(
-      tz.local,
-      now.year,
-      now.month,
-      now.day,
-      hour,
-      minute,
-    );
-
-    if (scheduled.isBefore(now)) {
-      scheduled = scheduled.add(const Duration(days: 1));
+    for (var i = 0; i < occurrences.length; i++) {
+      await _notifications.zonedSchedule(
+        id: _syncReminderBaseId + i,
+        title: 'Wealth Tracker',
+        body: 'Time to sync your accounts',
+        scheduledDate: occurrences[i],
+        notificationDetails: details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        payload: 'sync_reminder',
+      );
     }
 
-    return scheduled;
+    debugPrint(
+      'Scheduled ${occurrences.length} sync reminders (${frequency.key}) '
+      'at $hour:$minute',
+    );
+  }
+
+  /// Cancel all scheduled sync reminders (including the legacy single one).
+  Future<void> cancelSyncReminder() async {
+    await _notifications.cancel(id: _syncReminderNotificationId);
+    for (var i = 0; i < _syncReminderCount; i++) {
+      await _notifications.cancel(id: _syncReminderBaseId + i);
+    }
+  }
+
+  /// Compute the next [count] future reminder times for [frequency].
+  List<tz.TZDateTime> _computeOccurrences({
+    required int hour,
+    required int minute,
+    required NotificationFrequency frequency,
+    required bool shiftWeekend,
+    required bool skipHolidays,
+    required int count,
+  }) {
+    final now = tz.TZDateTime.now(tz.local);
+    final occurrences = <tz.TZDateTime>[];
+
+    if (frequency == NotificationFrequency.monthly) {
+      // Each month independently picks the anchor day-of-month, then shifts,
+      // so the cadence doesn't drift across months.
+      final anchorDay = now.day;
+      var year = now.year;
+      var month = now.month;
+      var guard = 0;
+      while (occurrences.length < count && guard < count * 3 + 12) {
+        guard++;
+        final lastDay = DateTime(year, month + 1, 0).day;
+        final day = anchorDay > lastDay ? lastDay : anchorDay;
+        final shifted = _applyShift(
+          tz.TZDateTime(tz.local, year, month, day, hour, minute),
+          shiftWeekend,
+          skipHolidays,
+        );
+        if (shifted.isAfter(now)) occurrences.add(shifted);
+        if (++month > 12) {
+          month = 1;
+          year++;
+        }
+      }
+      return occurrences;
+    }
+
+    final interval = frequency.intervalDays;
+    var current = _applyShift(
+      tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute),
+      shiftWeekend,
+      skipHolidays,
+    );
+    var guard = 0;
+    while (occurrences.length < count && guard < count * 4 + 30) {
+      guard++;
+      if (current.isAfter(now)) occurrences.add(current);
+      current = _applyShift(
+        _addDays(current, interval),
+        shiftWeekend,
+        skipHolidays,
+      );
+    }
+    return occurrences;
+  }
+
+  /// Move [date] forward past weekends (when [shiftWeekend] is set) and/or US
+  /// market holidays (when [skipHolidays] is set). The two toggles are
+  /// independent: with only [skipHolidays] enabled, a holiday is moved to the
+  /// next non-holiday day even if that day is a weekend, and vice versa.
+  tz.TZDateTime _applyShift(
+    tz.TZDateTime date,
+    bool shiftWeekend,
+    bool skipHolidays,
+  ) {
+    if (!shiftWeekend && !skipHolidays) return date;
+    var d = date;
+    for (var guard = 0; guard < 14; guard++) {
+      final isWeekend =
+          d.weekday == DateTime.saturday || d.weekday == DateTime.sunday;
+      if ((shiftWeekend && isWeekend) ||
+          (skipHolidays && UsMarketHolidays.isHoliday(d))) {
+        d = _addDays(d, 1);
+      } else {
+        return d;
+      }
+    }
+    return d;
+  }
+
+  /// Add [days] to [d] preserving the wall-clock time across DST changes.
+  tz.TZDateTime _addDays(tz.TZDateTime d, int days) {
+    return tz.TZDateTime(
+      tz.local,
+      d.year,
+      d.month,
+      d.day + days,
+      d.hour,
+      d.minute,
+    );
   }
 
   // --- Local sync reminder settings ---
@@ -253,6 +393,38 @@ class NotificationService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_syncReminderHourKey, hour);
     await prefs.setInt(_syncReminderMinuteKey, minute);
+  }
+
+  Future<NotificationFrequency> getSyncReminderFrequency() async {
+    final prefs = await SharedPreferences.getInstance();
+    return NotificationFrequency.fromKey(
+      prefs.getString(_syncReminderFrequencyKey),
+    );
+  }
+
+  Future<void> setSyncReminderFrequency(NotificationFrequency frequency) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_syncReminderFrequencyKey, frequency.key);
+  }
+
+  Future<bool> getSyncReminderShiftWeekend() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_syncReminderShiftWeekendKey) ?? false;
+  }
+
+  Future<void> setSyncReminderShiftWeekend(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_syncReminderShiftWeekendKey, value);
+  }
+
+  Future<bool> getSyncReminderSkipHolidays() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_syncReminderSkipHolidaysKey) ?? false;
+  }
+
+  Future<void> setSyncReminderSkipHolidays(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_syncReminderSkipHolidaysKey, value);
   }
 
   /// Record a sync-all operation timestamp.

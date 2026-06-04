@@ -1,9 +1,20 @@
 # Changelog
 
-## Next: 1.3.6
+## Next: 1.3.8
 
+- Bug fixes and improvements.
+
+## Next: 1.3.7
+
+- Bug fixes and improvements.
+
+## 1.3.6
+
+- Sync reminder can now repeat every day, every 3 days, weekly, or monthly (default every 3 days) instead of only daily
+- New option to shift reminders that fall on a weekend to the next weekday, with an optional setting to also skip US market holidays (e.g. Good Friday, Christmas)
 - Per-account chart y-axis now adapts to the visible value range with clean tick steps (100, 250, 500, 1k, 2.5k, 5k, 10k, ...)
 - Per-account chart now loads the full snapshot history instead of just the most recent 100 entries
+- Chart y-axis labels switch to 2 decimals (e.g. "13.20K", "1.25M") when step size would otherwise produce duplicate-looking ticks
 
 ## 1.3.5
 

@@ -249,7 +249,7 @@ class _WealthLineChartState extends ConsumerState<WealthLineChart> {
                         interval: gridInterval,
                         getTitlesWidget: (value, meta) {
                           return Text(
-                            formatChartAxisValue(value),
+                            formatChartAxisValue(value, step: gridInterval),
                             style:
                                 Theme.of(context).textTheme.labelSmall?.copyWith(
                                       color: Theme.of(context)
