@@ -110,6 +110,26 @@ def _write_last_otp(sp: Optional[Path]) -> None:
         logger.warning("MS 2FA: could not record OTP timestamp: %s", exc)
 
 
+def _enter_credential(page, selector: str, value: str) -> None:
+    """Enter a credential fast and reliably.
+
+    ``fill()`` pastes the value instantly AND clears anything a trusted device
+    pre-filled (no more "lumaluma" append bug), but on its own it skips the
+    ``input``/``keyup`` events the login form listens for. So we paste all but the
+    last character and type that final character as a real keystroke — firing the
+    handlers without typing the whole string. The device fingerprints are built
+    from device attributes (not keystroke timing), so a paste doesn't weaken them.
+    """
+    field = page.locator(selector)
+    field.click()
+    if len(value) <= 1:
+        field.fill("")
+        field.press_sequentially(value, delay=40)
+        return
+    field.fill(value[:-1])
+    field.press_sequentially(value[-1], delay=40)
+
+
 def _dump_login_error(page, sp: Optional[Path]) -> None:
     """Save the login-error page HTML so a failure can be diagnosed afterwards.
 
@@ -284,17 +304,10 @@ def browser_login(
                         pass
                     page.wait_for_timeout(1000)
 
-                # Type like a human — this login is keystroke-driven; .fill() is rejected.
-                # Triple-click first to select any pre-filled value: a remembered/trusted
-                # device pre-fills the account number, and press_sequentially would
-                # otherwise APPEND to it (e.g. "lumaluma") -> MS rejects as bad credentials.
+                # Paste creds + one trailing keystroke each (see _enter_credential).
                 try:
-                    u = page.locator(_SEL_USER)
-                    u.click(click_count=3)
-                    u.press_sequentially(username, delay=60)
-                    p = page.locator(_SEL_PASS)
-                    p.click(click_count=3)
-                    p.press_sequentially(password, delay=60)
+                    _enter_credential(page, _SEL_USER, username)
+                    _enter_credential(page, _SEL_PASS, password)
                 except Exception as exc:
                     raise BrowserLoginError(f"Could not fill the login form: {exc}")
                 try:
