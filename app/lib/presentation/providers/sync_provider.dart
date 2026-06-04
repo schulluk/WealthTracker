@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../services/ms_relay/relay_service.dart';
 import '../../services/notification_service.dart';
 import 'accounts_provider.dart';
 import 'core_providers.dart';
@@ -70,44 +71,50 @@ class SyncAllNotifier extends Notifier<SyncAllState> {
     try {
       final repository = ref.read(accountRepositoryProvider);
       final notificationService = ref.read(notificationServiceProvider);
+      final relay = ref.read(relayServiceProvider);
 
-      final startResult = await repository.syncAllAccounts();
-      final taskId = startResult['task_id'] as String?;
+      // Open the phone relay for the sync if any account needs it (e.g. MS).
+      final accounts = await ref.read(accountsProvider.future);
 
-      if (taskId == null) {
-        // No task created (e.g. no accounts to sync)
+      await relay.withRelay(() async {
+        final startResult = await repository.syncAllAccounts();
+        final taskId = startResult['task_id'] as String?;
+
+        if (taskId == null) {
+          // No task created (e.g. no accounts to sync)
+          await notificationService.recordSyncAll();
+          state = state.copyWith(
+            isSyncing: false,
+            lastSyncTime: DateTime.now(),
+          );
+          return;
+        }
+
+        // Poll for completion
+        final result = await _pollTask(repository, taskId);
+
+        int successCount = 0;
+        int failureCount = 0;
+
+        if (result != null) {
+          final details = result['result'] as Map<String, dynamic>?;
+          if (details != null) {
+            successCount = details['synced_count'] as int? ?? 0;
+            failureCount = details['error_count'] as int? ?? 0;
+          }
+        }
+
         await notificationService.recordSyncAll();
+
         state = state.copyWith(
           isSyncing: false,
           lastSyncTime: DateTime.now(),
+          successCount: successCount,
+          failureCount: failureCount,
         );
-        return;
-      }
 
-      // Poll for completion
-      final result = await _pollTask(repository, taskId);
-
-      int successCount = 0;
-      int failureCount = 0;
-
-      if (result != null) {
-        final details = result['result'] as Map<String, dynamic>?;
-        if (details != null) {
-          successCount = details['synced_count'] as int? ?? 0;
-          failureCount = details['error_count'] as int? ?? 0;
-        }
-      }
-
-      await notificationService.recordSyncAll();
-
-      state = state.copyWith(
-        isSyncing: false,
-        lastSyncTime: DateTime.now(),
-        successCount: successCount,
-        failureCount: failureCount,
-      );
-
-      ref.invalidate(accountsProvider);
+        ref.invalidate(accountsProvider);
+      }, active: anyNeedsRelay(accounts));
     } catch (e) {
       state = state.copyWith(
         isSyncing: false,

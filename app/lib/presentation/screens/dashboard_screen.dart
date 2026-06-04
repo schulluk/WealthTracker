@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../data/models/account.dart';
 import '../../data/repositories/account_repository.dart';
+import '../../services/ms_relay/relay_service.dart';
 import 'dart:async';
 
 import '../../main.dart' show initialNotificationResponse, notificationTapStream;
@@ -152,17 +153,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
 
     try {
       final repo = ref.read(accountRepositoryProvider);
-      final startResult = await repo.syncAccount(account.id);
-      final taskId = startResult['task_id'] as String?;
+      final relay = ref.read(relayServiceProvider);
+      await relay.withRelay(() async {
+        final startResult = await repo.syncAccount(account.id);
+        final taskId = startResult['task_id'] as String?;
 
-      if (taskId != null) {
-        final result = await _pollSyncTask(repo, taskId);
-        await _refresh();
-        if (mounted) {
-          final message = result?['message'] as String?;
-          if (message != null) _showSuccessSnackBar(message);
+        if (taskId != null) {
+          final result = await _pollSyncTask(repo, taskId);
+          await _refresh();
+          if (mounted) {
+            final message = result?['message'] as String?;
+            if (message != null) _showSuccessSnackBar(message);
+          }
         }
-      }
+      }, active: accountNeedsRelay(account));
     } catch (e) {
       if (mounted) {
         _showSyncErrorsDialog([
@@ -184,40 +188,44 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
 
     try {
       final repo = ref.read(accountRepositoryProvider);
-      final startResult = await repo.syncAllAccounts();
-      final taskId = startResult['task_id'] as String?;
+      final relay = ref.read(relayServiceProvider);
+      final accounts = ref.read(accountsProvider).asData?.value ?? const <Account>[];
+      await relay.withRelay(() async {
+        final startResult = await repo.syncAllAccounts();
+        final taskId = startResult['task_id'] as String?;
 
-      if (taskId == null) {
-        // No task created (e.g. no accounts to sync)
-        await _refresh();
-        if (mounted) {
-          _showSuccessSnackBar(startResult['message'] as String? ?? 'Done');
-        }
-        return;
-      }
-
-      final result = await _pollSyncTask(repo, taskId);
-      await _refresh();
-
-      if (mounted && result != null) {
-        final details = result['result'] as Map<String, dynamic>?;
-        if (details != null) {
-          final syncedCount = details['synced_count'] as int? ?? 0;
-          final errors = (details['details'] as Map?)?['errors'] as List? ?? [];
-
-          if (errors.isNotEmpty) {
-            _showSyncErrorsDialog(errors, syncedCount: syncedCount);
-          } else if (syncedCount > 0) {
-            _showSuccessSnackBar('Synced $syncedCount account${syncedCount == 1 ? '' : 's'}');
-          } else {
-            _showSuccessSnackBar('All accounts up to date');
+        if (taskId == null) {
+          // No task created (e.g. no accounts to sync)
+          await _refresh();
+          if (mounted) {
+            _showSuccessSnackBar(startResult['message'] as String? ?? 'Done');
           }
-        } else if (result['error'] != null) {
-          _showSyncErrorsDialog([
-            {'name': 'Sync', 'error': result['error']}
-          ]);
+          return;
         }
-      }
+
+        final result = await _pollSyncTask(repo, taskId);
+        await _refresh();
+
+        if (mounted && result != null) {
+          final details = result['result'] as Map<String, dynamic>?;
+          if (details != null) {
+            final syncedCount = details['synced_count'] as int? ?? 0;
+            final errors = (details['details'] as Map?)?['errors'] as List? ?? [];
+
+            if (errors.isNotEmpty) {
+              _showSyncErrorsDialog(errors, syncedCount: syncedCount);
+            } else if (syncedCount > 0) {
+              _showSuccessSnackBar('Synced $syncedCount account${syncedCount == 1 ? '' : 's'}');
+            } else {
+              _showSuccessSnackBar('All accounts up to date');
+            }
+          } else if (result['error'] != null) {
+            _showSyncErrorsDialog([
+              {'name': 'Sync', 'error': result['error']}
+            ]);
+          }
+        }
+      }, active: anyNeedsRelay(accounts));
     } catch (e) {
       if (mounted) {
         _showSyncErrorsDialog([
