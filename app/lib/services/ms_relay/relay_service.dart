@@ -8,6 +8,7 @@ import '../../data/datasources/api_client.dart';
 import '../../data/models/account.dart';
 import '../../presentation/providers/core_providers.dart';
 import '../secure_storage_service.dart';
+import 'background_keepalive.dart';
 import 'relay_exit.dart';
 
 /// Broker codes whose server-side sync needs the phone relay (residential IP).
@@ -82,6 +83,7 @@ class RelayService {
 /// is live again before the Morgan Stanley account's turn comes.
 class RelaySession with WidgetsBindingObserver {
   final RelayService _service;
+  final BackgroundKeepAlive _keepAlive = BackgroundKeepAlive();
   RelayExit? _exit;
   bool _stopped = false;
   bool _connecting = false;
@@ -92,6 +94,9 @@ class RelaySession with WidgetsBindingObserver {
 
   Future<void> start() async {
     WidgetsBinding.instance.addObserver(this);
+    // Request background execution so the relay survives a brief switch-away
+    // (e.g. approving another account's 2FA) mid-sync.
+    await _keepAlive.begin();
     await _connect();
   }
 
@@ -147,6 +152,7 @@ class RelaySession with WidgetsBindingObserver {
     final exit = _exit;
     _exit = null;
     await exit?.close();
+    await _keepAlive.end();
   }
 }
 
