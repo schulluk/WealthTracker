@@ -194,9 +194,17 @@ end
 
 # --- Release notes ---
 
+# Apple's App Store API rejects emoji in the "What's New" field. Strip them from
+# CHANGELOG-derived notes (supplementary-plane + BMP Misc Symbols/Dingbats) so a
+# stray emoji in a future entry still produces a working deploy. Android keeps
+# emoji (Google Play allows them), so this guard lives only in the iOS Fastfile.
+def strip_emoji_for_ios(text)
+  text.gsub(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}]/, '')
+end
+
 def write_release_notes
   version = changelog_version
-  notes = changelog_notes
+  notes = strip_emoji_for_ios(changelog_notes)
   if notes.empty?
     UI.important("No release notes found under '## Next: #{version}' in CHANGELOG.md")
     return version

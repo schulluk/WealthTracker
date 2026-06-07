@@ -18,6 +18,14 @@ echo ""
 echo "=== Android: fastlane $LANE ==="
 (cd "$SCRIPT_DIR/android" && fastlane "$LANE") && ANDROID_OK=1
 
+# Always sync metadata after beta builds so store listings stay current.
+if [ "$LANE" = "beta" ]; then
+  echo ""
+  echo "=== Syncing metadata ==="
+  (cd "$SCRIPT_DIR/ios" && fastlane metadata) || true
+  (cd "$SCRIPT_DIR/android" && fastlane metadata) || true
+fi
+
 echo ""
 echo "==============================="
 echo "  SUMMARY: deploy $LANE"
@@ -33,6 +41,14 @@ else
   echo "  Android: FAILED"
 fi
 echo "==============================="
+
+# After a fully successful submit, bump CHANGELOG.md to the next version
+# so the next `beta` run starts from a fresh "## Next: …" section.
+if [ "$LANE" = "submit" ] && [ $IOS_OK -eq 1 ] && [ $ANDROID_OK -eq 1 ]; then
+  echo ""
+  echo "=== Bumping CHANGELOG.md for next version ==="
+  ruby "$SCRIPT_DIR/scripts/bump_changelog.rb"
+fi
 
 if [ $IOS_OK -eq 0 ] || [ $ANDROID_OK -eq 0 ]; then
   exit 1
