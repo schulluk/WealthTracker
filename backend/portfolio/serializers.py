@@ -49,6 +49,7 @@ class FinancialAccountSerializer(serializers.ModelSerializer):
         source='broker'
     )
     latest_snapshot = AccountSnapshotSerializer(read_only=True)
+    ebics_credential = serializers.SerializerMethodField()
 
     class Meta:
         model = FinancialAccount
@@ -56,10 +57,16 @@ class FinancialAccountSerializer(serializers.ModelSerializer):
             'id', 'name', 'broker', 'broker_code', 'account_identifier',
             'account_type', 'currency', 'is_manual', 'status',
             'sync_enabled', 'last_sync_at', 'last_sync_error',
-            'latest_snapshot', 'created_at', 'updated_at'
+            'latest_snapshot', 'ebics_credential', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'status', 'last_sync_at', 'last_sync_error',
                            'created_at', 'updated_at']
+
+    def get_ebics_credential(self, obj):
+        if obj.ebics_credential_id:
+            c = obj.ebics_credential
+            return {'id': c.id, 'label': c.label, 'state': c.state}
+        return None
 
     def update(self, instance, validated_data):
         old_broker_id = instance.broker_id
@@ -87,17 +94,37 @@ class FinancialAccountCreateSerializer(serializers.ModelSerializer):
         source='broker'
     )
     credentials = serializers.JSONField(write_only=True, required=False)
+    ebics_credential_id = serializers.IntegerField(
+        write_only=True, required=False, allow_null=True
+    )
 
     class Meta:
         model = FinancialAccount
         fields = [
             'name', 'broker_code', 'account_identifier', 'account_type',
-            'currency', 'is_manual', 'sync_enabled', 'credentials'
+            'currency', 'is_manual', 'sync_enabled', 'credentials',
+            'ebics_credential_id'
         ]
 
     def create(self, validated_data):
         # Remove credentials - they will be encrypted by the view using KEK
         credentials = validated_data.pop('credentials', None)
+
+        # Link to a shared EBICS subscriber credential (validated for ownership).
+        ebics_credential_id = validated_data.pop('ebics_credential_id', None)
+        if ebics_credential_id is not None:
+            from brokers.models import EbicsCredential
+            request = self.context.get('request')
+            user = getattr(request, 'user', None)
+            try:
+                validated_data['ebics_credential'] = EbicsCredential.objects.get(
+                    pk=ebics_credential_id, user=user,
+                )
+            except EbicsCredential.DoesNotExist:
+                raise serializers.ValidationError(
+                    {'ebics_credential_id': 'EBICS credential not found'}
+                )
+
         account = FinancialAccount.objects.create(**validated_data)
 
         # If credentials provided, encrypt them using KEK from request context

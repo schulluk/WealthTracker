@@ -429,7 +429,8 @@ class AccountSyncView(KEKAuthenticationMixin, APIView):
         if account.is_manual:
             return Response({'error': 'Cannot sync manual accounts'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not account.encrypted_credentials:
+        # EBICS accounts carry their secret on the shared credential, not here.
+        if not account.encrypted_credentials and not account.ebics_credential_id:
             return Response({'error': 'No credentials configured'}, status=status.HTTP_400_BAD_REQUEST)
 
         # Check for already-running sync for this user
@@ -442,8 +443,9 @@ class AccountSyncView(KEKAuthenticationMixin, APIView):
             })
 
         try:
-            # Decrypt credentials on the request thread (needs KEK header)
-            credentials = self.decrypt_account_credentials(request, account)
+            # Decrypt credentials on the request thread (needs KEK header).
+            # For EBICS accounts this pulls the shared credential's keyring.
+            credentials = self.decrypt_sync_credentials(request, account)
             base_currency = request.user.profile.base_currency
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -484,12 +486,17 @@ class SyncAllAccountsView(KEKAuthenticationMixin, APIView):
                 'message': 'A sync is already in progress',
             })
 
-        # Find all syncable accounts
+        # Find all syncable accounts: those with stored credentials, OR EBICS
+        # accounts whose secret lives on a shared credential.
+        from django.db.models import Q
         accounts = FinancialAccount.objects.filter(
             user=request.user,
             is_manual=False,
             sync_enabled=True,
-        ).exclude(encrypted_credentials__isnull=True).exclude(encrypted_credentials=b'')
+        ).filter(
+            ~Q(encrypted_credentials__isnull=True) & ~Q(encrypted_credentials=b'')
+            | Q(ebics_credential__isnull=False)
+        ).select_related('broker', 'ebics_credential')
 
         if not accounts.exists():
             return Response({
@@ -507,7 +514,7 @@ class SyncAllAccountsView(KEKAuthenticationMixin, APIView):
         account_creds = []
         for account in accounts:
             try:
-                creds = self.decrypt_account_credentials(request, account)
+                creds = self.decrypt_sync_credentials(request, account)
                 account_creds.append((account.id, creds))
             except Exception as e:
                 logger.warning("Failed to decrypt credentials for account %s: %s", account.id, e)

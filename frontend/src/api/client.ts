@@ -409,6 +409,7 @@ export async function createAccount(fields: {
   currency: string;
   is_manual: boolean;
   credentials?: Record<string, string>;
+  ebics_credential_id?: number;
 }) {
   const res = await fetchWithAuth('/api/accounts/', {
     method: 'POST',
@@ -597,6 +598,114 @@ export async function getBroker(brokerCode: string) {
   const res = await fetchWithAuth(`/api/brokers/${brokerCode}/`);
   if (!res.ok) throw new Error('Failed to fetch broker');
   return res.json();
+}
+
+// EBICS credential API (e.g. ZKB). Subscriber-level credentials shared across
+// accounts. All go through fetchWithAuth, so X-KEK + KEK-recovery are automatic.
+export interface EbicsCredential {
+  id: number;
+  label: string;
+  broker_code: string;
+  broker_name: string;
+  host_id: string;
+  partner_id: string;
+  user_id: string;
+  url: string;
+  bank_hash_auth: string;
+  bank_hash_enc: string;
+  state: 'new' | 'keys_sent' | 'active' | 'error';
+  last_error: string;
+  initialized: boolean;
+  account_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EbicsLetter {
+  media_type: string;
+  filename: string;
+  content_base64: string;
+}
+
+export interface EbicsDiscoveredAccount {
+  iban: string;
+  currency: string;
+  balance: number;
+  date: string;
+}
+
+export async function getEbicsCredentials(): Promise<EbicsCredential[]> {
+  const res = await fetchWithAuth('/api/ebics/credentials/');
+  if (!res.ok) throw new Error('Failed to fetch EBICS credentials');
+  return res.json();
+}
+
+export async function createEbicsCredential(fields: {
+  broker_code: string;
+  label: string;
+  host_id: string;
+  partner_id: string;
+  user_id: string;
+  url: string;
+  bank_hash_auth?: string;
+  bank_hash_enc?: string;
+}): Promise<EbicsCredential> {
+  const res = await fetchWithAuth('/api/ebics/credentials/', {
+    method: 'POST',
+    body: JSON.stringify(fields),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to create EBICS credential');
+  return data;
+}
+
+export async function deleteEbicsCredential(id: number): Promise<void> {
+  const res = await fetchWithAuth(`/api/ebics/credentials/${id}/`, { method: 'DELETE' });
+  if (!res.ok && res.status !== 204) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Failed to delete EBICS credential');
+  }
+}
+
+// Send INI + HIA and get the initialisation letter to print, sign and mail.
+export async function initializeEbicsCredential(
+  id: number,
+): Promise<{ status: string; ini: string; hia: string; letter: EbicsLetter; message: string }> {
+  const res = await fetchWithAuth(`/api/ebics/credentials/${id}/initialize/`, { method: 'POST' });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Key submission failed');
+  return data;
+}
+
+export async function getEbicsLetter(id: number): Promise<EbicsLetter> {
+  const res = await fetchWithAuth(`/api/ebics/credentials/${id}/letter/`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to render letter');
+  return data.letter;
+}
+
+// Verify activation: HPB + camt.053 download; returns discovered IBANs.
+export async function testEbicsCredential(
+  id: number,
+): Promise<{ status: string; bank_key_hashes: { auth: string; enc: string }; bank_key_hashes_recorded: boolean; accounts: EbicsDiscoveredAccount[]; message: string }> {
+  const res = await fetchWithAuth(`/api/ebics/credentials/${id}/test/`, { method: 'POST' });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Connection test failed');
+  return data;
+}
+
+// Trigger a browser download of a base64-encoded letter (PDF or HTML).
+export function downloadEbicsLetter(letter: EbicsLetter) {
+  const bytes = base64ToBytes(letter.content_base64);
+  const blob = new Blob([bytes as BlobPart], { type: letter.media_type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = letter.filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 // CSV Import

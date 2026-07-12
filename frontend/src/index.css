@@ -2040,3 +2040,121 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     padding: 14px;
   }
 }
+
+/* ---- EBICS bank connections page ---- */
+.page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.page-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.page-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.4rem;
+  margin: 0;
+}
+.empty-state {
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: 32px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+  margin-top: 16px;
+}
+.ebics-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+.ebics-card {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.ebics-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ebics-card-head h3 {
+  margin: 0 0 4px;
+}
+.ebics-meta {
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+}
+.ebics-badge {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.ebics-badge-active { color: var(--color-success); border-color: var(--color-success); }
+.ebics-badge-keys_sent { color: var(--color-warning); border-color: var(--color-warning); }
+.ebics-badge-error { color: var(--color-danger); border-color: var(--color-danger); }
+.ebics-hashes {
+  margin-top: 10px;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+.ebics-hashes code { word-break: break-all; }
+.ebics-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+.ebics-busy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+}
+.ebics-discovered {
+  margin-top: 14px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 12px;
+}
+.ebics-discovered-title {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  margin-bottom: 8px;
+}
+.ebics-acct-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.ebics-acct-row:last-child { border-bottom: none; }
+.ebics-acct-bal {
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  margin-left: 10px;
+}

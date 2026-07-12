@@ -33,6 +33,16 @@ class FinancialAccount(models.Model):
         on_delete=models.PROTECT,
         related_name='accounts'
     )
+    # For EBICS brokers (e.g. ZKB): the shared subscriber credential this account
+    # is read through. Its keyring — not this account's encrypted_credentials — is
+    # used to sync. One credential serves many accounts (by IBAN).
+    ebics_credential = models.ForeignKey(
+        'brokers.EbicsCredential',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='accounts',
+    )
 
     name = models.CharField(
         max_length=100,

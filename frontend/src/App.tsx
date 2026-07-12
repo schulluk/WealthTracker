@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 import SettingsPage from './pages/SettingsPage'
+import EbicsPage from './pages/EbicsPage'
 import ImprintPage from './pages/ImprintPage'
 
 function App() {
@@ -39,6 +40,14 @@ function App() {
           element={
             <ProtectedRoute>
               <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ebics"
+          element={
+            <ProtectedRoute>
+              <EbicsPage />
             </ProtectedRoute>
           }
         />

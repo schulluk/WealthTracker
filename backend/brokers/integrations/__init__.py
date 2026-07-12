@@ -37,6 +37,12 @@ def get_broker_integration(
             fints_server=broker.fints_server
         )
 
+    if broker.integration_type == 'ebics':
+        # EBICS (e.g. ZKB). The keyring/connection params are passed in `credentials`,
+        # decrypted from the account's shared EbicsCredential by the sync view.
+        from .zkb_ebics import ZKBEbicsIntegration
+        return ZKBEbicsIntegration(credentials=credentials)
+
     if broker.code == 'ibkr':
         # IBKR uses Flex Web Service (requires flex_token and query_id)
         if credentials.get('flex_token') and credentials.get('query_id'):

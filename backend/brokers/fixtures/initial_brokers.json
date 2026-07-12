@@ -260,5 +260,30 @@
       "created_at": "2026-01-20T00:00:00Z",
       "updated_at": "2026-01-20T00:00:00Z"
     }
+  },
+  {
+    "model": "brokers.broker",
+    "pk": 8,
+    "fields": {
+      "code": "zkb",
+      "name": "Zürcher Kantonalbank (ZKB)",
+      "integration_type": "ebics",
+      "bank_identifier": "",
+      "fints_server": "",
+      "api_base_url": "https://ebicsweb.zkb.ch/ebicsweb",
+      "logo_url": "",
+      "website_url": "https://www.zkb.ch",
+      "country": "CH",
+      "is_active": true,
+      "supports_2fa": false,
+      "supports_auto_sync": true,
+      "credential_schema": {
+        "type": "object",
+        "properties": {},
+        "description": "ZKB uses the EBICS 3.0 (H005) protocol. Credentials (an RSA keyring) are subscriber-level and set up once under 'EBICS credentials', then shared across all ZKB accounts. A one-time key exchange with ZKB is required: the app generates keys, submits them, and produces an initialisation letter you print, sign, and mail to ZKB."
+      },
+      "created_at": "2026-07-12T00:00:00Z",
+      "updated_at": "2026-07-12T00:00:00Z"
+    }
   }
 ]

@@ -40,6 +40,30 @@ class KEKAuthenticationMixin:
             logger.warning("Failed to decode KEK header")
             return None
 
+    def get_user_key(self, request) -> bytes:
+        """
+        Derive the per-user Fernet key by unwrapping it with the request's KEK.
+
+        This is the single choke point every encrypted operation goes through.
+
+        Raises:
+            PermissionDenied: If the KEK is missing or unwrapping fails.
+        """
+        profile = request.user.profile
+
+        kek = self.get_kek(request)
+        if not kek:
+            raise PermissionDenied("KEK required for encrypted operations")
+        if not profile.encrypted_user_key:
+            raise PermissionDenied("User encryption not set up")
+
+        try:
+            kek = pad_kek_for_fernet(kek)
+            return decrypt_user_key(profile.encrypted_user_key, kek)
+        except Exception as e:
+            logger.warning(f"Failed to unwrap user key for user {request.user.id}: {e}")
+            raise PermissionDenied("Failed to decrypt credentials")
+
     def decrypt_account_credentials(self, request, account) -> dict:
         """
         Decrypt credentials for a specific account.
@@ -54,23 +78,59 @@ class KEKAuthenticationMixin:
         Raises:
             PermissionDenied: If decryption fails or KEK is missing
         """
-        user = request.user
-        profile = user.profile
-
-        kek = self.get_kek(request)
-        if not kek:
-            raise PermissionDenied("KEK required for encrypted operations")
-
-        if not profile.encrypted_user_key:
-            raise PermissionDenied("User encryption not set up")
-
         try:
-            kek = pad_kek_for_fernet(kek)
-            user_key = decrypt_user_key(profile.encrypted_user_key, kek)
-            return decrypt_credentials(account.encrypted_credentials, user_key)
+            return decrypt_credentials(account.encrypted_credentials, self.get_user_key(request))
+        except PermissionDenied:
+            raise
         except Exception as e:
-            logger.warning(f"Failed to decrypt credentials for user {user.id}: {e}")
+            logger.warning(f"Failed to decrypt credentials for user {request.user.id}: {e}")
             raise PermissionDenied("Failed to decrypt credentials")
+
+    def decrypt_blob(self, request, encrypted) -> dict:
+        """Decrypt an arbitrary Fernet-under-KEK blob (e.g. an EBICS keyring)."""
+        try:
+            return decrypt_credentials(encrypted, self.get_user_key(request))
+        except PermissionDenied:
+            raise
+        except Exception as e:
+            logger.warning(f"Failed to decrypt blob for user {request.user.id}: {e}")
+            raise PermissionDenied("Failed to decrypt credentials")
+
+    def encrypt_blob(self, request, data: dict) -> bytes:
+        """Encrypt an arbitrary dict under the same Fernet-under-KEK scheme."""
+        try:
+            return encrypt_credentials(data, self.get_user_key(request))
+        except PermissionDenied:
+            raise
+        except Exception as e:
+            logger.warning(f"Failed to encrypt blob for user {request.user.id}: {e}")
+            raise PermissionDenied("Failed to encrypt credentials")
+
+    def decrypt_sync_credentials(self, request, account) -> dict:
+        """
+        Return the credentials dict a sync needs, for either credential model.
+
+        For EBICS accounts the secret keyring lives on the shared
+        ``account.ebics_credential`` (not ``account.encrypted_credentials``); it is
+        decrypted with the same per-user key and merged with the connection
+        parameters the integration expects.
+        """
+        cred = account.ebics_credential
+        if cred is not None:
+            if not cred.encrypted_keyring:
+                raise PermissionDenied("EBICS credential is not initialized")
+            blob = self.decrypt_blob(request, cred.encrypted_keyring)
+            return {
+                'host_id': cred.host_id,
+                'partner_id': cred.partner_id,
+                'user_id': cred.subscriber_id,
+                'url': cred.url,
+                'bank_hash_auth': cred.bank_hash_auth,
+                'bank_hash_enc': cred.bank_hash_enc,
+                'keyring_pem': blob.get('keyring_pem'),
+                'keyring_passphrase': blob.get('keyring_passphrase'),
+            }
+        return self.decrypt_account_credentials(request, account)
 
     def require_kek(self, request):
         """

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { X, Search, Loader, Check, Shield } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { X, Search, Loader, Check, Shield, Landmark } from 'lucide-react';
 import {
   getBrokers,
   createAccount,
@@ -12,6 +13,7 @@ interface Broker {
   id: number;
   code: string;
   name: string;
+  integration_type: string;
   supports_2fa: boolean;
   credential_schema: {
     properties?: Record<string, {
@@ -382,7 +384,19 @@ export default function AddAccountModal({ onClose, onCreated }: Props) {
               )}
             </div>
 
-            {selectedBroker && credentialFields.length > 0 && (
+            {selectedBroker?.integration_type === 'ebics' && (
+              <div className="form-notice">
+                <Landmark size={16} />
+                <span>
+                  {selectedBroker.name} connects via EBICS. Its credentials are set up once and
+                  shared across accounts. Head to{' '}
+                  <Link to="/ebics" className="btn-link">EBICS bank connections</Link>{' '}
+                  to create the credential and add accounts.
+                </span>
+              </div>
+            )}
+
+            {selectedBroker?.integration_type !== 'ebics' && selectedBroker && credentialFields.length > 0 && (
               <fieldset className="form-fieldset">
                 <legend>Credentials</legend>
                 {credentialFields.map(([key, field]) => (
@@ -439,7 +453,7 @@ export default function AddAccountModal({ onClose, onCreated }: Props) {
               <button
                 type="submit"
                 className="btn btn-primary"
-                disabled={!selectedBroker}
+                disabled={!selectedBroker || selectedBroker.integration_type === 'ebics'}
               >
                 <Search size={14} />
                 Discover Accounts
