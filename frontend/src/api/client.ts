@@ -348,10 +348,35 @@ export async function getWealthBreakdown(by: string) {
 }
 
 // Broker API
-export async function getBrokers() {
+export interface Broker {
+  id: number;
+  code: string;
+  name: string;
+  integration_type: string;
+  country: string;
+  is_active: boolean;
+  supports_2fa: boolean;
+  supports_auto_sync: boolean;
+  credential_schema: Record<string, unknown>;
+  logo_url?: string;
+  website_url?: string;
+  api_base_url?: string;
+}
+
+// DRF list endpoints are paginated ({count, next, previous, results}). Unwrap to a
+// plain array (tolerating a bare array too) so callers never touch pagination.
+function unwrapResults<T>(data: unknown): T[] {
+  if (Array.isArray(data)) return data as T[];
+  const results = (data as { results?: unknown } | null)?.results;
+  return Array.isArray(results) ? (results as T[]) : [];
+}
+
+// Returns a plain Broker[] regardless of pagination. Use this, not a raw fetch:
+// callers that assumed an array crashed on the paginated object.
+export async function getBrokersList<T = Broker>(): Promise<T[]> {
   const res = await fetchWithAuth('/api/brokers/');
   if (!res.ok) throw new Error('Failed to fetch brokers');
-  return res.json();
+  return unwrapResults<T>(await res.json());
 }
 
 export async function discoverAccounts(brokerCode: string, credentials: Record<string, string>) {

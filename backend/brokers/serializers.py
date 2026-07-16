@@ -9,7 +9,7 @@ class BrokerSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'code', 'name', 'integration_type',
             'country', 'is_active', 'supports_2fa', 'supports_auto_sync',
-            'credential_schema', 'logo_url', 'website_url'
+            'credential_schema', 'logo_url', 'website_url', 'api_base_url'
         ]
 
 

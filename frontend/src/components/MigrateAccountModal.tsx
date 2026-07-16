@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { X, Repeat, AlertTriangle, Loader } from 'lucide-react';
-import { getBrokers, updateAccount, updateAccountCredentials } from '../api/client';
+import { getBrokersList, updateAccount, updateAccountCredentials } from '../api/client';
 
 interface Broker {
   id: number;
@@ -41,9 +41,8 @@ export default function MigrateAccountModal({ account, onClose, onMigrated }: Pr
   const [error, setError] = useState('');
 
   useEffect(() => {
-    getBrokers()
-      .then((data) => {
-        const list: Broker[] = data.results ?? data;
+    getBrokersList<Broker>()
+      .then((list) => {
         list.sort((a, b) => {
           if (a.code === 'manual') return 1;
           if (b.code === 'manual') return -1;

@@ -4,7 +4,7 @@ import {
   Landmark, Plus, Trash2, FileSignature, Download, PlugZap, Loader, X, ArrowLeft,
 } from 'lucide-react';
 import {
-  getBrokers,
+  getBrokersList,
   getEbicsCredentials,
   createEbicsCredential,
   deleteEbicsCredential,
@@ -59,11 +59,9 @@ export default function EbicsPage() {
 
   async function load() {
     try {
-      const [creds, brk] = await Promise.all([getEbicsCredentials(), getBrokers()]);
+      const [creds, brk] = await Promise.all([getEbicsCredentials(), getBrokersList<Broker>()]);
       setCredentials(creds);
-      // getBrokers is paginated (DRF PageNumberPagination) -> unwrap .results
-      const brokerList: Broker[] = (brk?.results ?? brk) as Broker[];
-      setBrokers(brokerList.filter((b) => b.integration_type === 'ebics'));
+      setBrokers(brk.filter((b) => b.integration_type === 'ebics'));
     } catch (err) {
       console.error('Failed to load EBICS credentials:', err);
       setError(err instanceof Error ? err.message : 'Failed to load');

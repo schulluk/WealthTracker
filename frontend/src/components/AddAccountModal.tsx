@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { X, Search, Loader, Check, Shield, Landmark } from 'lucide-react';
 import {
-  getBrokers,
+  getBrokersList,
   createAccount,
   discoverAccounts,
   createAccountsBulk,
@@ -78,9 +78,8 @@ export default function AddAccountModal({ onClose, onCreated }: Props) {
   const [submitting2fa, setSubmitting2fa] = useState(false);
 
   useEffect(() => {
-    getBrokers()
-      .then((data) => {
-        const list = data.results ?? data;
+    getBrokersList<Broker>()
+      .then((list) => {
         // Sort brokers: Manual Entry always last
         list.sort((a: Broker, b: Broker) => {
           if (a.code === 'manual') return 1;
