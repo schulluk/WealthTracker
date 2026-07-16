@@ -104,7 +104,7 @@ class EbicsCredential(models.Model):
     )
     label = models.CharField(
         max_length=100,
-        help_text='User-friendly name, e.g. "ZKB DataLink 1234567"',
+        help_text='User-friendly name, e.g. "ZKB DataLink"',
     )
 
     # Connection parameters (from the bank's Bankparameterdaten letter). Not secret.

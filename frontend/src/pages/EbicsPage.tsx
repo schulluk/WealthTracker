@@ -256,7 +256,7 @@ export default function EbicsPage() {
               <div className="form-group">
                 <label>Label</label>
                 <input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })}
-                  placeholder="ZKB DataLink 1234567" required />
+                  placeholder="e.g. ZKB DataLink" required />
               </div>
               <div className="form-row">
                 <div className="form-group">
@@ -274,12 +274,12 @@ export default function EbicsPage() {
                 <div className="form-group">
                   <label>Partner ID (Kunden-ID)</label>
                   <input value={form.partner_id} onChange={(e) => setForm({ ...form, partner_id: e.target.value })}
-                    placeholder="1234567" required />
+                    placeholder="e.g. 1234567" required />
                 </div>
                 <div className="form-group">
                   <label>User ID (Teilnehmer-ID)</label>
                   <input value={form.user_id} onChange={(e) => setForm({ ...form, user_id: e.target.value })}
-                    placeholder="1234567" required />
+                    placeholder="e.g. 1234567" required />
                 </div>
               </div>
               <fieldset className="form-fieldset">

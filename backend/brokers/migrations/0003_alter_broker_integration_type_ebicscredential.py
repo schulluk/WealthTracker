@@ -22,7 +22,7 @@ class Migration(migrations.Migration):
             name='EbicsCredential',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('label', models.CharField(help_text='User-friendly name, e.g. "ZKB DataLink 1234567"', max_length=100)),
+                ('label', models.CharField(help_text='User-friendly name, e.g. "ZKB DataLink"', max_length=100)),
                 ('host_id', models.CharField(help_text='EBICS Host ID (e.g. ZKBKCHZZ)', max_length=64)),
                 ('partner_id', models.CharField(help_text='Partner/Customer ID (Kunden-ID)', max_length=64)),
                 ('subscriber_id', models.CharField(help_text='EBICS User/Subscriber ID (Teilnehmer-ID)', max_length=64)),
