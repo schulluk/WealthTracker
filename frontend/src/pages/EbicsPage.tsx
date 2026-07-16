@@ -61,7 +61,9 @@ export default function EbicsPage() {
     try {
       const [creds, brk] = await Promise.all([getEbicsCredentials(), getBrokers()]);
       setCredentials(creds);
-      setBrokers((brk as Broker[]).filter((b) => b.integration_type === 'ebics'));
+      // getBrokers is paginated (DRF PageNumberPagination) -> unwrap .results
+      const brokerList: Broker[] = (brk?.results ?? brk) as Broker[];
+      setBrokers(brokerList.filter((b) => b.integration_type === 'ebics'));
     } catch (err) {
       console.error('Failed to load EBICS credentials:', err);
       setError(err instanceof Error ? err.message : 'Failed to load');
