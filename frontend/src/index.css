@@ -2042,6 +2042,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 /* ---- EBICS bank connections page ---- */
+/* The create-credential form is tall; let it scroll inside the height-capped
+   modal so the Create/Cancel actions stay reachable. */
+.ebics-modal form {
+  min-height: 0;
+  overflow-y: auto;
+}
 .page {
   max-width: 900px;
   margin: 0 auto;

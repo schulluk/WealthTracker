@@ -230,7 +230,7 @@ export default function EbicsPage() {
 
       {showForm && (
         <div className="modal-overlay" onClick={() => setShowForm(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal ebics-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>New EBICS credential</h3>
               <button className="btn btn-ghost" onClick={() => setShowForm(false)}><X size={18} /></button>

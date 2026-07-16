@@ -172,7 +172,7 @@ class EbicsCredentialInitializeView(KEKAuthenticationMixin, APIView):
         try:
             ini_state, hia_state, letter = submit_keys_and_letter(cred, blob)
         except Exception as e:
-            logger.warning('EBICS INI/HIA failed for credential %s: %s', cred.id, e)
+            logger.exception('EBICS INI/HIA failed for credential %s', cred.id)
             cred.last_error = str(e) or repr(e)
             cred.save(update_fields=['last_error', 'updated_at'])
             return Response(
@@ -236,7 +236,7 @@ class EbicsCredentialTestView(KEKAuthenticationMixin, APIView):
         try:
             hashes_hex, statements = fetch_bank_keys_and_statements(cred, blob)
         except Exception as e:
-            logger.warning('EBICS test failed for credential %s: %s', cred.id, e)
+            logger.exception('EBICS test failed for credential %s', cred.id)
             cred.last_error = str(e) or repr(e)
             cred.save(update_fields=['last_error', 'updated_at'])
             return Response(
