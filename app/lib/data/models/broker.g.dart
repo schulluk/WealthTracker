@@ -6,15 +6,14 @@ part of 'broker.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$BrokerImpl _$$BrokerImplFromJson(Map<String, dynamic> json) => _$BrokerImpl(
+_Broker _$BrokerFromJson(Map<String, dynamic> json) => _Broker(
   code: json['code'] as String,
   name: json['name'] as String,
   supportsAutoSync: json['supports_auto_sync'] as bool? ?? false,
 );
 
-Map<String, dynamic> _$$BrokerImplToJson(_$BrokerImpl instance) =>
-    <String, dynamic>{
-      'code': instance.code,
-      'name': instance.name,
-      'supports_auto_sync': instance.supportsAutoSync,
-    };
+Map<String, dynamic> _$BrokerToJson(_Broker instance) => <String, dynamic>{
+  'code': instance.code,
+  'name': instance.name,
+  'supports_auto_sync': instance.supportsAutoSync,
+};

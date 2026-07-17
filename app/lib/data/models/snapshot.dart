@@ -4,7 +4,7 @@ part 'snapshot.freezed.dart';
 part 'snapshot.g.dart';
 
 @freezed
-class AccountSnapshot with _$AccountSnapshot {
+abstract class AccountSnapshot with _$AccountSnapshot {
   const factory AccountSnapshot({
     required int id,
     required String balance,

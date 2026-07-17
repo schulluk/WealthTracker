@@ -4,7 +4,7 @@ part 'broker.freezed.dart';
 part 'broker.g.dart';
 
 @freezed
-class Broker with _$Broker {
+abstract class Broker with _$Broker {
   const factory Broker({
     required String code,
     required String name,

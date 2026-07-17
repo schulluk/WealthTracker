@@ -4,7 +4,7 @@ part 'wealth_summary.freezed.dart';
 part 'wealth_summary.g.dart';
 
 @freezed
-class WealthSummary with _$WealthSummary {
+abstract class WealthSummary with _$WealthSummary {
   const factory WealthSummary({
     @JsonKey(name: 'total_wealth') required double totalWealth,
     @JsonKey(name: 'base_currency') required String baseCurrency,
@@ -16,7 +16,7 @@ class WealthSummary with _$WealthSummary {
 }
 
 @freezed
-class WealthHistoryPoint with _$WealthHistoryPoint {
+abstract class WealthHistoryPoint with _$WealthHistoryPoint {
   const factory WealthHistoryPoint({
     required String date,
     @JsonKey(name: 'total_wealth') required double totalWealth,
