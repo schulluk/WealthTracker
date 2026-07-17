@@ -175,7 +175,9 @@ def _client_for(cred, blob):
 
     keyring = deserialize_keyring(base64.b64decode(blob['keyring_pem']), blob['keyring_passphrase'])
     bank = Bank(host_id=cred.host_id, url=cred.url)
-    user = User(partner_id=cred.partner_id, user_id=cred.user_id)
+    # NB: the EBICS user id is `subscriber_id`, NOT `cred.user_id` — the latter is the
+    # Django `user` FK's integer PK (a non-str), which crashed ebicsclient during INI.
+    user = User(partner_id=cred.partner_id, user_id=cred.subscriber_id)
     return Client(bank, user, keyring)
 
 
