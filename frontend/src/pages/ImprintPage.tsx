@@ -1,4 +1,4 @@
-import { ExternalLink, Github, Heart, Code, AlertCircle } from 'lucide-react';
+import { ExternalLink, Heart, Code, AlertCircle } from 'lucide-react';
 
 export default function ImprintPage() {
   return (
@@ -18,7 +18,7 @@ export default function ImprintPage() {
         {/* Open Source */}
         <section className="imprint-section">
           <h2>
-            <Github size={20} />
+            <Code size={20} />
             Open Source
           </h2>
           <p>
@@ -32,7 +32,7 @@ export default function ImprintPage() {
               rel="noopener noreferrer"
               className="imprint-link"
             >
-              <Github size={16} />
+              <Code size={16} />
               Source Code
               <ExternalLink size={14} />
             </a>
