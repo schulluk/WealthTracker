@@ -137,7 +137,7 @@ export async function fetchWithAuth(
   url: string,
   options: RequestInit = {},
 ): Promise<Response> {
-  let token = getAccessToken();
+  const token = getAccessToken();
   const kek = getKEK();
 
   const headers: Record<string, string> = {

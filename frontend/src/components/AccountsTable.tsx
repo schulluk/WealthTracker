@@ -15,7 +15,7 @@ interface ToastData {
   message: string;
 }
 
-interface Account {
+export interface Account {
   id: number;
   name: string;
   broker: { code: string; name: string; supports_auto_sync?: boolean };
@@ -44,6 +44,19 @@ interface AuthPrompt {
   accountId: number;
   accountName: string;
   twoFaType: string;
+}
+
+interface CredentialField {
+  type: string;
+  title?: string;
+  format?: string;
+  description?: string;
+  default?: boolean;
+}
+
+interface CredentialSchema {
+  properties?: Record<string, CredentialField>;
+  required?: string[];
 }
 
 function formatCurrency(value: number, currency: string): string {
@@ -156,7 +169,7 @@ export default function AccountsTable({ accounts, baseCurrency, onRefresh }: Pro
 
   // Account settings modal
   const [credentialsAccount, setCredentialsAccount] = useState<Account | null>(null);
-  const [credentialSchema, setCredentialSchema] = useState<Record<string, any> | null>(null);
+  const [credentialSchema, setCredentialSchema] = useState<CredentialSchema | null>(null);
   const [credentialValues, setCredentialValues] = useState<Record<string, string>>({});
   const [savingCredentials, setSavingCredentials] = useState(false);
   const [credentialsRetrySync, setCredentialsRetrySync] = useState(false);
@@ -288,15 +301,16 @@ export default function AccountsTable({ accounts, baseCurrency, onRefresh }: Pro
             addToast('success', `${accountName} synced successfully`);
             onRefresh();
           }
-        } catch (err: any) {
-          const isAuthError = isAuthenticationError(err.message);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : '';
+          const isAuthError = isAuthenticationError(message);
           if (isAuthError) {
             const account = accounts.find(a => a.id === accountId);
             if (account) {
-              openCredentialsModal(account, true, err.message);
+              openCredentialsModal(account, true, message);
             }
           } else {
-            addToast('error', `Sync failed: ${err.message || 'Unknown error'}`);
+            addToast('error', `Sync failed: ${message || 'Unknown error'}`);
           }
           onRefresh();
         } finally {
@@ -309,8 +323,8 @@ export default function AccountsTable({ accounts, baseCurrency, onRefresh }: Pro
         setCredentialsRetrySync(false);
         onRefresh();
       }
-    } catch (err: any) {
-      setCredentialsError(err.message || 'Failed to update credentials');
+    } catch (err) {
+      setCredentialsError(err instanceof Error && err.message ? err.message : 'Failed to update credentials');
     } finally {
       setSavingCredentials(false);
     }
@@ -343,12 +357,13 @@ export default function AccountsTable({ accounts, baseCurrency, onRefresh }: Pro
         addToast('success', `${accountName} synced successfully`);
         onRefresh();
       }
-    } catch (err: any) {
+    } catch (err) {
       // Check if it's an authentication error
-      if (account && isAuthenticationError(err.message)) {
-        openCredentialsModal(account, true, err.message);
+      const message = err instanceof Error ? err.message : '';
+      if (account && isAuthenticationError(message)) {
+        openCredentialsModal(account, true, message);
       } else {
-        addToast('error', `Failed to sync ${accountName}: ${err.message || 'Unknown error'}`);
+        addToast('error', `Failed to sync ${accountName}: ${message || 'Unknown error'}`);
       }
       onRefresh();
     } finally {
@@ -368,8 +383,8 @@ export default function AccountsTable({ accounts, baseCurrency, onRefresh }: Pro
       setAuthPrompt(null);
       setAuthCode('');
       onRefresh();
-    } catch (err: any) {
-      setAuthError(err.message || 'Authentication failed');
+    } catch (err) {
+      setAuthError(err instanceof Error && err.message ? err.message : 'Authentication failed');
     } finally {
       setSubmittingAuth(false);
     }
@@ -779,7 +794,7 @@ export default function AccountsTable({ accounts, baseCurrency, onRefresh }: Pro
                     onChange={(e) => setSettingsAccountName(e.target.value)}
                   />
                 </div>
-                {Object.entries(credentialSchema.properties).map(([key, field]: [string, any]) => (
+                {Object.entries(credentialSchema.properties).map(([key, field]) => (
                   field.type === 'boolean' ? (
                     <div className="form-group" key={key}>
                       <label className="toggle-label">

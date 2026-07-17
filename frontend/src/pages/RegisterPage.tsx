@@ -26,8 +26,8 @@ export default function RegisterPage() {
         base_currency: baseCurrency,
       });
       navigate('/');
-    } catch (err: any) {
-      setError(err.message || 'Registration failed');
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'Registration failed');
     } finally {
       setLoading(false);
     }

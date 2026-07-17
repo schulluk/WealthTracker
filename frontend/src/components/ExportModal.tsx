@@ -27,24 +27,23 @@ export default function ExportModal({ onClose }: Props) {
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
+    async function loadAccounts() {
+      try {
+        const data = await getAccounts();
+        // Handle both array and paginated { results: [...] } response
+        const accountList = Array.isArray(data) ? data : data.results || [];
+        setAccounts(accountList);
+        if (accountList.length > 0) {
+          setSelectedAccountId(accountList[0].id);
+        }
+      } catch (err) {
+        console.error('Failed to load accounts:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
     loadAccounts();
   }, []);
-
-  async function loadAccounts() {
-    try {
-      const data = await getAccounts();
-      // Handle both array and paginated { results: [...] } response
-      const accountList = Array.isArray(data) ? data : data.results || [];
-      setAccounts(accountList);
-      if (accountList.length > 0) {
-        setSelectedAccountId(accountList[0].id);
-      }
-    } catch (err) {
-      console.error('Failed to load accounts:', err);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   async function handleExport() {
     if (!selectedAccountId) return;

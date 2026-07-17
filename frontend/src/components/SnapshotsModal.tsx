@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X, Pencil, Trash2, Check, XCircle } from 'lucide-react';
 import { getSnapshots, updateSnapshot, deleteSnapshot, addSnapshot } from '../api/client';
 
@@ -63,7 +63,7 @@ export default function SnapshotsModal({
   const [addDate, setAddDate] = useState(new Date().toISOString().slice(0, 10));
   const [adding, setAdding] = useState(false);
 
-  const fetchSnapshots = async (page = 1, append = false) => {
+  const fetchSnapshots = useCallback(async (page = 1, append = false) => {
     try {
       const data = await getSnapshots(accountId, page);
       // Handle paginated response (results array) or plain array
@@ -81,13 +81,13 @@ export default function SnapshotsModal({
         setNextPage(data.next ? page + 1 : null);
         setTotalCount(data.count || results.length);
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to load snapshots');
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'Failed to load snapshots');
     } finally {
       setLoading(false);
       setLoadingMore(false);
     }
-  };
+  }, [accountId]);
 
   const loadMore = async () => {
     if (!nextPage || loadingMore) return;
@@ -96,8 +96,10 @@ export default function SnapshotsModal({
   };
 
   useEffect(() => {
-    fetchSnapshots();
-  }, [accountId]);
+    // Wrapped in an async IIFE so the fetch (and its setState calls) runs
+    // after the effect returns rather than synchronously in the effect body.
+    (async () => { await fetchSnapshots(); })();
+  }, [fetchSnapshots]);
 
   // Close on Escape key
   useEffect(() => {
@@ -134,8 +136,8 @@ export default function SnapshotsModal({
       cancelEdit();
       await fetchSnapshots();
       onChanged();
-    } catch (err: any) {
-      setError(err.message || 'Failed to update snapshot');
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'Failed to update snapshot');
     } finally {
       setSaving(false);
     }
@@ -150,8 +152,8 @@ export default function SnapshotsModal({
       setDeleteId(null);
       await fetchSnapshots();
       onChanged();
-    } catch (err: any) {
-      setError(err.message || 'Failed to delete snapshot');
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'Failed to delete snapshot');
     } finally {
       setDeleting(false);
     }
@@ -167,8 +169,8 @@ export default function SnapshotsModal({
       setAddDate(new Date().toISOString().slice(0, 10));
       await fetchSnapshots();
       onChanged();
-    } catch (err: any) {
-      setError(err.message || 'Failed to add snapshot');
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'Failed to add snapshot');
     } finally {
       setAdding(false);
     }

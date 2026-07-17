@@ -41,8 +41,8 @@ export default function AddSnapshotModal({
     try {
       await addSnapshot(accountId, parseFloat(balance), currency, date);
       onSaved();
-    } catch (err: any) {
-      setError(err.message || 'Failed to save');
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'Failed to save');
     } finally {
       setSaving(false);
     }

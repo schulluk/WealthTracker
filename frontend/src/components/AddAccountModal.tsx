@@ -135,8 +135,8 @@ export default function AddAccountModal({ onClose, onCreated }: Props) {
         is_manual: true,
       });
       onCreated();
-    } catch (err: any) {
-      setError(err.message || 'Failed to create account');
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'Failed to create account');
     } finally {
       setSaving(false);
     }
@@ -176,8 +176,8 @@ export default function AddAccountModal({ onClose, onCreated }: Props) {
       setDiscovered(result.accounts);
       setSelected(new Set(result.accounts.map((a: DiscoveredAccount) => a.identifier)));
       setStep('select');
-    } catch (err: any) {
-      setError(err.message || 'Discovery failed');
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'Discovery failed');
       setStep('credentials');
     }
   };
@@ -202,8 +202,8 @@ export default function AddAccountModal({ onClose, onCreated }: Props) {
       setDiscovered(result.accounts);
       setSelected(new Set(result.accounts.map((a: DiscoveredAccount) => a.identifier)));
       setStep('select');
-    } catch (err: any) {
-      setError(err.message || 'Authentication failed');
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'Authentication failed');
     } finally {
       setSubmitting2fa(false);
     }
@@ -226,8 +226,8 @@ export default function AddAccountModal({ onClose, onCreated }: Props) {
       const accountsToCreate = discovered.filter((a) => selected.has(a.identifier));
       await createAccountsBulk(selectedBroker.code, credentials, accountsToCreate);
       onCreated();
-    } catch (err: any) {
-      setError(err.message || 'Failed to create accounts');
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'Failed to create accounts');
     } finally {
       setSaving(false);
     }
@@ -247,8 +247,8 @@ export default function AddAccountModal({ onClose, onCreated }: Props) {
         is_manual: true,
       });
       onCreated();
-    } catch (err: any) {
-      setError(err.message || 'Failed to create account');
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'Failed to create account');
     } finally {
       setSaving(false);
     }

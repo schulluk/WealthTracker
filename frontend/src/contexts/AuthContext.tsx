@@ -41,12 +41,14 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Start in the loading state only when a token exists and we still need to
+  // fetch the user. With no token there is nothing to load, so loading starts
+  // false — this also avoids a synchronous setState inside the effect below.
+  const [loading, setLoading] = useState(() => getAccessToken() !== null);
 
   useEffect(() => {
     const token = getAccessToken();
     if (!token) {
-      setLoading(false);
       return;
     }
     getCurrentUser()
@@ -92,6 +94,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// This module intentionally exports both the AuthProvider component and the
+// useAuth hook (the standard React context pattern). Fast Refresh's
+// "only-export-components" rule flags the hook; splitting it into its own
+// module would fragment the context with no runtime benefit, so we opt out
+// for this one export.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');

@@ -67,30 +67,29 @@ export default function SettingsPage() {
   const [passwordError, setPasswordError] = useState('');
 
   useEffect(() => {
+    async function loadData() {
+      try {
+        const profileData = await getProfile();
+        setProfile(profileData);
+        setUser(profileData.user);
+
+        setBaseCurrency(profileData.base_currency);
+        setAutoSyncEnabled(profileData.auto_sync_enabled);
+        setSendWeeklyReport(profileData.send_weekly_report);
+        setDefaultChartRange(profileData.default_chart_range);
+        setDefaultChartGranularity(profileData.default_chart_granularity);
+
+        setFirstName(profileData.user.first_name || '');
+        setLastName(profileData.user.last_name || '');
+        setEmail(profileData.user.email || '');
+      } catch (err) {
+        console.error('Failed to load settings:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
     loadData();
   }, []);
-
-  async function loadData() {
-    try {
-      const profileData = await getProfile();
-      setProfile(profileData);
-      setUser(profileData.user);
-
-      setBaseCurrency(profileData.base_currency);
-      setAutoSyncEnabled(profileData.auto_sync_enabled);
-      setSendWeeklyReport(profileData.send_weekly_report);
-      setDefaultChartRange(profileData.default_chart_range);
-      setDefaultChartGranularity(profileData.default_chart_granularity);
-
-      setFirstName(profileData.user.first_name || '');
-      setLastName(profileData.user.last_name || '');
-      setEmail(profileData.user.email || '');
-    } catch (err) {
-      console.error('Failed to load settings:', err);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   async function handleProfileSave(e: React.FormEvent) {
     e.preventDefault();
@@ -105,8 +104,8 @@ export default function SettingsPage() {
         default_chart_granularity: defaultChartGranularity,
       });
       setProfileMessage('Preferences saved');
-    } catch (err: any) {
-      setProfileMessage(err.message || 'Failed to save');
+    } catch (err) {
+      setProfileMessage(err instanceof Error && err.message ? err.message : 'Failed to save');
     } finally {
       setProfileSaving(false);
     }
@@ -124,8 +123,8 @@ export default function SettingsPage() {
       });
       await refreshUser();
       setUserMessage('User details saved successfully');
-    } catch (err: any) {
-      setUserMessage(err.message || 'Failed to save');
+    } catch (err) {
+      setUserMessage(err instanceof Error && err.message ? err.message : 'Failed to save');
     } finally {
       setUserSaving(false);
     }
@@ -153,8 +152,8 @@ export default function SettingsPage() {
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
-    } catch (err: any) {
-      setPasswordError(err.message || 'Failed to change password');
+    } catch (err) {
+      setPasswordError(err instanceof Error && err.message ? err.message : 'Failed to change password');
     } finally {
       setPasswordSaving(false);
     }

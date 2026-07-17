@@ -10,12 +10,12 @@ import WealthSummaryCard from '../components/WealthSummaryCard';
 import WealthChart from '../components/WealthChart';
 import BreakdownChart from '../components/BreakdownChart';
 import RecentChanges from '../components/RecentChanges';
-import AccountsTable from '../components/AccountsTable';
+import AccountsTable, { type Account } from '../components/AccountsTable';
 
 interface Summary {
   total_wealth: number;
   base_currency: string;
-  accounts: any[];
+  accounts: Account[];
   account_count: number;
 }
 
@@ -33,7 +33,7 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [history, setHistory] = useState<History | null>(null);
   const [breakdown, setBreakdown] = useState<Breakdown | null>(null);
-  const [accounts, setAccounts] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [defaultChartRange, setDefaultChartRange] = useState(365);
   const [defaultChartGranularity, setDefaultChartGranularity] = useState<'daily' | 'monthly'>('daily');
@@ -71,7 +71,9 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    fetchAll();
+    // Wrapped in an async IIFE so the fetch (and its setState calls) runs
+    // after the effect returns rather than synchronously in the effect body.
+    (async () => { await fetchAll(); })();
   }, [fetchAll]);
 
   const handleRangeChange = async (days: number, granularity: 'daily' | 'monthly') => {

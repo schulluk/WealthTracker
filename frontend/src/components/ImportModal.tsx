@@ -77,8 +77,8 @@ export default function ImportModal({ onClose, onImported }: Props) {
       if (importResult.imported > 0) {
         onImported();
       }
-    } catch (err: any) {
-      setError(err.message || 'Import failed');
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'Import failed');
     } finally {
       setImporting(false);
     }

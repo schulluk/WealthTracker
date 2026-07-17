@@ -70,7 +70,9 @@ export default function EbicsPage() {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  // Wrapped in an async IIFE so the initial load (and its setState calls) runs
+  // after the effect returns rather than synchronously in the effect body.
+  useEffect(() => { (async () => { await load(); })(); }, []);
 
   function openForm() {
     const first = brokers[0];
