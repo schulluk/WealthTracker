@@ -199,16 +199,22 @@ def submit_keys_and_letter(cred, blob):
     Letter (``.media_type``, ``.content``). ``ini``/``hia`` are idempotent: the
     library reports ALREADY_INITIALISED rather than raising if keys were sent before.
     """
+    from ebicsclient import OutputFormat
+
     client = _client_for(cred, blob)
     ini_state = client.ini()
     hia_state = client.hia()
-    letter = client.make_ini_letter(branding='Wealth Tracker')
+    letter = client.make_ini_letter(output_format=OutputFormat.PDF, branding='Wealth Tracker')
     return ini_state, hia_state, letter
 
 
 def render_letter(cred, blob):
-    """Re-render the initialisation letter (deterministic from the keys)."""
-    return _client_for(cred, blob).make_ini_letter(branding='Wealth Tracker')
+    """Re-render the initialisation letter as PDF (deterministic from the keys)."""
+    from ebicsclient import OutputFormat
+
+    return _client_for(cred, blob).make_ini_letter(
+        output_format=OutputFormat.PDF, branding='Wealth Tracker',
+    )
 
 
 def fetch_bank_keys_and_statements(cred, blob):

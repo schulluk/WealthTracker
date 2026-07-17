@@ -15,10 +15,12 @@ fints==5.0.0
 idna==3.11
 lxml==6.0.2
 mt-940==4.30.0
+pillow==12.3.0
 pycparser==2.23
 Pygments==2.19.2
 PyJWT==2.10.1
 python-dotenv==1.2.1
+reportlab==5.0.0
 requests==2.32.5
 sepaxml==2.7.0
 sqlparse==0.5.5
