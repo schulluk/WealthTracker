@@ -671,7 +671,6 @@ export async function createEbicsCredential(fields: {
   host_id: string;
   partner_id: string;
   user_id: string;
-  url: string;
   bank_hash_auth?: string;
   bank_hash_enc?: string;
 }): Promise<EbicsCredential> {

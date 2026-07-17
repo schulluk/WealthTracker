@@ -98,7 +98,6 @@ export default function EbicsPage() {
         host_id: form.host_id.trim(),
         partner_id: form.partner_id.trim(),
         user_id: form.user_id.trim(),
-        url: form.url.trim(),
         bank_hash_auth: form.bank_hash_auth.trim() || undefined,
         bank_hash_enc: form.bank_hash_enc.trim() || undefined,
       });
@@ -267,9 +266,9 @@ export default function EbicsPage() {
                     placeholder="ZKBKCHZZ" required />
                 </div>
                 <div className="form-group">
-                  <label>EBICS URL</label>
-                  <input value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })}
-                    placeholder="https://ebicsweb.zkb.ch/ebicsweb" required />
+                  <label>EBICS URL (provided by the bank)</label>
+                  <input value={form.url} readOnly tabIndex={-1}
+                    aria-readonly="true" title="Set by the selected bank; not editable" />
                 </div>
               </div>
               <div className="form-row">

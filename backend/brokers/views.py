@@ -80,6 +80,15 @@ class EbicsCredentialListCreateView(KEKAuthenticationMixin, APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # The EBICS endpoint URL comes from the broker's configured api_base_url — never
+        # from client input — so a user cannot point the server at an arbitrary host (SSRF).
+        url = broker.api_base_url
+        if not url:
+            return Response(
+                {'error': f'Broker {broker.code} has no EBICS URL configured'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         # Generate the keyring and encrypt it under the user's KEK before storing.
         blob = generate_keyring_blob()
         encrypted_keyring = self.encrypt_blob(request, blob)
@@ -92,7 +101,7 @@ class EbicsCredentialListCreateView(KEKAuthenticationMixin, APIView):
                 host_id=data['host_id'],
                 partner_id=data['partner_id'],
                 subscriber_id=data['user_id'],
-                url=data['url'],
+                url=url,
                 bank_hash_auth=(data.get('bank_hash_auth') or '').replace(' ', '').lower(),
                 bank_hash_enc=(data.get('bank_hash_enc') or '').replace(' ', '').lower(),
                 encrypted_keyring=encrypted_keyring,
@@ -110,7 +119,7 @@ class EbicsCredentialListCreateView(KEKAuthenticationMixin, APIView):
 
 
 class EbicsCredentialDetailView(KEKAuthenticationMixin, APIView):
-    """Retrieve, update (label/url/hashes), or delete an EBICS credential."""
+    """Retrieve, update (label/hashes), or delete an EBICS credential."""
     permission_classes = [IsAuthenticated]
 
     def _get(self, request, pk):
@@ -129,9 +138,10 @@ class EbicsCredentialDetailView(KEKAuthenticationMixin, APIView):
         except EbicsCredential.DoesNotExist:
             return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        for field in ('label', 'url'):
-            if field in request.data:
-                setattr(cred, field, request.data[field])
+        # url is intentionally NOT patchable — it is bank infrastructure sourced from
+        # the broker, not user-editable (avoids repointing the server at an arbitrary host).
+        if 'label' in request.data:
+            cred.label = request.data['label']
         for field in ('bank_hash_auth', 'bank_hash_enc'):
             if field in request.data:
                 setattr(cred, field, (request.data[field] or '').replace(' ', '').lower())

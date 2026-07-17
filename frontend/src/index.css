@@ -2048,6 +2048,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   min-height: 0;
   overflow-y: auto;
 }
+/* Bank-provided, non-editable URL field */
+.ebics-modal input[readonly] {
+  opacity: 0.7;
+  cursor: default;
+}
 .page {
   max-width: 900px;
   margin: 0 auto;

@@ -46,6 +46,7 @@ class EbicsCredentialCreateSerializer(serializers.Serializer):
     host_id = serializers.CharField(max_length=64)
     partner_id = serializers.CharField(max_length=64)
     user_id = serializers.CharField(max_length=64)
-    url = serializers.URLField()
+    # url is NOT accepted from the client: it is sourced from the broker's
+    # configured api_base_url server-side (prevents SSRF via an arbitrary endpoint).
     bank_hash_auth = serializers.CharField(required=False, allow_blank=True, default='')
     bank_hash_enc = serializers.CharField(required=False, allow_blank=True, default='')

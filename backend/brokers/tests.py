@@ -252,7 +252,10 @@ class BrokerEndpointTests(APITestCase):
 class EbicsEndpointTestBase(APITestCase):
     def setUp(self):
         self.user, self.kek, self.user_key = make_kek_user(username='alice')
-        self.broker = Broker.objects.create(code='zkb', name='ZKB', integration_type='ebics')
+        self.broker = Broker.objects.create(
+            code='zkb', name='ZKB', integration_type='ebics',
+            api_base_url='https://ebics.zkb.ch/ebics',
+        )
         self.non_ebics = Broker.objects.create(code='viac', name='VIAC', integration_type='rest')
         self.client.force_authenticate(user=self.user)
         self.client.credentials(HTTP_X_KEK=self.kek)
@@ -281,7 +284,6 @@ class EbicsCredentialCrudTests(EbicsEndpointTestBase):
         data = {
             'broker_code': 'zkb', 'label': 'ZKB DataLink',
             'host_id': 'ZKBKCHZZ', 'partner_id': 'PARTNER1', 'user_id': 'SUB1',
-            'url': 'https://ebics.zkb.ch/ebics',
         }
         data.update(overrides)
         return data
@@ -298,6 +300,39 @@ class EbicsCredentialCrudTests(EbicsEndpointTestBase):
         cred = EbicsCredential.objects.get(pk=resp.data['id'])
         self.assertEqual(cred.subscriber_id, 'SUB1')
         self.assertIsNotNone(cred.encrypted_keyring)
+        # URL is sourced from the broker, not the client (SSRF prevention).
+        self.assertEqual(cred.url, 'https://ebics.zkb.ch/ebics')
+
+    @patch('brokers.integrations.zkb_ebics.generate_keyring_blob')
+    def test_create_ignores_client_supplied_url(self, m_gen):
+        m_gen.return_value = {'keyring_pem': base64.b64encode(b'pem').decode(),
+                              'keyring_passphrase': 'pp'}
+        # A malicious url in the body must be ignored; the broker's url is used.
+        resp = self.client.post(
+            reverse('ebics_credential_list'),
+            self._payload(url='https://169.254.169.254/latest/meta-data/'),
+            format='json',
+        )
+        self.assertEqual(resp.status_code, 201, resp.data)
+        cred = EbicsCredential.objects.get(pk=resp.data['id'])
+        self.assertEqual(cred.url, 'https://ebics.zkb.ch/ebics')
+
+    def test_create_ebics_broker_without_url_400(self):
+        Broker.objects.filter(code='zkb').update(api_base_url='')
+        resp = self.client.post(reverse('ebics_credential_list'), self._payload(), format='json')
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('URL', resp.data['error'])
+
+    def test_url_not_patchable(self):
+        cred = self._create_cred()
+        resp = self.client.patch(
+            reverse('ebics_credential_detail', args=[cred.id]),
+            {'url': 'https://evil.example/ebics', 'label': 'Renamed'}, format='json',
+        )
+        self.assertEqual(resp.status_code, 200)
+        cred.refresh_from_db()
+        self.assertEqual(cred.url, 'https://ebics.zkb.ch/ebics')  # unchanged
+        self.assertEqual(cred.label, 'Renamed')  # label still patchable
 
     def test_create_without_kek_denied(self):
         self.client.credentials()  # clear X-KEK
