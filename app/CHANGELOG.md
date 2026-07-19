@@ -1,7 +1,10 @@
 # Changelog
 
-## Next: 1.3.8
+## Next: 1.4.0
 
+- Bug fixes and improvements.
+
+## 1.3.8
 - Added Zürcher Kantonalbank (ZKB) as a broker: accounts connect via EBICS and sync end-of-day balances. EBICS credentials are set up once on the web app (one-time key exchange) and shared across all your ZKB accounts.
 - A ZKB account behaves like a manual account until its EBICS key exchange is activated by the bank: it prompts you to add snapshots by hand instead of showing a sync action that would fail.
 - Bug fixes and improvements.
