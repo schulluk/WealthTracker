@@ -346,3 +346,95 @@ class ExchangeRateModelTests(TestCase):
 
     def test_missing_rate_returns_none(self):
         self.assertIsNone(ExchangeRate.get_rate('JPY', 'CHF', date(2026, 6, 1)))
+
+
+class EbicsAccountFallbackTests(APITestCase):
+    """Until the bank activates the EBICS key exchange (credential state != 'active'),
+    an EBICS-linked account must behave like a manual one: no auto-sync, surfaced in
+    the app's manual "needs a snapshot" prompt."""
+
+    def setUp(self):
+        from brokers.models import EbicsCredential
+        self.user, self.kek, self.user_key = make_kek_user(base_currency='CHF')
+        self.broker = Broker.objects.create(
+            code='zkb', name='ZKB', integration_type='ebics', supports_auto_sync=True,
+        )
+        self.cred = EbicsCredential.objects.create(
+            user=self.user, broker=self.broker, label='ZKB',
+            host_id='ZKBKCHZZ', partner_id='PARTNER1', subscriber_id='SUB1',
+            url='https://ebicsweb.zkb.ch/ebicsweb', state='new',
+        )
+        self.account = FinancialAccount.objects.create(
+            user=self.user, broker=self.broker, name='ZKB Giro', currency='CHF',
+            account_identifier='CH00', ebics_credential=self.cred,
+            sync_enabled=True, is_manual=False,
+        )
+        self.client.force_authenticate(user=self.user)
+        self.client.credentials(HTTP_X_KEK=self.kek)
+
+    def _activate(self):
+        self.cred.state = 'active'
+        self.cred.save(update_fields=['state'])
+
+    # --- serializer: effective sync_enabled drives the app's manual-vs-auto UX ---
+    def test_serializer_reports_sync_disabled_while_credential_pending(self):
+        for state in ('new', 'keys_sent'):
+            self.cred.state = state
+            self.cred.save(update_fields=['state'])
+            data = FinancialAccountSerializer(self.account).data
+            self.assertFalse(
+                data['sync_enabled'],
+                f'sync should be effectively off while credential is {state}',
+            )
+            self.assertEqual(data['ebics_credential']['state'], state)
+
+    def test_serializer_reports_real_sync_enabled_when_active(self):
+        self._activate()
+        data = FinancialAccountSerializer(self.account).data
+        self.assertTrue(data['sync_enabled'])
+
+    def test_non_ebics_account_sync_flag_untouched(self):
+        acct = FinancialAccount.objects.create(
+            user=self.user, broker=self.broker, name='Plain',
+            currency='CHF', sync_enabled=True,
+        )
+        data = FinancialAccountSerializer(acct).data
+        self.assertTrue(data['sync_enabled'])
+        self.assertIsNone(data['ebics_credential'])
+
+    # --- single-account sync guard ---
+    def test_single_sync_rejected_while_pending(self):
+        resp = self.client.post(reverse('account_sync', args=[self.account.pk]))
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('not active', resp.data['error'].lower())
+
+    def test_single_sync_allowed_when_active(self):
+        self._activate()
+        from portfolio.sync_queue import sync_queue
+        from portfolio.views import AccountSyncView
+        with patch.object(AccountSyncView, 'decrypt_sync_credentials', return_value={'k': 1}), \
+                patch.object(sync_queue, 'has_pending_task', return_value=None), \
+                patch.object(sync_queue, 'enqueue', return_value='t1') as m_enqueue:
+            resp = self.client.post(reverse('account_sync', args=[self.account.pk]))
+        self.assertEqual(resp.status_code, 200, resp.data)
+        self.assertTrue(m_enqueue.called)
+
+    # --- sync-all filter: pending EBICS accounts are skipped, not errored ---
+    def test_sync_all_excludes_pending_ebics(self):
+        resp = self.client.post(reverse('sync_all_accounts'))
+        self.assertEqual(resp.status_code, 200, resp.data)
+        self.assertEqual(resp.data['synced_count'], 0)
+        self.assertIn('No accounts to sync', resp.data['message'])
+
+    def test_sync_all_includes_active_ebics(self):
+        self._activate()
+        from portfolio.sync_queue import sync_queue
+        from portfolio.views import SyncAllAccountsView
+        with patch.object(SyncAllAccountsView, 'decrypt_sync_credentials', return_value={'k': 1}), \
+                patch.object(sync_queue, 'has_pending_task', return_value=None), \
+                patch.object(sync_queue, 'enqueue', return_value='t2') as m_enqueue:
+            resp = self.client.post(reverse('sync_all_accounts'))
+        self.assertEqual(resp.status_code, 200, resp.data)
+        self.assertTrue(m_enqueue.called)
+        account_ids = [aid for aid, _ in m_enqueue.call_args.kwargs['account_creds']]
+        self.assertEqual(account_ids, [self.account.id])

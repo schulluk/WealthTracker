@@ -68,6 +68,20 @@ class FinancialAccountSerializer(serializers.ModelSerializer):
             return {'id': c.id, 'label': c.label, 'state': c.state}
         return None
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # An EBICS account cannot actually auto-sync until the bank has activated
+        # the subscriber's key exchange (credential state == 'active'). Until then,
+        # present it to the client as a manual-entry account: reporting sync as
+        # effectively disabled hides the (guaranteed-to-fail) Sync button and lets
+        # the app surface the account in its "needs a snapshot" prompt, exactly
+        # like a manual account. Once the credential is active the real value
+        # passes through unchanged.
+        cred = data.get('ebics_credential')
+        if cred and cred.get('state') != 'active':
+            data['sync_enabled'] = False
+        return data
+
     def update(self, instance, validated_data):
         old_broker_id = instance.broker_id
         account = super().update(instance, validated_data)

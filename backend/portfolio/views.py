@@ -433,6 +433,15 @@ class AccountSyncView(KEKAuthenticationMixin, APIView):
         if not account.encrypted_credentials and not account.ebics_credential_id:
             return Response({'error': 'No credentials configured'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # An EBICS account can't sync until the bank activates the subscriber's keys.
+        # Until then it behaves like a manual account (add snapshots by hand).
+        if account.ebics_credential_id and account.ebics_credential.state != 'active':
+            return Response(
+                {'error': 'EBICS access is not active yet. Add snapshots manually '
+                          'until the bank activates your key exchange.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         # Check for already-running sync for this user
         existing = sync_queue.has_pending_task(request.user.id)
         if existing:
@@ -487,7 +496,10 @@ class SyncAllAccountsView(KEKAuthenticationMixin, APIView):
             })
 
         # Find all syncable accounts: those with stored credentials, OR EBICS
-        # accounts whose secret lives on a shared credential.
+        # accounts whose secret lives on a shared, *activated* credential. An EBICS
+        # credential that hasn't completed its key exchange with the bank yet
+        # (state != 'active') can't sync, so it's excluded here — the account is
+        # treated like a manual one until the bank activates it.
         from django.db.models import Q
         accounts = FinancialAccount.objects.filter(
             user=request.user,
@@ -495,7 +507,7 @@ class SyncAllAccountsView(KEKAuthenticationMixin, APIView):
             sync_enabled=True,
         ).filter(
             ~Q(encrypted_credentials__isnull=True) & ~Q(encrypted_credentials=b'')
-            | Q(ebics_credential__isnull=False)
+            | Q(ebics_credential__state='active')
         ).select_related('broker', 'ebics_credential')
 
         if not accounts.exists():
