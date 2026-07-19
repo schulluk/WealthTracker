@@ -4,12 +4,12 @@ The relay WebSocket (`/ws/ms-relay/`) authenticates with the user's access token
 This prints one (and, with --url, the ready-to-run ms_relay_exit command) so you
 don't need the rest_framework_simplejwt shell incantation each time.
 
-    python manage.py ms_relay_token --user lukas
-    python manage.py ms_relay_token --user lukas --url wss://your-server.example.com/ws/ms-relay/
+    python manage.py ms_relay_token --user alice
+    python manage.py ms_relay_token --user alice --url wss://your-server.example.com/ws/ms-relay/
 
-On the VPS:
-    dcm exec wealth-py /venv-python/bin/python /var/www/app/manage.py \\
-        ms_relay_token --user lukas --url wss://your-server.example.com/ws/ms-relay/
+On the server:
+    <compose exec> wealth-py /venv-python/bin/python /var/www/app/manage.py \\
+        ms_relay_token --user alice --url wss://your-server.example.com/ws/ms-relay/
 """
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError

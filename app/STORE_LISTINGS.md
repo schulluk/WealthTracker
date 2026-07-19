@@ -265,5 +265,5 @@ developer. The only data collected by the developer is crash diagnostics.
 
 - Developer: Lukas Schulze
 - Email: support@miniapps.ch
-- Privacy Policy URL: https://your-server.example.com/privacy
+- Privacy Policy URL: https://miniapps.ch/wealth-tracker/privacy-policy.html
 - Website: https://miniapps.ch
