@@ -8,7 +8,7 @@ Django==6.0.7
 django-cors-headers==4.9.0
 djangorestframework==3.17.1
 djangorestframework_simplejwt==5.5.1
-ebicsclient==1.3.2
+ebicsclient==1.4.0
 elementpath==5.1.3
 enum-tools==0.12.0
 fints==5.0.0
