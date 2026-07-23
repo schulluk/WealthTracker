@@ -192,18 +192,50 @@ def _pinned_for(cred):
     return None
 
 
-def submit_keys_and_letter(cred, blob):
-    """Send INI + HIA and render the initialisation letter.
+class EbicsSubscriberBlockedError(Exception):
+    """The bank rejected the key submission as already-initialised (EBICS 091002).
 
-    Returns ``(ini_state, hia_state, letter)`` where letter is the ebicsclient
-    Letter (``.media_type``, ``.content``). ``ini``/``hia`` are idempotent: the
-    library reports ALREADY_INITIALISED rather than raising if keys were sent before.
+    Our freshly generated keys were NOT transmitted: the bank still holds an earlier
+    initialisation for this subscriber, and that state blocks any new key delivery
+    until the bank resets (deletes) the subscriber. Crucially the bank answers 091002
+    for BOTH "you re-sent the same keys" and "you sent different keys we ignored", and
+    the response carries no way to tell them apart — so a fresh keyring that comes back
+    ALREADY_INITIALISED means our keys were silently dropped. Producing an
+    initialisation letter here would be actively harmful: its key fingerprints would
+    never match the keys the bank holds, so activation fails with a hash mismatch.
     """
-    from ebicsclient import OutputFormat
+
+    def __init__(self, ini_state, hia_state):
+        self.ini_state = ini_state
+        self.hia_state = hia_state
+        super().__init__(
+            'The bank rejected the key submission: this subscriber is already '
+            'initialised on the bank side (EBICS 091002), so your new keys were NOT '
+            'transmitted. Ask the bank to reset (delete) your EBICS subscriber '
+            'initialisation, then submit keys again.'
+        )
+
+
+def submit_keys_and_letter(cred, blob):
+    """Send INI + HIA, then render the initialisation letter for the delivered keys.
+
+    Returns ``(ini_state, hia_state, letter)`` where letter is the ebicsclient Letter
+    (``.media_type``, ``.content``).
+
+    If the bank rejects the submission as already-initialised (EBICS 091002 ->
+    ``InitializationState.ALREADY_INITIALISED``), the keys were NOT delivered — the
+    bank still holds an earlier initialisation. We deliberately do NOT render a letter
+    in that case (its fingerprints would never match the bank's keys) and raise
+    ``EbicsSubscriberBlockedError`` so the caller can tell the user the bank must reset
+    the subscriber before new keys can be submitted.
+    """
+    from ebicsclient import InitializationState, OutputFormat
 
     client = _client_for(cred, blob)
     ini_state = client.ini()
     hia_state = client.hia()
+    if InitializationState.ALREADY_INITIALISED in (ini_state, hia_state):
+        raise EbicsSubscriberBlockedError(ini_state, hia_state)
     letter = client.make_ini_letter(output_format=OutputFormat.PDF, branding='Wealth Tracker')
     return ini_state, hia_state, letter
 

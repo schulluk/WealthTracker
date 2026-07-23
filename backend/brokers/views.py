@@ -169,7 +169,10 @@ class EbicsCredentialInitializeView(KEKAuthenticationMixin, APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
-        from .integrations.zkb_ebics import submit_keys_and_letter
+        from .integrations.zkb_ebics import (
+            EbicsSubscriberBlockedError,
+            submit_keys_and_letter,
+        )
 
         try:
             cred = EbicsCredential.objects.get(pk=pk, user=request.user)
@@ -181,6 +184,24 @@ class EbicsCredentialInitializeView(KEKAuthenticationMixin, APIView):
         blob = self.decrypt_blob(request, cred.encrypted_keyring)
         try:
             ini_state, hia_state, letter = submit_keys_and_letter(cred, blob)
+        except EbicsSubscriberBlockedError as e:
+            # The bank rejected our fresh keys as already-initialised (091002): the keys
+            # did NOT reach the bank, so there is no valid letter to mail. Mark the
+            # credential errored and tell the user the bank must reset the subscriber
+            # first. Do NOT advance to 'keys_sent' or return a letter.
+            logger.warning('EBICS keys not delivered for credential %s: %s', cred.id, e)
+            cred.state = 'error'
+            cred.last_error = str(e)
+            cred.save(update_fields=['state', 'last_error', 'updated_at'])
+            return Response(
+                {'error': str(e),
+                 'code': 'subscriber_blocked',
+                 'hint': 'Contact the bank and ask them to reset (delete) your EBICS '
+                         'subscriber, then submit keys again. Do not mail any letter '
+                         'downloaded before the reset — its key fingerprints will not '
+                         'match the keys the bank holds and activation will fail.'},
+                status=status.HTTP_409_CONFLICT,
+            )
         except Exception as e:
             logger.exception('EBICS INI/HIA failed for credential %s', cred.id)
             cred.last_error = str(e) or repr(e)

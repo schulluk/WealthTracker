@@ -3,7 +3,7 @@ import base64
 from datetime import date
 from decimal import Decimal
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from django.test import TestCase
 from django.urls import reverse
@@ -18,9 +18,11 @@ from rest_framework.test import APITestCase
 from brokers.integrations import get_broker_integration
 from brokers.integrations.base import AccountInfo, BalanceInfo
 from brokers.integrations.zkb_ebics import (
+    EbicsSubscriberBlockedError,
     ZKBEbicsIntegration,
     _client_for,
     generate_keyring_blob,
+    submit_keys_and_letter,
 )
 from brokers.models import Broker, EbicsCredential
 from core.kek_testing import make_kek_user
@@ -209,6 +211,55 @@ class ClientForRegressionTests(TestCase):
         m_bank.assert_called_once_with(host_id='ZKBKCHZZ', url='https://ebics.zkb.ch/ebics')
         m_deser.assert_called_once()
         m_client.assert_called_once()
+
+
+class SubmitKeysAndLetterTests(TestCase):
+    """The bank answers 091002 (ALREADY_INITIALISED) for BOTH a benign re-send of the
+    same keys AND a rejected send of *different* keys — the response can't distinguish
+    them. Since we only ever call this with a freshly generated keyring, ALREADY_INITIALISED
+    means our keys were silently dropped: we must NOT render a letter (its fingerprints
+    would never match the bank's keys) and must raise so the caller can tell the user."""
+
+    @patch('brokers.integrations.zkb_ebics._client_for')
+    def test_submitted_returns_letter(self, m_client_for):
+        client = MagicMock()
+        client.ini.return_value = InitializationState.SUBMITTED
+        client.hia.return_value = InitializationState.SUBMITTED
+        client.make_ini_letter.return_value = SimpleNamespace(
+            media_type='application/pdf', content=b'%PDF',
+        )
+        m_client_for.return_value = client
+
+        ini, hia, letter = submit_keys_and_letter(SimpleNamespace(), {'k': 'v'})
+        self.assertEqual(ini, InitializationState.SUBMITTED)
+        self.assertEqual(hia, InitializationState.SUBMITTED)
+        self.assertEqual(letter.content, b'%PDF')
+        client.make_ini_letter.assert_called_once()
+
+    @patch('brokers.integrations.zkb_ebics._client_for')
+    def test_already_initialised_raises_and_skips_letter(self, m_client_for):
+        client = MagicMock()
+        client.ini.return_value = InitializationState.ALREADY_INITIALISED
+        client.hia.return_value = InitializationState.ALREADY_INITIALISED
+        m_client_for.return_value = client
+
+        with self.assertRaises(EbicsSubscriberBlockedError):
+            submit_keys_and_letter(SimpleNamespace(), {'k': 'v'})
+        # No letter may be produced for keys the bank never accepted.
+        client.make_ini_letter.assert_not_called()
+
+    @patch('brokers.integrations.zkb_ebics._client_for')
+    def test_partial_already_initialised_also_raises(self, m_client_for):
+        # Even a mixed result (one leg accepted, the other already-initialised) is a
+        # non-delivery: fail closed rather than mail a half-valid letter.
+        client = MagicMock()
+        client.ini.return_value = InitializationState.SUBMITTED
+        client.hia.return_value = InitializationState.ALREADY_INITIALISED
+        m_client_for.return_value = client
+
+        with self.assertRaises(EbicsSubscriberBlockedError):
+            submit_keys_and_letter(SimpleNamespace(), {'k': 'v'})
+        client.make_ini_letter.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -449,6 +500,25 @@ class EbicsInitializeTests(EbicsEndpointTestBase):
         cred.refresh_from_db()
         self.assertEqual(cred.state, 'new')  # unchanged
         self.assertIn('bank rejected keys', cred.last_error)
+
+    @patch('brokers.integrations.zkb_ebics.submit_keys_and_letter')
+    def test_initialize_blocked_subscriber_returns_409_no_letter(self, m_submit):
+        # The bank rejected our fresh keys as already-initialised: the credential must
+        # go to 'error' with an actionable message, and NO letter may be returned.
+        cred = self._create_cred()
+        m_submit.side_effect = EbicsSubscriberBlockedError(
+            InitializationState.ALREADY_INITIALISED,
+            InitializationState.ALREADY_INITIALISED,
+        )
+        resp = self.client.post(reverse('ebics_credential_initialize', args=[cred.pk]))
+        self.assertEqual(resp.status_code, 409, resp.data)
+        self.assertEqual(resp.data['code'], 'subscriber_blocked')
+        self.assertIn('091002', resp.data['error'])
+        self.assertIn('reset', resp.data['hint'].lower())
+        self.assertNotIn('letter', resp.data)  # nothing to mail
+        cred.refresh_from_db()
+        self.assertEqual(cred.state, 'error')
+        self.assertIn('reset', cred.last_error.lower())
 
     def test_initialize_other_user_404(self):
         other, _, _ = make_kek_user(username='bob')

@@ -132,6 +132,9 @@ export default function EbicsPage() {
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Key submission failed');
+      // The server may have flipped the credential to 'error' (e.g. the bank rejected
+      // the keys as already-initialised); refresh so the card reflects that.
+      await load();
     } finally {
       clearBusy(cred.id);
     }

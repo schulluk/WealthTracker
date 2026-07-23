@@ -697,7 +697,10 @@ export async function initializeEbicsCredential(
 ): Promise<{ status: string; ini: string; hia: string; letter: EbicsLetter; message: string }> {
   const res = await fetchWithAuth(`/api/ebics/credentials/${id}/initialize/`, { method: 'POST' });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Key submission failed');
+  if (!res.ok) {
+    const msg = data.hint ? `${data.error} ${data.hint}` : (data.error || 'Key submission failed');
+    throw new Error(msg);
+  }
   return data;
 }
 
