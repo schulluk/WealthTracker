@@ -36,7 +36,7 @@ Credentials are stored encrypted with a **KEK the app supplies per request** ([c
 ### Production deployment (branch `main`)
 Two repos. We work directly on **`main`** and production deploys from `main`. (The `demo` *instance* is only for app-review builds, not a git branch workflow.)
 - **App repo** (`lsgd/WealthTracker`): the module, `requirements.txt` pins `playwright==1.60.0`, the dedicated in-repo `docker/backend` image bakes Chromium+Xvfb.
-- **Infra repo** (`adliswil/docker`, at `~/git/docker/medan.schulze.uno`, deployed to `/opt/docker/medan.schulze.uno` via the `dcm` alias): a **dedicated `_gunicorn-py314-wealth` image** (bakes Chromium + Xvfb + Playwright at build) used by the production and demo wealth services. The shared `_gunicorn-py314` image was reverted to its clean template.
+- **Infra repo** (private, at `~/git/docker/<host>`, deployed to `/opt/docker/<host>` via the `dcm` alias): a **dedicated `_gunicorn-py314-wealth` image** (bakes Chromium + Xvfb + Playwright at build) used by the production and demo wealth services. The shared `_gunicorn-py314` image was reverted to its clean template.
 - Service env on the wealth services: `MS_HEADLESS=0`, `MS_SERVER_MODE=1` (adds `--no-sandbox` + software-GL launch args), `DISPLAY=:99`, `MS_BROWSER_STATE_DIR=/var/ms-browser-state` (persistent volume). Browser is baked in the image (no `/var/playwright` volume). The entrypoint starts `Xvfb :99`.
 - **Confirmed on the VPS**: `dcm exec wealth-py … chromium.launch(headless=False, --no-sandbox …) → google` works; and through a residential exit, MS loads.
 

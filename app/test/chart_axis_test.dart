@@ -57,20 +57,20 @@ void main() {
 
   group('stripLeadingIban', () {
     test('strips a valid German IBAN prefix', () {
-      expect(stripLeadingIban('DE57120300001015708611LUKAS SCHULZE'),
-          'LUKAS SCHULZE');
+      expect(stripLeadingIban('DE89370400440532013000MAX MUSTERMANN'),
+          'MAX MUSTERMANN');
     });
 
     test('keeps strings without an IBAN untouched', () {
       expect(stripLeadingIban('GOOGLE SWITZERLAND GMBH'),
           'GOOGLE SWITZERLAND GMBH');
-      expect(stripLeadingIban('Praxis Dr. med. dent. Juliane'),
-          'Praxis Dr. med. dent. Juliane');
+      expect(stripLeadingIban('Praxis Dr. med. dent. Beispiel'),
+          'Praxis Dr. med. dent. Beispiel');
     });
 
     test('rejects an invalid checksum even when the shape matches', () {
       // Same as the valid IBAN but with one digit flipped.
-      const broken = 'DE57120300001015708612WERTGARANTIE';
+      const broken = 'DE89370400440532013001WERTGARANTIE';
       expect(stripLeadingIban(broken), broken);
     });
 

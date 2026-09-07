@@ -101,7 +101,7 @@ def validate_signing_cert
     UI.user_error!(
       "Distribution certificate not found at keys/apple-distribution.p12\n" \
       "To create a new one:\n" \
-      "  1. Generate a CSR: openssl req -new -newkey rsa:2048 -nodes -keyout keys/apple-distribution.key -out /tmp/CSR.certSigningRequest -subj \"/emailAddress=lukas@schulze.uno/CN=Lukas Schulze/C=CH\"\n" \
+      "  1. Generate a CSR: openssl req -new -newkey rsa:2048 -nodes -keyout keys/apple-distribution.key -out /tmp/CSR.certSigningRequest -subj \"/emailAddress=<your-apple-id-email>/CN=<your name>/C=CH\"\n" \
       "  2. Upload CSR at https://developer.apple.com/account/resources/certificates/add (select 'Apple Distribution')\n" \
       "  3. Download the .cer file\n" \
       "  4. Convert to PEM: openssl x509 -in distribution.cer -inform DER -out /tmp/distribution.pem\n" \
