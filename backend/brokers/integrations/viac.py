@@ -30,6 +30,23 @@ from .base import (
 logger = logging.getLogger(__name__)
 
 
+def _amount(value: Any) -> Optional[Decimal]:
+    """Read a VIAC amount, rounded to the cent, or None if it isn't one.
+
+    VIAC wraps amounts as {"__type": "VIAC_DECIMAL", "__value": "<decimal string>"}
+    with up to 20 decimal places (plain JSON numbers until autumn 2026); both are
+    accepted. Rounding keeps an unchanged balance equal to the stored snapshot.
+    """
+    if isinstance(value, dict) and value.get('__type') == 'VIAC_DECIMAL':
+        value = value.get('__value')
+    if isinstance(value, (int, float, str)) and not isinstance(value, bool):
+        try:
+            return Decimal(str(value)).quantize(Decimal('0.01'))
+        except InvalidOperation:
+            pass
+    return None
+
+
 def _describe(value: Any) -> str:
     """Say what VIAC sent where a number was expected, for the sync error."""
     if isinstance(value, dict):
@@ -369,14 +386,12 @@ class VIACIntegration(BrokerIntegrationBase):
         )
 
     def _balance_amount(self, value: Any) -> Decimal:
-        """Convert the reported total to a Decimal, or fail the sync saying what
-        VIAC sent instead. The log line lists the summary's field types (no
-        amounts) so a changed API shape can be read straight from the logs."""
-        if isinstance(value, (int, float, str)) and not isinstance(value, bool):
-            try:
-                return Decimal(str(value))
-            except InvalidOperation:
-                pass
+        """Read the reported total, or fail the sync saying what VIAC sent
+        instead. The log line lists the summary's field types (no amounts) so a
+        changed API shape can be read straight from the logs."""
+        amount = _amount(value)
+        if amount is not None:
+            return amount
         logger.warning(
             "VIAC wealth summary has no numeric total; field types: %s",
             {key: type(field).__name__ for key, field in self._wealth_data.items()},
@@ -514,18 +529,18 @@ class VIACIntegration(BrokerIntegrationBase):
             data = response.json()
             historical = []
 
-            # Parse dailyWealth array: [{date: "YYYY-MM-DD", value: number}, ...]
+            # Parse dailyWealth array: [{date: "YYYY-MM-DD", value: amount}, ...]
             daily_wealth = data.get('dailyWealth', [])
             for entry in daily_wealth:
                 entry_date = entry.get('date')
-                entry_value = entry.get('value')
+                entry_value = _amount(entry.get('value'))
                 if entry_date and entry_value is not None:
                     try:
                         bal_date = datetime.strptime(entry_date[:10], '%Y-%m-%d').date()
                         # Filter by date range
                         if start_date <= bal_date <= end_date:
                             historical.append(BalanceInfo(
-                                balance=Decimal(str(entry_value)),
+                                balance=entry_value,
                                 currency='CHF',
                                 balance_date=bal_date
                             ))

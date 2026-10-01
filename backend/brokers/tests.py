@@ -899,16 +899,23 @@ class FinTSBalanceParsingTests(TestCase):
         self.assertEqual(_tolerant_get_balance(None, 'HKSAL', response), 'MT940BAL')
 
 
+def viac_decimal(value):
+    return {'__type': 'VIAC_DECIMAL', '__value': value}
+
+
 class VIACBalanceTests(TestCase):
-    """The wealth summary's totalValue is the balance. Anything that isn't a number
-    fails the sync saying what VIAC sent — never a cryptic Decimal error or a 0."""
+    """VIAC amounts arrive as {"__type": "VIAC_DECIMAL", "__value": "..."} (plain
+    numbers before). A total that is neither fails the sync saying what VIAC sent
+    — never a cryptic Decimal error or a 0 balance."""
+
+    def setUp(self):
+        from brokers.integrations.viac import VIACIntegration
+        self.integration = VIACIntegration({'username': '+41790000000', 'password': 'p'})
+        self.integration._authenticated = True
 
     def _balance(self, summary):
-        from brokers.integrations.viac import VIACIntegration
-        integration = VIACIntegration({'username': '+41790000000', 'password': 'p'})
-        integration._authenticated = True
-        with patch.object(integration, '_fetch_wealth_summary', return_value=summary):
-            return integration.get_balance('main')
+        with patch.object(self.integration, '_fetch_wealth_summary', return_value=summary):
+            return self.integration.get_balance('main')
 
     def _error(self, summary):
         with self.assertLogs('brokers.integrations.viac', 'WARNING') as self.logs, \
@@ -916,10 +923,30 @@ class VIACBalanceTests(TestCase):
             self._balance(summary)
         return str(ctx.exception)
 
-    def test_numeric_total_is_the_balance(self):
+    def test_wrapped_total_is_the_balance_rounded_to_the_cent(self):
+        bal = self._balance({'totalValue': viac_decimal('12345.67890123456789012345')})
+        self.assertEqual(bal.balance, Decimal('12345.68'))
+        self.assertEqual(bal.currency, 'CHF')
+
+    def test_plain_number_total_is_still_read(self):
         bal = self._balance({'totalValue': 12345.67, 'dailyWealth': []})
         self.assertEqual(bal.balance, Decimal('12345.67'))
-        self.assertEqual(bal.currency, 'CHF')
+
+    def test_history_reads_wrapped_daily_values_in_range(self):
+        summary = {'dailyWealth': [
+            {'date': '2026-09-29', 'value': viac_decimal('100.004')},
+            {'date': '2026-09-30', 'value': viac_decimal('101.49999999999999999999')},
+            {'date': '2026-10-01', 'value': {'__type': 'UNKNOWN', '__value': '1'}},
+        ]}
+        response = SimpleNamespace(status_code=200, json=lambda: summary)
+        with patch.object(self.integration._session, 'get', return_value=response):
+            history = self.integration.get_historical_balances(
+                'main', date(2026, 9, 30), date(2026, 10, 1),
+            )
+        self.assertEqual(
+            [(b.balance_date, b.balance) for b in history],
+            [(date(2026, 9, 30), Decimal('101.50'))],
+        )
 
     def test_null_total_fails_instead_of_recording_zero(self):
         self.assertIn('VIAC returned no total value', self._error({'totalValue': None}))
