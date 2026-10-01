@@ -2,6 +2,7 @@
 
 ## Next: 1.4.0
 
+- A failed VIAC sync now says what VIAC returned instead of a cryptic decimal error, and a missing total fails the sync rather than recording a zero balance
 - Commerzbank accounts are now kept up to date by hand: the bank only offers scan-the-graphic photoTAN over its data interface, so the sync button and the credential fields are gone, the balance is entered as a snapshot, and transactions come from the CSV export
 - App transactions: search the list by text or amount, and one Show filter for everything, uncategorized only or transfers only
 - App transactions: a new "Create a rule from this" action in the category sheet, prefilled with the booking's merchant and category

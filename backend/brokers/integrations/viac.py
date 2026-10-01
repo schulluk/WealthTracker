@@ -14,7 +14,7 @@ Note: VIAC uses CSRF tokens with a custom header format (x-csrft759).
 import logging
 import re
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -28,6 +28,15 @@ from .base import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _describe(value: Any) -> str:
+    """Say what VIAC sent where a number was expected, for the sync error."""
+    if isinstance(value, dict):
+        return f"an object ({', '.join(sorted(value))})"
+    if isinstance(value, str):
+        return f"text ({value[:40]!r})"
+    return f"a {type(value).__name__}"
 
 
 class VIACIntegration(BrokerIntegrationBase):
@@ -150,11 +159,6 @@ class VIACIntegration(BrokerIntegrationBase):
 
             login_payload = {'username': self.username, 'password': self.password}
 
-            logger.info(f"VIAC login: csrf_token={self._csrf_token}, csrf_header={self._csrf_header}")
-            logger.info(f"VIAC cookies: {dict(self._session.cookies)}")
-            logger.info(f"VIAC login headers: {headers}")
-            logger.info(f"VIAC login payload: username={self.username}")
-
             response = self._session.post(
                 f"{self.BASE_URL}/external-login/public/authentication/password/check/",
                 json=login_payload,
@@ -163,11 +167,6 @@ class VIACIntegration(BrokerIntegrationBase):
             )
 
             logger.info(f"VIAC login response: status={response.status_code}")
-            logger.info(f"VIAC response headers: {dict(response.headers)}")
-            try:
-                logger.info(f"VIAC response body: {response.text[:500]}")
-            except Exception:
-                pass
 
             if response.status_code == 200:
                 self._authenticated = True
@@ -348,8 +347,9 @@ class VIACIntegration(BrokerIntegrationBase):
         # Fetch fresh wealth data
         self._wealth_data = self._fetch_wealth_summary()
 
-        # Extract total value
-        total_value = self._wealth_data.get('totalValue', 0)
+        # Extract total value. No default: a missing total must fail the sync,
+        # not be recorded as a 0 balance.
+        total_value = self._wealth_data.get('totalValue')
         currency = self._wealth_data.get('currency', 'CHF')
 
         # If we have multiple portfolios, try to find the specific one
@@ -362,11 +362,30 @@ class VIACIntegration(BrokerIntegrationBase):
                 break
 
         return BalanceInfo(
-            balance=Decimal(str(total_value)),
+            balance=self._balance_amount(total_value),
             currency=currency,
             balance_date=date.today(),
             raw_data=self._wealth_data
         )
+
+    def _balance_amount(self, value: Any) -> Decimal:
+        """Convert the reported total to a Decimal, or fail the sync saying what
+        VIAC sent instead. The log line lists the summary's field types (no
+        amounts) so a changed API shape can be read straight from the logs."""
+        if isinstance(value, (int, float, str)) and not isinstance(value, bool):
+            try:
+                return Decimal(str(value))
+            except InvalidOperation:
+                pass
+        logger.warning(
+            "VIAC wealth summary has no numeric total; field types: %s",
+            {key: type(field).__name__ for key, field in self._wealth_data.items()},
+        )
+        if value is None:
+            reason = "VIAC returned no total value."
+        else:
+            reason = f"VIAC returned the total as {_describe(value)} instead of a number."
+        raise RuntimeError(f"{reason} Its API may have changed.")
 
     def get_positions(self, account_identifier: str) -> List[PositionInfo]:
         """

@@ -899,6 +899,47 @@ class FinTSBalanceParsingTests(TestCase):
         self.assertEqual(_tolerant_get_balance(None, 'HKSAL', response), 'MT940BAL')
 
 
+class VIACBalanceTests(TestCase):
+    """The wealth summary's totalValue is the balance. Anything that isn't a number
+    fails the sync saying what VIAC sent — never a cryptic Decimal error or a 0."""
+
+    def _balance(self, summary):
+        from brokers.integrations.viac import VIACIntegration
+        integration = VIACIntegration({'username': '+41790000000', 'password': 'p'})
+        integration._authenticated = True
+        with patch.object(integration, '_fetch_wealth_summary', return_value=summary):
+            return integration.get_balance('main')
+
+    def _error(self, summary):
+        with self.assertLogs('brokers.integrations.viac', 'WARNING') as self.logs, \
+                self.assertRaises(RuntimeError) as ctx:
+            self._balance(summary)
+        return str(ctx.exception)
+
+    def test_numeric_total_is_the_balance(self):
+        bal = self._balance({'totalValue': 12345.67, 'dailyWealth': []})
+        self.assertEqual(bal.balance, Decimal('12345.67'))
+        self.assertEqual(bal.currency, 'CHF')
+
+    def test_null_total_fails_instead_of_recording_zero(self):
+        self.assertIn('VIAC returned no total value', self._error({'totalValue': None}))
+
+    def test_missing_total_fails_instead_of_recording_zero(self):
+        self.assertIn('VIAC returned no total value', self._error({'dailyWealth': []}))
+
+    def test_object_total_names_its_fields(self):
+        message = self._error({'totalValue': {'currency': 'CHF', 'amount': 1.5}})
+        self.assertIn('as an object (amount, currency) instead of a number', message)
+
+    def test_unparseable_text_total_is_quoted(self):
+        self.assertIn('as text ("12\'345.67")', self._error({'totalValue': "12'345.67"}))
+
+    def test_log_lists_field_types_without_amounts(self):
+        self._error({'totalValue': None, 'p3aSummary': {'value': 812.5}})
+        self.assertIn("'totalValue': 'NoneType', 'p3aSummary': 'dict'", self.logs.output[0])
+        self.assertNotIn('812.5', self.logs.output[0])
+
+
 # ---------------------------------------------------------------------------
 # Transaction parsing (camt.053 entries + FinTS/MT940 mapping)
 # ---------------------------------------------------------------------------
