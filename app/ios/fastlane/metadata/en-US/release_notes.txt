@@ -1,3 +1,5 @@
+- VIAC accounts sync again after VIAC changed how it sends amounts, and the days missed meanwhile are filled in; should the format change again, the sync error says what VIAC returned instead of a cryptic decimal message, and never records a zero balance
+- Commerzbank accounts are now kept up to date by hand: the bank only offers scan-the-graphic photoTAN over its data interface, so the sync button and the credential fields are gone, the balance is entered as a snapshot, and transactions come from the CSV export
 - App transactions: search the list by text or amount, and one Show filter for everything, uncategorized only or transfers only
 - App transactions: a new "Create a rule from this" action in the category sheet, prefilled with the booking's merchant and category
 - App spending: the category history sheet can open the transaction list narrowed to that category
@@ -6,6 +8,7 @@
 - App spending: spent, income and net for the selected period, each against the period before and against the average of the last six
 - App spending: budgets are shown in the app now — how much of this period's budget is left, and per category as a target marker on its bar with what is left or over
 - App spending: the breakdown lists categories as ranked bars with their share and how they compare with their own average; tapping one opens its history (total, average, highest, and a bar per period)
+- Web: the wealth chart's y-axis now fits the range on screen instead of always starting at zero, so movements within a period are actually visible
 - Web: a dashboard icon in the top navigation, first of the icons on the right, so getting back no longer means clicking the app name
 - Swisscard accounts can be synced from the app again: the card no longer counts as a manual account, and its sync button starts the login that texts you a code (it stays out of "Sync all", which runs unattended)
 - Tapping the "Syncing accounts" bar opens a live breakdown: accounts still in progress on top, finished ones below, each moving down as it completes
@@ -15,8 +18,4 @@
 - New wealth simulation (chart icon on the start screen): Monte Carlo projection of total wealth with percentile bands, in today's purchasing power; defaults derived from your accounts, spending, and holdings, all adjustable, with an optional target amount and the probability of reaching it
 - Simulation assumptions you change are saved to your profile and shared between web and app; assumptions you leave untouched keep updating from your data, and clearing a field goes back to the derived value
 - Simulation polish: readable y-axis labels (K/M, no overlap or duplicates), a red line marking the target amount and the year the median path reaches it, sticky tap-to-inspect showing median/75%/95% values above the chart, an explanation under every assumption field, and instant horizon switching (no recalculation)
-- Spending chart fixes: month labels no longer overlap, y-axis ticks are evenly spaced without duplicate values, and the breakdown total in the donut uses a thousands separator
-- Transaction lists now show the counterparty name instead of a leading IBAN, and the booking text gets two lines instead of one
-- AI suggestions: the settings card now explains upfront that a round proposes both categories and rules; a banner at the top announces proposed rules with a switch to skip creating them, select or deselect all with one tap in the app bar, and the apply button breaks its count into categories and rules
-- Categories can now be renamed and deleted in the app under Spending settings
-- Transactions tab now lists all accounts together in chronological order, with a collapsible filter for account and uncategoriz
+- Spending chart fixes: month labels no longer overlap, y-axis ticks are evenly spaced without duplicate values, and the breakdown total in the donut u
