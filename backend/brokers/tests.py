@@ -1,10 +1,14 @@
 """Tests for the EBICS integration, the broker factory, and EBICS endpoints."""
 import base64
-from datetime import date
+import json
+from datetime import date, timedelta
 from decimal import Decimal
+from io import StringIO
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from django.contrib.auth.models import User
+from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 from ebicsclient import (
@@ -965,6 +969,166 @@ class VIACBalanceTests(TestCase):
         self._error({'totalValue': None, 'p3aSummary': {'value': 812.5}})
         self.assertIn("'totalValue': 'NoneType', 'p3aSummary': 'dict'", self.logs.output[0])
         self.assertNotIn('812.5', self.logs.output[0])
+
+
+def viac_totals(total):
+    """The totals VIAC reports at every level of the wealth summary."""
+    return {
+        'totalValue': viac_decimal(total),
+        'totalReturn': viac_decimal('812.50000000000000000001'),
+        'totalPerformance': viac_decimal('0.06120000000000000000'),
+        'totalPerformanceCalculationMethod': 'TWR',
+        'productIsBlocked': False,
+    }
+
+
+def viac_summary(history):
+    """A wealth summary shaped like VIAC's: the same daily series repeated for the
+    account, each product and each portfolio. The portfolio numbers are made up."""
+    daily = [{'date': day.isoformat(), 'value': viac_decimal(value)} for day, value in history]
+
+    def level(total):
+        return {
+            **viac_totals(total),
+            'dailyWealth': daily,
+            'dailyPerformance': daily,
+            'dailyInvestedAmounts': daily,
+        }
+
+    summary = level('15000.50')
+    summary['p3aSummary'] = level('12000.00')
+    summary['p3aSummary']['portfolioWealthSummaries'] = {
+        '9000001': level('7000.00'),
+        '9000002': level('5000.00'),
+    }
+    summary['invSummary'] = level('3000.50')
+    return summary
+
+
+# What a snapshot keeps of any viac_summary().
+VIAC_SUMMARY_TOTALS = {
+    **viac_totals('15000.50'),
+    'p3aSummary': {
+        **viac_totals('12000.00'),
+        'portfolioWealthSummaries': {
+            '9000001': viac_totals('7000.00'),
+            '9000002': viac_totals('5000.00'),
+        },
+    },
+    'invSummary': viac_totals('3000.50'),
+}
+
+
+class VIACRawDataTests(TestCase):
+    """A snapshot keeps the wealth summary's totals, not the daily history VIAC
+    repeats at every level of it; the backfill fetches that history itself."""
+
+    def setUp(self):
+        from brokers.integrations.viac import VIACIntegration
+        today = date.today()
+        self.history = [
+            (today - timedelta(days=2), '14800.00'),
+            (today - timedelta(days=1), '14900.40'),
+            (today, '15000.50'),
+        ]
+        self.summary = viac_summary(self.history)
+        self.integration = VIACIntegration({'username': '+41790000000', 'password': 'p'})
+        self.integration._authenticated = True
+
+    def test_raw_data_keeps_the_totals_of_every_level(self):
+        with patch.object(self.integration, '_fetch_wealth_summary', return_value=self.summary):
+            self.assertEqual(self.integration.get_balance('main').raw_data, VIAC_SUMMARY_TOTALS)
+
+    def test_trimming_a_trimmed_summary_changes_nothing(self):
+        from brokers.integrations.viac import trim_wealth_summary
+        self.assertEqual(trim_wealth_summary(VIAC_SUMMARY_TOTALS), VIAC_SUMMARY_TOTALS)
+
+    def test_sync_stores_the_totals_and_still_backfills_the_history(self):
+        from portfolio.models import AccountSnapshot, FinancialAccount
+        from portfolio.views import _sync_authenticated_account
+        broker = Broker.objects.create(code='viac', name='VIAC', integration_type='rest')
+        account = FinancialAccount.objects.create(
+            user=User.objects.create_user(username='viac-owner'), broker=broker,
+            name='VIAC 3a', account_identifier='main', currency='CHF',
+        )
+        response = SimpleNamespace(status_code=200, json=lambda: self.summary)
+        with patch.object(self.integration, '_fetch_wealth_summary', return_value=self.summary), \
+                patch.object(self.integration._session, 'get', return_value=response):
+            result = _sync_authenticated_account(account, self.integration, 'CHF')
+
+        self.assertEqual(result['backfilled'], 2)
+        stored = {s.snapshot_date: s for s in AccountSnapshot.objects.filter(account=account)}
+        self.assertEqual(
+            {day: snapshot.balance for day, snapshot in stored.items()},
+            {day: Decimal(value) for day, value in self.history},
+        )
+        self.assertEqual(stored[date.today()].raw_data, VIAC_SUMMARY_TOTALS)
+
+
+class TrimVIACRawDataCommandTests(TestCase):
+    """trim_viac_raw_data gives snapshots stored before the trim the same treatment."""
+
+    def setUp(self):
+        from portfolio.models import AccountSnapshot, FinancialAccount
+        user = User.objects.create_user(username='viac-owner')
+        viac = FinancialAccount.objects.create(
+            user=user, name='VIAC 3a',
+            broker=Broker.objects.create(code='viac', name='VIAC', integration_type='rest'),
+        )
+        other = FinancialAccount.objects.create(
+            user=user, name='TrueWealth',
+            broker=Broker.objects.create(
+                code='truewealth', name='TrueWealth', integration_type='rest'),
+        )
+        summary = viac_summary([(date(2026, 9, 30), '14900.40'), (date(2026, 10, 1), '15000.50')])
+
+        def snapshot(account, day, raw_data):
+            return AccountSnapshot.objects.create(
+                account=account, balance=Decimal('15000.50'), currency='CHF',
+                snapshot_date=day, raw_data=raw_data,
+            )
+
+        self.untrimmed = [snapshot(viac, date(2026, 10, day), summary) for day in (1, 2)]
+        snapshot(viac, date(2026, 10, 3), VIAC_SUMMARY_TOTALS)
+        snapshot(viac, date(2026, 9, 30), None)  # backfilled rows carry no raw data
+        # Another broker's raw data is not this command's to touch, whatever its shape.
+        self.not_viac = snapshot(other, date(2026, 10, 1), summary)
+
+    def _run(self, *args):
+        out = StringIO()
+        call_command('trim_viac_raw_data', *args, stdout=out)
+        return out.getvalue()
+
+    def test_dry_run_reports_rows_and_bytes_and_changes_nothing(self):
+        from brokers.integrations.viac import trim_wealth_summary
+        for row in self.untrimmed:
+            row.refresh_from_db()
+        saved = sum(
+            len(json.dumps(row.raw_data)) - len(json.dumps(trim_wealth_summary(row.raw_data)))
+            for row in self.untrimmed
+        )
+
+        output = self._run('--dry-run')
+
+        self.assertIn('Would trim 2 of 3 VIAC snapshots with raw data (1 had nothing to trim)', output)
+        self.assertIn(f'would save {saved:,} bytes', output)
+        for row in self.untrimmed:
+            row.refresh_from_db()
+            self.assertIn('dailyWealth', row.raw_data)
+
+    def test_trims_viac_rows_only_and_keeps_their_balances(self):
+        self.assertIn('Trimmed 2 of 3', self._run())
+        for row in self.untrimmed:
+            row.refresh_from_db()
+            self.assertEqual(row.raw_data, VIAC_SUMMARY_TOTALS)
+            self.assertEqual(row.balance, Decimal('15000.50'))
+        self.not_viac.refresh_from_db()
+        self.assertIn('dailyWealth', self.not_viac.raw_data)
+
+    def test_a_second_run_finds_nothing_to_trim(self):
+        self._run()
+        self.assertIn(
+            'Trimmed 0 of 3 VIAC snapshots with raw data (3 had nothing to trim)', self._run())
 
 
 # ---------------------------------------------------------------------------

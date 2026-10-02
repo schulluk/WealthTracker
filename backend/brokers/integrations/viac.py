@@ -56,6 +56,41 @@ def _describe(value: Any) -> str:
     return f"a {type(value).__name__}"
 
 
+# The totals kept from every level of the wealth summary: the whole account, each
+# product (p3aSummary, invSummary) and each portfolio in portfolioWealthSummaries.
+_SUMMARY_FIELDS = (
+    'totalValue',
+    'totalReturn',
+    'totalPerformance',
+    'totalPerformanceCalculationMethod',
+    'productIsBlocked',
+)
+
+
+def trim_wealth_summary(summary: Dict[str, Any]) -> Dict[str, Any]:
+    """The wealth summary without its daily history, for a snapshot's raw_data.
+
+    /rest/web/wealth/summary repeats the full daily history (dailyWealth,
+    dailyPerformance, dailyInvestedAmounts) for the account, again per product
+    and again per portfolio: tens of thousands of entries, megabytes of JSON per
+    snapshot. Only the totals are kept; get_historical_balances fetches the
+    history itself. Trimming a trimmed summary returns it unchanged.
+    """
+    trimmed = {key: summary[key] for key in _SUMMARY_FIELDS if key in summary}
+    for product in ('p3aSummary', 'invSummary'):
+        if isinstance(summary.get(product), dict):
+            trimmed[product] = trim_wealth_summary(summary[product])
+    # Keyed by portfolio number.
+    portfolios = summary.get('portfolioWealthSummaries')
+    if isinstance(portfolios, dict):
+        trimmed['portfolioWealthSummaries'] = {
+            number: trim_wealth_summary(portfolio)
+            for number, portfolio in portfolios.items()
+            if isinstance(portfolio, dict)
+        }
+    return trimmed
+
+
 class VIACIntegration(BrokerIntegrationBase):
     """
     Integration for VIAC Swiss pension (Pillar 3a) provider.
@@ -382,7 +417,7 @@ class VIACIntegration(BrokerIntegrationBase):
             balance=self._balance_amount(total_value),
             currency=currency,
             balance_date=date.today(),
-            raw_data=self._wealth_data
+            raw_data=trim_wealth_summary(self._wealth_data)
         )
 
     def _balance_amount(self, value: Any) -> Decimal:

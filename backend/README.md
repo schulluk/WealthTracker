@@ -97,7 +97,7 @@ balance_base_currency: Decimal  # Converted amount
 exchange_rate_used: Decimal
 snapshot_date: date
 snapshot_source: str  # auto, manual, import
-raw_data: dict        # Full broker response
+raw_data: dict        # Broker fields behind the balance (not its daily history)
 ```
 
 ### PortfolioPosition
@@ -232,7 +232,8 @@ class NewBrokerIntegration(BrokerIntegrationBase):
             balance=Decimal('10000.00'),
             currency='EUR',
             balance_date=date.today(),
-            raw_data={'original': 'response'},  # Store full API response
+            # Stored with every snapshot: the fields behind the balance, not a daily history
+            raw_data={'balance': '10000.00'},
         )
 
     def get_positions(self, account_identifier: str) -> List[PositionInfo]:
