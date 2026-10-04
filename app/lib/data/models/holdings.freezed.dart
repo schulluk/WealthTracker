@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // coverage:ignore-file
-// ignore_for_file: type=lint
+// ignore_for_file: type=lint, type=warning, deprecated_member_use, deprecated_member_use_from_same_package
 // ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
 part of 'holdings.dart';
@@ -9,6 +9,7 @@ part of 'holdings.dart';
 // FreezedGenerator
 // **************************************************************************
 
+// GENERATED CODE - DO NOT MODIFY BY HAND
 // dart format off
 T _$identity<T>(T value) => value;
 
@@ -28,16 +29,21 @@ $HoldingCopyWith<Holding> get copyWith => _$HoldingCopyWithImpl<Holding>(this as
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Holding&&(identical(other.isin, isin) || other.isin == isin)&&(identical(other.symbol, symbol) || other.symbol == symbol)&&(identical(other.name, name) || other.name == name)&&(identical(other.assetClass, assetClass) || other.assetClass == assetClass)&&(identical(other.quantity, quantity) || other.quantity == quantity)&&(identical(other.valueBaseCurrency, valueBaseCurrency) || other.valueBaseCurrency == valueBaseCurrency)&&(identical(other.priceBaseCurrency, priceBaseCurrency) || other.priceBaseCurrency == priceBaseCurrency)&&(identical(other.percentage, percentage) || other.percentage == percentage)&&const DeepCollectionEquality().equals(other.accounts, accounts));
+  final _this = this as Holding;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Holding&&(identical(other.isin, _this.isin) || other.isin == _this.isin)&&(identical(other.symbol, _this.symbol) || other.symbol == _this.symbol)&&(identical(other.name, _this.name) || other.name == _this.name)&&(identical(other.assetClass, _this.assetClass) || other.assetClass == _this.assetClass)&&(identical(other.quantity, _this.quantity) || other.quantity == _this.quantity)&&(identical(other.valueBaseCurrency, _this.valueBaseCurrency) || other.valueBaseCurrency == _this.valueBaseCurrency)&&(identical(other.priceBaseCurrency, _this.priceBaseCurrency) || other.priceBaseCurrency == _this.priceBaseCurrency)&&(identical(other.percentage, _this.percentage) || other.percentage == _this.percentage)&&const DeepCollectionEquality().equals(other.accounts, _this.accounts));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,isin,symbol,name,assetClass,quantity,valueBaseCurrency,priceBaseCurrency,percentage,const DeepCollectionEquality().hash(accounts));
+int get hashCode {
+  final _this = this as Holding;
+  return Object.hash(runtimeType,_this.isin,_this.symbol,_this.name,_this.assetClass,_this.quantity,_this.valueBaseCurrency,_this.priceBaseCurrency,_this.percentage,const DeepCollectionEquality().hash(_this.accounts));
+}
 
 @override
 String toString() {
-  return 'Holding(isin: $isin, symbol: $symbol, name: $name, assetClass: $assetClass, quantity: $quantity, valueBaseCurrency: $valueBaseCurrency, priceBaseCurrency: $priceBaseCurrency, percentage: $percentage, accounts: $accounts)';
+  final _this = this as Holding;
+  return 'Holding(isin: ${_this.isin}, symbol: ${_this.symbol}, name: ${_this.name}, assetClass: ${_this.assetClass}, quantity: ${_this.quantity}, valueBaseCurrency: ${_this.valueBaseCurrency}, priceBaseCurrency: ${_this.priceBaseCurrency}, percentage: ${_this.percentage}, accounts: ${_this.accounts})';
 }
 
 
@@ -66,7 +72,7 @@ class _$HoldingCopyWithImpl<$Res>
 /// Create a copy of Holding
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') @override $Res call({Object? isin = null,Object? symbol = null,Object? name = null,Object? assetClass = null,Object? quantity = null,Object? valueBaseCurrency = null,Object? priceBaseCurrency = freezed,Object? percentage = null,Object? accounts = null,}) {
-  return _then(_self.copyWith(
+  return _then(Holding(
 isin: null == isin ? _self.isin : isin // ignore: cast_nullable_to_non_nullable
 as String,symbol: null == symbol ? _self.symbol : symbol // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
@@ -217,7 +223,7 @@ return $default(_that.isin,_that.symbol,_that.name,_that.assetClass,_that.quanti
 @JsonSerializable()
 
 class _Holding implements Holding {
-  const _Holding({this.isin = '', this.symbol = '', required this.name, @JsonKey(name: 'asset_class') required this.assetClass, required this.quantity, @JsonKey(name: 'value_base_currency') required this.valueBaseCurrency, @JsonKey(name: 'price_base_currency') this.priceBaseCurrency, required this.percentage, required final  List<String> accounts}): _accounts = accounts;
+  const _Holding({this.isin = '', this.symbol = '', required this.name, @JsonKey(name: 'asset_class') required this.assetClass, required this.quantity, @JsonKey(name: 'value_base_currency') required this.valueBaseCurrency, @JsonKey(name: 'price_base_currency') this.priceBaseCurrency, required this.percentage, required  List<String> accounts}): _accounts = accounts;
   factory _Holding.fromJson(Map<String, dynamic> json) => _$HoldingFromJson(json);
 
 @override@JsonKey() final  String isin;
@@ -249,16 +255,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Holding&&(identical(other.isin, isin) || other.isin == isin)&&(identical(other.symbol, symbol) || other.symbol == symbol)&&(identical(other.name, name) || other.name == name)&&(identical(other.assetClass, assetClass) || other.assetClass == assetClass)&&(identical(other.quantity, quantity) || other.quantity == quantity)&&(identical(other.valueBaseCurrency, valueBaseCurrency) || other.valueBaseCurrency == valueBaseCurrency)&&(identical(other.priceBaseCurrency, priceBaseCurrency) || other.priceBaseCurrency == priceBaseCurrency)&&(identical(other.percentage, percentage) || other.percentage == percentage)&&const DeepCollectionEquality().equals(other._accounts, _accounts));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Holding&&(identical(other.isin, isin) || other.isin == isin)&&(identical(other.symbol, symbol) || other.symbol == symbol)&&(identical(other.name, name) || other.name == name)&&(identical(other.assetClass, assetClass) || other.assetClass == assetClass)&&(identical(other.quantity, quantity) || other.quantity == quantity)&&(identical(other.valueBaseCurrency, valueBaseCurrency) || other.valueBaseCurrency == valueBaseCurrency)&&(identical(other.priceBaseCurrency, priceBaseCurrency) || other.priceBaseCurrency == priceBaseCurrency)&&(identical(other.percentage, percentage) || other.percentage == percentage)&&const DeepCollectionEquality().equals(other.accounts, _accounts));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,isin,symbol,name,assetClass,quantity,valueBaseCurrency,priceBaseCurrency,percentage,const DeepCollectionEquality().hash(_accounts));
+int get hashCode {
+    return Object.hash(runtimeType,isin,symbol,name,assetClass,quantity,valueBaseCurrency,priceBaseCurrency,percentage,const DeepCollectionEquality().hash(_accounts));
+}
 
 @override
 String toString() {
-  return 'Holding(isin: $isin, symbol: $symbol, name: $name, assetClass: $assetClass, quantity: $quantity, valueBaseCurrency: $valueBaseCurrency, priceBaseCurrency: $priceBaseCurrency, percentage: $percentage, accounts: $accounts)';
+    return 'Holding(isin: $isin, symbol: $symbol, name: $name, assetClass: $assetClass, quantity: $quantity, valueBaseCurrency: $valueBaseCurrency, priceBaseCurrency: $priceBaseCurrency, percentage: $percentage, accounts: $accounts)';
 }
 
 
@@ -321,16 +329,21 @@ $HoldingsReportCopyWith<HoldingsReport> get copyWith => _$HoldingsReportCopyWith
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is HoldingsReport&&(identical(other.baseCurrency, baseCurrency) || other.baseCurrency == baseCurrency)&&(identical(other.asOf, asOf) || other.asOf == asOf)&&(identical(other.total, total) || other.total == total)&&const DeepCollectionEquality().equals(other.holdings, holdings));
+  final _this = this as HoldingsReport;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is HoldingsReport&&(identical(other.baseCurrency, _this.baseCurrency) || other.baseCurrency == _this.baseCurrency)&&(identical(other.asOf, _this.asOf) || other.asOf == _this.asOf)&&(identical(other.total, _this.total) || other.total == _this.total)&&const DeepCollectionEquality().equals(other.holdings, _this.holdings));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,baseCurrency,asOf,total,const DeepCollectionEquality().hash(holdings));
+int get hashCode {
+  final _this = this as HoldingsReport;
+  return Object.hash(runtimeType,_this.baseCurrency,_this.asOf,_this.total,const DeepCollectionEquality().hash(_this.holdings));
+}
 
 @override
 String toString() {
-  return 'HoldingsReport(baseCurrency: $baseCurrency, asOf: $asOf, total: $total, holdings: $holdings)';
+  final _this = this as HoldingsReport;
+  return 'HoldingsReport(baseCurrency: ${_this.baseCurrency}, asOf: ${_this.asOf}, total: ${_this.total}, holdings: ${_this.holdings})';
 }
 
 
@@ -359,7 +372,7 @@ class _$HoldingsReportCopyWithImpl<$Res>
 /// Create a copy of HoldingsReport
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') @override $Res call({Object? baseCurrency = null,Object? asOf = freezed,Object? total = null,Object? holdings = null,}) {
-  return _then(_self.copyWith(
+  return _then(HoldingsReport(
 baseCurrency: null == baseCurrency ? _self.baseCurrency : baseCurrency // ignore: cast_nullable_to_non_nullable
 as String,asOf: freezed == asOf ? _self.asOf : asOf // ignore: cast_nullable_to_non_nullable
 as String?,total: null == total ? _self.total : total // ignore: cast_nullable_to_non_nullable
@@ -505,7 +518,7 @@ return $default(_that.baseCurrency,_that.asOf,_that.total,_that.holdings);case _
 @JsonSerializable()
 
 class _HoldingsReport implements HoldingsReport {
-  const _HoldingsReport({@JsonKey(name: 'base_currency') required this.baseCurrency, @JsonKey(name: 'as_of') this.asOf, required this.total, required final  List<Holding> holdings}): _holdings = holdings;
+  const _HoldingsReport({@JsonKey(name: 'base_currency') required this.baseCurrency, @JsonKey(name: 'as_of') this.asOf, required this.total, required  List<Holding> holdings}): _holdings = holdings;
   factory _HoldingsReport.fromJson(Map<String, dynamic> json) => _$HoldingsReportFromJson(json);
 
 @override@JsonKey(name: 'base_currency') final  String baseCurrency;
@@ -532,16 +545,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _HoldingsReport&&(identical(other.baseCurrency, baseCurrency) || other.baseCurrency == baseCurrency)&&(identical(other.asOf, asOf) || other.asOf == asOf)&&(identical(other.total, total) || other.total == total)&&const DeepCollectionEquality().equals(other._holdings, _holdings));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _HoldingsReport&&(identical(other.baseCurrency, baseCurrency) || other.baseCurrency == baseCurrency)&&(identical(other.asOf, asOf) || other.asOf == asOf)&&(identical(other.total, total) || other.total == total)&&const DeepCollectionEquality().equals(other.holdings, _holdings));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,baseCurrency,asOf,total,const DeepCollectionEquality().hash(_holdings));
+int get hashCode {
+    return Object.hash(runtimeType,baseCurrency,asOf,total,const DeepCollectionEquality().hash(_holdings));
+}
 
 @override
 String toString() {
-  return 'HoldingsReport(baseCurrency: $baseCurrency, asOf: $asOf, total: $total, holdings: $holdings)';
+    return 'HoldingsReport(baseCurrency: $baseCurrency, asOf: $asOf, total: $total, holdings: $holdings)';
 }
 
 

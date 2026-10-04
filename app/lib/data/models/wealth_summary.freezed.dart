@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // coverage:ignore-file
-// ignore_for_file: type=lint
+// ignore_for_file: type=lint, type=warning, deprecated_member_use, deprecated_member_use_from_same_package
 // ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
 part of 'wealth_summary.dart';
@@ -9,6 +9,7 @@ part of 'wealth_summary.dart';
 // FreezedGenerator
 // **************************************************************************
 
+// GENERATED CODE - DO NOT MODIFY BY HAND
 // dart format off
 T _$identity<T>(T value) => value;
 
@@ -28,16 +29,21 @@ $WealthSummaryCopyWith<WealthSummary> get copyWith => _$WealthSummaryCopyWithImp
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is WealthSummary&&(identical(other.totalWealth, totalWealth) || other.totalWealth == totalWealth)&&(identical(other.baseCurrency, baseCurrency) || other.baseCurrency == baseCurrency)&&(identical(other.accountCount, accountCount) || other.accountCount == accountCount));
+  final _this = this as WealthSummary;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is WealthSummary&&(identical(other.totalWealth, _this.totalWealth) || other.totalWealth == _this.totalWealth)&&(identical(other.baseCurrency, _this.baseCurrency) || other.baseCurrency == _this.baseCurrency)&&(identical(other.accountCount, _this.accountCount) || other.accountCount == _this.accountCount));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,totalWealth,baseCurrency,accountCount);
+int get hashCode {
+  final _this = this as WealthSummary;
+  return Object.hash(runtimeType,_this.totalWealth,_this.baseCurrency,_this.accountCount);
+}
 
 @override
 String toString() {
-  return 'WealthSummary(totalWealth: $totalWealth, baseCurrency: $baseCurrency, accountCount: $accountCount)';
+  final _this = this as WealthSummary;
+  return 'WealthSummary(totalWealth: ${_this.totalWealth}, baseCurrency: ${_this.baseCurrency}, accountCount: ${_this.accountCount})';
 }
 
 
@@ -66,7 +72,7 @@ class _$WealthSummaryCopyWithImpl<$Res>
 /// Create a copy of WealthSummary
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') @override $Res call({Object? totalWealth = null,Object? baseCurrency = null,Object? accountCount = null,}) {
-  return _then(_self.copyWith(
+  return _then(WealthSummary(
 totalWealth: null == totalWealth ? _self.totalWealth : totalWealth // ignore: cast_nullable_to_non_nullable
 as double,baseCurrency: null == baseCurrency ? _self.baseCurrency : baseCurrency // ignore: cast_nullable_to_non_nullable
 as String,accountCount: null == accountCount ? _self.accountCount : accountCount // ignore: cast_nullable_to_non_nullable
@@ -231,16 +237,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _WealthSummary&&(identical(other.totalWealth, totalWealth) || other.totalWealth == totalWealth)&&(identical(other.baseCurrency, baseCurrency) || other.baseCurrency == baseCurrency)&&(identical(other.accountCount, accountCount) || other.accountCount == accountCount));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _WealthSummary&&(identical(other.totalWealth, totalWealth) || other.totalWealth == totalWealth)&&(identical(other.baseCurrency, baseCurrency) || other.baseCurrency == baseCurrency)&&(identical(other.accountCount, accountCount) || other.accountCount == accountCount));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,totalWealth,baseCurrency,accountCount);
+int get hashCode {
+    return Object.hash(runtimeType,totalWealth,baseCurrency,accountCount);
+}
 
 @override
 String toString() {
-  return 'WealthSummary(totalWealth: $totalWealth, baseCurrency: $baseCurrency, accountCount: $accountCount)';
+    return 'WealthSummary(totalWealth: $totalWealth, baseCurrency: $baseCurrency, accountCount: $accountCount)';
 }
 
 
@@ -297,16 +305,21 @@ $WealthHistoryPointCopyWith<WealthHistoryPoint> get copyWith => _$WealthHistoryP
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is WealthHistoryPoint&&(identical(other.date, date) || other.date == date)&&(identical(other.totalWealth, totalWealth) || other.totalWealth == totalWealth));
+  final _this = this as WealthHistoryPoint;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is WealthHistoryPoint&&(identical(other.date, _this.date) || other.date == _this.date)&&(identical(other.totalWealth, _this.totalWealth) || other.totalWealth == _this.totalWealth));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,date,totalWealth);
+int get hashCode {
+  final _this = this as WealthHistoryPoint;
+  return Object.hash(runtimeType,_this.date,_this.totalWealth);
+}
 
 @override
 String toString() {
-  return 'WealthHistoryPoint(date: $date, totalWealth: $totalWealth)';
+  final _this = this as WealthHistoryPoint;
+  return 'WealthHistoryPoint(date: ${_this.date}, totalWealth: ${_this.totalWealth})';
 }
 
 
@@ -335,7 +348,7 @@ class _$WealthHistoryPointCopyWithImpl<$Res>
 /// Create a copy of WealthHistoryPoint
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') @override $Res call({Object? date = null,Object? totalWealth = null,}) {
-  return _then(_self.copyWith(
+  return _then(WealthHistoryPoint(
 date: null == date ? _self.date : date // ignore: cast_nullable_to_non_nullable
 as String,totalWealth: null == totalWealth ? _self.totalWealth : totalWealth // ignore: cast_nullable_to_non_nullable
 as double,
@@ -498,16 +511,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _WealthHistoryPoint&&(identical(other.date, date) || other.date == date)&&(identical(other.totalWealth, totalWealth) || other.totalWealth == totalWealth));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _WealthHistoryPoint&&(identical(other.date, date) || other.date == date)&&(identical(other.totalWealth, totalWealth) || other.totalWealth == totalWealth));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,date,totalWealth);
+int get hashCode {
+    return Object.hash(runtimeType,date,totalWealth);
+}
 
 @override
 String toString() {
-  return 'WealthHistoryPoint(date: $date, totalWealth: $totalWealth)';
+    return 'WealthHistoryPoint(date: $date, totalWealth: $totalWealth)';
 }
 
 

@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // coverage:ignore-file
-// ignore_for_file: type=lint
+// ignore_for_file: type=lint, type=warning, deprecated_member_use, deprecated_member_use_from_same_package
 // ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
 part of 'simulation.dart';
@@ -9,6 +9,7 @@ part of 'simulation.dart';
 // FreezedGenerator
 // **************************************************************************
 
+// GENERATED CODE - DO NOT MODIFY BY HAND
 // dart format off
 T _$identity<T>(T value) => value;
 
@@ -28,16 +29,21 @@ $SimulationBandCopyWith<SimulationBand> get copyWith => _$SimulationBandCopyWith
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is SimulationBand&&(identical(other.year, year) || other.year == year)&&(identical(other.p5, p5) || other.p5 == p5)&&(identical(other.p25, p25) || other.p25 == p25)&&(identical(other.p50, p50) || other.p50 == p50)&&(identical(other.p75, p75) || other.p75 == p75)&&(identical(other.p95, p95) || other.p95 == p95));
+  final _this = this as SimulationBand;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is SimulationBand&&(identical(other.year, _this.year) || other.year == _this.year)&&(identical(other.p5, _this.p5) || other.p5 == _this.p5)&&(identical(other.p25, _this.p25) || other.p25 == _this.p25)&&(identical(other.p50, _this.p50) || other.p50 == _this.p50)&&(identical(other.p75, _this.p75) || other.p75 == _this.p75)&&(identical(other.p95, _this.p95) || other.p95 == _this.p95));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,year,p5,p25,p50,p75,p95);
+int get hashCode {
+  final _this = this as SimulationBand;
+  return Object.hash(runtimeType,_this.year,_this.p5,_this.p25,_this.p50,_this.p75,_this.p95);
+}
 
 @override
 String toString() {
-  return 'SimulationBand(year: $year, p5: $p5, p25: $p25, p50: $p50, p75: $p75, p95: $p95)';
+  final _this = this as SimulationBand;
+  return 'SimulationBand(year: ${_this.year}, p5: ${_this.p5}, p25: ${_this.p25}, p50: ${_this.p50}, p75: ${_this.p75}, p95: ${_this.p95})';
 }
 
 
@@ -66,7 +72,7 @@ class _$SimulationBandCopyWithImpl<$Res>
 /// Create a copy of SimulationBand
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') @override $Res call({Object? year = null,Object? p5 = null,Object? p25 = null,Object? p50 = null,Object? p75 = null,Object? p95 = null,}) {
-  return _then(_self.copyWith(
+  return _then(SimulationBand(
 year: null == year ? _self.year : year // ignore: cast_nullable_to_non_nullable
 as int,p5: null == p5 ? _self.p5 : p5 // ignore: cast_nullable_to_non_nullable
 as double,p25: null == p25 ? _self.p25 : p25 // ignore: cast_nullable_to_non_nullable
@@ -237,16 +243,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SimulationBand&&(identical(other.year, year) || other.year == year)&&(identical(other.p5, p5) || other.p5 == p5)&&(identical(other.p25, p25) || other.p25 == p25)&&(identical(other.p50, p50) || other.p50 == p50)&&(identical(other.p75, p75) || other.p75 == p75)&&(identical(other.p95, p95) || other.p95 == p95));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _SimulationBand&&(identical(other.year, year) || other.year == year)&&(identical(other.p5, p5) || other.p5 == p5)&&(identical(other.p25, p25) || other.p25 == p25)&&(identical(other.p50, p50) || other.p50 == p50)&&(identical(other.p75, p75) || other.p75 == p75)&&(identical(other.p95, p95) || other.p95 == p95));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,year,p5,p25,p50,p75,p95);
+int get hashCode {
+    return Object.hash(runtimeType,year,p5,p25,p50,p75,p95);
+}
 
 @override
 String toString() {
-  return 'SimulationBand(year: $year, p5: $p5, p25: $p25, p50: $p50, p75: $p75, p95: $p95)';
+    return 'SimulationBand(year: $year, p5: $p5, p25: $p25, p50: $p50, p75: $p75, p95: $p95)';
 }
 
 
@@ -306,16 +314,21 @@ $SimulationParameterCopyWith<SimulationParameter> get copyWith => _$SimulationPa
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is SimulationParameter&&(identical(other.value, value) || other.value == value)&&(identical(other.derived, derived) || other.derived == derived));
+  final _this = this as SimulationParameter;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is SimulationParameter&&(identical(other.value, _this.value) || other.value == _this.value)&&(identical(other.derived, _this.derived) || other.derived == _this.derived));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,value,derived);
+int get hashCode {
+  final _this = this as SimulationParameter;
+  return Object.hash(runtimeType,_this.value,_this.derived);
+}
 
 @override
 String toString() {
-  return 'SimulationParameter(value: $value, derived: $derived)';
+  final _this = this as SimulationParameter;
+  return 'SimulationParameter(value: ${_this.value}, derived: ${_this.derived})';
 }
 
 
@@ -344,7 +357,7 @@ class _$SimulationParameterCopyWithImpl<$Res>
 /// Create a copy of SimulationParameter
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') @override $Res call({Object? value = null,Object? derived = null,}) {
-  return _then(_self.copyWith(
+  return _then(SimulationParameter(
 value: null == value ? _self.value : value // ignore: cast_nullable_to_non_nullable
 as double,derived: null == derived ? _self.derived : derived // ignore: cast_nullable_to_non_nullable
 as bool,
@@ -507,16 +520,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SimulationParameter&&(identical(other.value, value) || other.value == value)&&(identical(other.derived, derived) || other.derived == derived));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _SimulationParameter&&(identical(other.value, value) || other.value == value)&&(identical(other.derived, derived) || other.derived == derived));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,value,derived);
+int get hashCode {
+    return Object.hash(runtimeType,value,derived);
+}
 
 @override
 String toString() {
-  return 'SimulationParameter(value: $value, derived: $derived)';
+    return 'SimulationParameter(value: $value, derived: $derived)';
 }
 
 
@@ -574,16 +589,21 @@ $SimulationTargetCopyWith<SimulationTarget> get copyWith => _$SimulationTargetCo
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is SimulationTarget&&(identical(other.amount, amount) || other.amount == amount)&&(identical(other.probability, probability) || other.probability == probability)&&const DeepCollectionEquality().equals(other.probabilityByYear, probabilityByYear)&&(identical(other.medianReachedYear, medianReachedYear) || other.medianReachedYear == medianReachedYear));
+  final _this = this as SimulationTarget;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is SimulationTarget&&(identical(other.amount, _this.amount) || other.amount == _this.amount)&&(identical(other.probability, _this.probability) || other.probability == _this.probability)&&const DeepCollectionEquality().equals(other.probabilityByYear, _this.probabilityByYear)&&(identical(other.medianReachedYear, _this.medianReachedYear) || other.medianReachedYear == _this.medianReachedYear));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,amount,probability,const DeepCollectionEquality().hash(probabilityByYear),medianReachedYear);
+int get hashCode {
+  final _this = this as SimulationTarget;
+  return Object.hash(runtimeType,_this.amount,_this.probability,const DeepCollectionEquality().hash(_this.probabilityByYear),_this.medianReachedYear);
+}
 
 @override
 String toString() {
-  return 'SimulationTarget(amount: $amount, probability: $probability, probabilityByYear: $probabilityByYear, medianReachedYear: $medianReachedYear)';
+  final _this = this as SimulationTarget;
+  return 'SimulationTarget(amount: ${_this.amount}, probability: ${_this.probability}, probabilityByYear: ${_this.probabilityByYear}, medianReachedYear: ${_this.medianReachedYear})';
 }
 
 
@@ -612,7 +632,7 @@ class _$SimulationTargetCopyWithImpl<$Res>
 /// Create a copy of SimulationTarget
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') @override $Res call({Object? amount = null,Object? probability = null,Object? probabilityByYear = null,Object? medianReachedYear = freezed,}) {
-  return _then(_self.copyWith(
+  return _then(SimulationTarget(
 amount: null == amount ? _self.amount : amount // ignore: cast_nullable_to_non_nullable
 as double,probability: null == probability ? _self.probability : probability // ignore: cast_nullable_to_non_nullable
 as double,probabilityByYear: null == probabilityByYear ? _self.probabilityByYear : probabilityByYear // ignore: cast_nullable_to_non_nullable
@@ -758,7 +778,7 @@ return $default(_that.amount,_that.probability,_that.probabilityByYear,_that.med
 @JsonSerializable()
 
 class _SimulationTarget implements SimulationTarget {
-  const _SimulationTarget({required this.amount, required this.probability, @JsonKey(name: 'probability_by_year') final  List<double> probabilityByYear = const <double>[], @JsonKey(name: 'median_reached_year') this.medianReachedYear}): _probabilityByYear = probabilityByYear;
+  const _SimulationTarget({required this.amount, required this.probability, @JsonKey(name: 'probability_by_year')  List<double> probabilityByYear = const <double>[], @JsonKey(name: 'median_reached_year') this.medianReachedYear}): _probabilityByYear = probabilityByYear;
   factory _SimulationTarget.fromJson(Map<String, dynamic> json) => _$SimulationTargetFromJson(json);
 
 @override final  double amount;
@@ -789,16 +809,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SimulationTarget&&(identical(other.amount, amount) || other.amount == amount)&&(identical(other.probability, probability) || other.probability == probability)&&const DeepCollectionEquality().equals(other._probabilityByYear, _probabilityByYear)&&(identical(other.medianReachedYear, medianReachedYear) || other.medianReachedYear == medianReachedYear));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _SimulationTarget&&(identical(other.amount, amount) || other.amount == amount)&&(identical(other.probability, probability) || other.probability == probability)&&const DeepCollectionEquality().equals(other.probabilityByYear, _probabilityByYear)&&(identical(other.medianReachedYear, medianReachedYear) || other.medianReachedYear == medianReachedYear));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,amount,probability,const DeepCollectionEquality().hash(_probabilityByYear),medianReachedYear);
+int get hashCode {
+    return Object.hash(runtimeType,amount,probability,const DeepCollectionEquality().hash(_probabilityByYear),medianReachedYear);
+}
 
 @override
 String toString() {
-  return 'SimulationTarget(amount: $amount, probability: $probability, probabilityByYear: $probabilityByYear, medianReachedYear: $medianReachedYear)';
+    return 'SimulationTarget(amount: $amount, probability: $probability, probabilityByYear: $probabilityByYear, medianReachedYear: $medianReachedYear)';
 }
 
 
@@ -856,16 +878,21 @@ $SimulationResultCopyWith<SimulationResult> get copyWith => _$SimulationResultCo
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is SimulationResult&&(identical(other.years, years) || other.years == years)&&(identical(other.paths, paths) || other.paths == paths)&&(identical(other.baseCurrency, baseCurrency) || other.baseCurrency == baseCurrency)&&const DeepCollectionEquality().equals(other.bands, bands)&&const DeepCollectionEquality().equals(other.parameters, parameters)&&(identical(other.target, target) || other.target == target));
+  final _this = this as SimulationResult;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is SimulationResult&&(identical(other.years, _this.years) || other.years == _this.years)&&(identical(other.paths, _this.paths) || other.paths == _this.paths)&&(identical(other.baseCurrency, _this.baseCurrency) || other.baseCurrency == _this.baseCurrency)&&const DeepCollectionEquality().equals(other.bands, _this.bands)&&const DeepCollectionEquality().equals(other.parameters, _this.parameters)&&(identical(other.target, _this.target) || other.target == _this.target));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,years,paths,baseCurrency,const DeepCollectionEquality().hash(bands),const DeepCollectionEquality().hash(parameters),target);
+int get hashCode {
+  final _this = this as SimulationResult;
+  return Object.hash(runtimeType,_this.years,_this.paths,_this.baseCurrency,const DeepCollectionEquality().hash(_this.bands),const DeepCollectionEquality().hash(_this.parameters),_this.target);
+}
 
 @override
 String toString() {
-  return 'SimulationResult(years: $years, paths: $paths, baseCurrency: $baseCurrency, bands: $bands, parameters: $parameters, target: $target)';
+  final _this = this as SimulationResult;
+  return 'SimulationResult(years: ${_this.years}, paths: ${_this.paths}, baseCurrency: ${_this.baseCurrency}, bands: ${_this.bands}, parameters: ${_this.parameters}, target: ${_this.target})';
 }
 
 
@@ -894,7 +921,7 @@ class _$SimulationResultCopyWithImpl<$Res>
 /// Create a copy of SimulationResult
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') @override $Res call({Object? years = null,Object? paths = null,Object? baseCurrency = null,Object? bands = null,Object? parameters = null,Object? target = freezed,}) {
-  return _then(_self.copyWith(
+  return _then(SimulationResult(
 years: null == years ? _self.years : years // ignore: cast_nullable_to_non_nullable
 as int,paths: null == paths ? _self.paths : paths // ignore: cast_nullable_to_non_nullable
 as int,baseCurrency: null == baseCurrency ? _self.baseCurrency : baseCurrency // ignore: cast_nullable_to_non_nullable
@@ -1054,7 +1081,7 @@ return $default(_that.years,_that.paths,_that.baseCurrency,_that.bands,_that.par
 @JsonSerializable()
 
 class _SimulationResult implements SimulationResult {
-  const _SimulationResult({required this.years, required this.paths, @JsonKey(name: 'base_currency') required this.baseCurrency, required final  List<SimulationBand> bands, required final  Map<String, SimulationParameter> parameters, this.target}): _bands = bands,_parameters = parameters;
+  const _SimulationResult({required this.years, required this.paths, @JsonKey(name: 'base_currency') required this.baseCurrency, required  List<SimulationBand> bands, required  Map<String, SimulationParameter> parameters, this.target}): _bands = bands,_parameters = parameters;
   factory _SimulationResult.fromJson(Map<String, dynamic> json) => _$SimulationResultFromJson(json);
 
 @override final  int years;
@@ -1089,16 +1116,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SimulationResult&&(identical(other.years, years) || other.years == years)&&(identical(other.paths, paths) || other.paths == paths)&&(identical(other.baseCurrency, baseCurrency) || other.baseCurrency == baseCurrency)&&const DeepCollectionEquality().equals(other._bands, _bands)&&const DeepCollectionEquality().equals(other._parameters, _parameters)&&(identical(other.target, target) || other.target == target));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _SimulationResult&&(identical(other.years, years) || other.years == years)&&(identical(other.paths, paths) || other.paths == paths)&&(identical(other.baseCurrency, baseCurrency) || other.baseCurrency == baseCurrency)&&const DeepCollectionEquality().equals(other.bands, _bands)&&const DeepCollectionEquality().equals(other.parameters, _parameters)&&(identical(other.target, target) || other.target == target));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,years,paths,baseCurrency,const DeepCollectionEquality().hash(_bands),const DeepCollectionEquality().hash(_parameters),target);
+int get hashCode {
+    return Object.hash(runtimeType,years,paths,baseCurrency,const DeepCollectionEquality().hash(_bands),const DeepCollectionEquality().hash(_parameters),target);
+}
 
 @override
 String toString() {
-  return 'SimulationResult(years: $years, paths: $paths, baseCurrency: $baseCurrency, bands: $bands, parameters: $parameters, target: $target)';
+    return 'SimulationResult(years: $years, paths: $paths, baseCurrency: $baseCurrency, bands: $bands, parameters: $parameters, target: $target)';
 }
 
 

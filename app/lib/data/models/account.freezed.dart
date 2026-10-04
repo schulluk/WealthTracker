@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // coverage:ignore-file
-// ignore_for_file: type=lint
+// ignore_for_file: type=lint, type=warning, deprecated_member_use, deprecated_member_use_from_same_package
 // ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
 part of 'account.dart';
@@ -9,6 +9,7 @@ part of 'account.dart';
 // FreezedGenerator
 // **************************************************************************
 
+// GENERATED CODE - DO NOT MODIFY BY HAND
 // dart format off
 T _$identity<T>(T value) => value;
 
@@ -28,16 +29,21 @@ $AccountCopyWith<Account> get copyWith => _$AccountCopyWithImpl<Account>(this as
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Account&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.broker, broker) || other.broker == broker)&&(identical(other.accountIdentifier, accountIdentifier) || other.accountIdentifier == accountIdentifier)&&(identical(other.accountType, accountType) || other.accountType == accountType)&&(identical(other.currency, currency) || other.currency == currency)&&(identical(other.isManual, isManual) || other.isManual == isManual)&&(identical(other.syncEnabled, syncEnabled) || other.syncEnabled == syncEnabled)&&(identical(other.status, status) || other.status == status)&&(identical(other.lastSyncAt, lastSyncAt) || other.lastSyncAt == lastSyncAt)&&(identical(other.lastSyncError, lastSyncError) || other.lastSyncError == lastSyncError)&&(identical(other.latestSnapshot, latestSnapshot) || other.latestSnapshot == latestSnapshot)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
+  final _this = this as Account;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Account&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.name, _this.name) || other.name == _this.name)&&(identical(other.broker, _this.broker) || other.broker == _this.broker)&&(identical(other.accountIdentifier, _this.accountIdentifier) || other.accountIdentifier == _this.accountIdentifier)&&(identical(other.accountType, _this.accountType) || other.accountType == _this.accountType)&&(identical(other.currency, _this.currency) || other.currency == _this.currency)&&(identical(other.isManual, _this.isManual) || other.isManual == _this.isManual)&&(identical(other.syncEnabled, _this.syncEnabled) || other.syncEnabled == _this.syncEnabled)&&(identical(other.status, _this.status) || other.status == _this.status)&&(identical(other.lastSyncAt, _this.lastSyncAt) || other.lastSyncAt == _this.lastSyncAt)&&(identical(other.lastSyncError, _this.lastSyncError) || other.lastSyncError == _this.lastSyncError)&&(identical(other.latestSnapshot, _this.latestSnapshot) || other.latestSnapshot == _this.latestSnapshot)&&(identical(other.createdAt, _this.createdAt) || other.createdAt == _this.createdAt)&&(identical(other.updatedAt, _this.updatedAt) || other.updatedAt == _this.updatedAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,name,broker,accountIdentifier,accountType,currency,isManual,syncEnabled,status,lastSyncAt,lastSyncError,latestSnapshot,createdAt,updatedAt);
+int get hashCode {
+  final _this = this as Account;
+  return Object.hash(runtimeType,_this.id,_this.name,_this.broker,_this.accountIdentifier,_this.accountType,_this.currency,_this.isManual,_this.syncEnabled,_this.status,_this.lastSyncAt,_this.lastSyncError,_this.latestSnapshot,_this.createdAt,_this.updatedAt);
+}
 
 @override
 String toString() {
-  return 'Account(id: $id, name: $name, broker: $broker, accountIdentifier: $accountIdentifier, accountType: $accountType, currency: $currency, isManual: $isManual, syncEnabled: $syncEnabled, status: $status, lastSyncAt: $lastSyncAt, lastSyncError: $lastSyncError, latestSnapshot: $latestSnapshot, createdAt: $createdAt, updatedAt: $updatedAt)';
+  final _this = this as Account;
+  return 'Account(id: ${_this.id}, name: ${_this.name}, broker: ${_this.broker}, accountIdentifier: ${_this.accountIdentifier}, accountType: ${_this.accountType}, currency: ${_this.currency}, isManual: ${_this.isManual}, syncEnabled: ${_this.syncEnabled}, status: ${_this.status}, lastSyncAt: ${_this.lastSyncAt}, lastSyncError: ${_this.lastSyncError}, latestSnapshot: ${_this.latestSnapshot}, createdAt: ${_this.createdAt}, updatedAt: ${_this.updatedAt})';
 }
 
 
@@ -66,7 +72,7 @@ class _$AccountCopyWithImpl<$Res>
 /// Create a copy of Account
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? broker = null,Object? accountIdentifier = freezed,Object? accountType = null,Object? currency = null,Object? isManual = null,Object? syncEnabled = null,Object? status = null,Object? lastSyncAt = freezed,Object? lastSyncError = freezed,Object? latestSnapshot = freezed,Object? createdAt = freezed,Object? updatedAt = freezed,}) {
-  return _then(_self.copyWith(
+  return _then(Account(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,broker: null == broker ? _self.broker : broker // ignore: cast_nullable_to_non_nullable
@@ -274,16 +280,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Account&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.broker, broker) || other.broker == broker)&&(identical(other.accountIdentifier, accountIdentifier) || other.accountIdentifier == accountIdentifier)&&(identical(other.accountType, accountType) || other.accountType == accountType)&&(identical(other.currency, currency) || other.currency == currency)&&(identical(other.isManual, isManual) || other.isManual == isManual)&&(identical(other.syncEnabled, syncEnabled) || other.syncEnabled == syncEnabled)&&(identical(other.status, status) || other.status == status)&&(identical(other.lastSyncAt, lastSyncAt) || other.lastSyncAt == lastSyncAt)&&(identical(other.lastSyncError, lastSyncError) || other.lastSyncError == lastSyncError)&&(identical(other.latestSnapshot, latestSnapshot) || other.latestSnapshot == latestSnapshot)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Account&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.broker, broker) || other.broker == broker)&&(identical(other.accountIdentifier, accountIdentifier) || other.accountIdentifier == accountIdentifier)&&(identical(other.accountType, accountType) || other.accountType == accountType)&&(identical(other.currency, currency) || other.currency == currency)&&(identical(other.isManual, isManual) || other.isManual == isManual)&&(identical(other.syncEnabled, syncEnabled) || other.syncEnabled == syncEnabled)&&(identical(other.status, status) || other.status == status)&&(identical(other.lastSyncAt, lastSyncAt) || other.lastSyncAt == lastSyncAt)&&(identical(other.lastSyncError, lastSyncError) || other.lastSyncError == lastSyncError)&&(identical(other.latestSnapshot, latestSnapshot) || other.latestSnapshot == latestSnapshot)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,name,broker,accountIdentifier,accountType,currency,isManual,syncEnabled,status,lastSyncAt,lastSyncError,latestSnapshot,createdAt,updatedAt);
+int get hashCode {
+    return Object.hash(runtimeType,id,name,broker,accountIdentifier,accountType,currency,isManual,syncEnabled,status,lastSyncAt,lastSyncError,latestSnapshot,createdAt,updatedAt);
+}
 
 @override
 String toString() {
-  return 'Account(id: $id, name: $name, broker: $broker, accountIdentifier: $accountIdentifier, accountType: $accountType, currency: $currency, isManual: $isManual, syncEnabled: $syncEnabled, status: $status, lastSyncAt: $lastSyncAt, lastSyncError: $lastSyncError, latestSnapshot: $latestSnapshot, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'Account(id: $id, name: $name, broker: $broker, accountIdentifier: $accountIdentifier, accountType: $accountType, currency: $currency, isManual: $isManual, syncEnabled: $syncEnabled, status: $status, lastSyncAt: $lastSyncAt, lastSyncError: $lastSyncError, latestSnapshot: $latestSnapshot, createdAt: $createdAt, updatedAt: $updatedAt)';
 }
 
 

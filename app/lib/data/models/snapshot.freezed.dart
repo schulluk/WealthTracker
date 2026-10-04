@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // coverage:ignore-file
-// ignore_for_file: type=lint
+// ignore_for_file: type=lint, type=warning, deprecated_member_use, deprecated_member_use_from_same_package
 // ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
 part of 'snapshot.dart';
@@ -9,6 +9,7 @@ part of 'snapshot.dart';
 // FreezedGenerator
 // **************************************************************************
 
+// GENERATED CODE - DO NOT MODIFY BY HAND
 // dart format off
 T _$identity<T>(T value) => value;
 
@@ -28,16 +29,21 @@ $AccountSnapshotCopyWith<AccountSnapshot> get copyWith => _$AccountSnapshotCopyW
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is AccountSnapshot&&(identical(other.id, id) || other.id == id)&&(identical(other.balance, balance) || other.balance == balance)&&(identical(other.currency, currency) || other.currency == currency)&&(identical(other.balanceBaseCurrency, balanceBaseCurrency) || other.balanceBaseCurrency == balanceBaseCurrency)&&(identical(other.baseCurrency, baseCurrency) || other.baseCurrency == baseCurrency)&&(identical(other.snapshotDate, snapshotDate) || other.snapshotDate == snapshotDate)&&(identical(other.snapshotSource, snapshotSource) || other.snapshotSource == snapshotSource)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt));
+  final _this = this as AccountSnapshot;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is AccountSnapshot&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.balance, _this.balance) || other.balance == _this.balance)&&(identical(other.currency, _this.currency) || other.currency == _this.currency)&&(identical(other.balanceBaseCurrency, _this.balanceBaseCurrency) || other.balanceBaseCurrency == _this.balanceBaseCurrency)&&(identical(other.baseCurrency, _this.baseCurrency) || other.baseCurrency == _this.baseCurrency)&&(identical(other.snapshotDate, _this.snapshotDate) || other.snapshotDate == _this.snapshotDate)&&(identical(other.snapshotSource, _this.snapshotSource) || other.snapshotSource == _this.snapshotSource)&&(identical(other.createdAt, _this.createdAt) || other.createdAt == _this.createdAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,balance,currency,balanceBaseCurrency,baseCurrency,snapshotDate,snapshotSource,createdAt);
+int get hashCode {
+  final _this = this as AccountSnapshot;
+  return Object.hash(runtimeType,_this.id,_this.balance,_this.currency,_this.balanceBaseCurrency,_this.baseCurrency,_this.snapshotDate,_this.snapshotSource,_this.createdAt);
+}
 
 @override
 String toString() {
-  return 'AccountSnapshot(id: $id, balance: $balance, currency: $currency, balanceBaseCurrency: $balanceBaseCurrency, baseCurrency: $baseCurrency, snapshotDate: $snapshotDate, snapshotSource: $snapshotSource, createdAt: $createdAt)';
+  final _this = this as AccountSnapshot;
+  return 'AccountSnapshot(id: ${_this.id}, balance: ${_this.balance}, currency: ${_this.currency}, balanceBaseCurrency: ${_this.balanceBaseCurrency}, baseCurrency: ${_this.baseCurrency}, snapshotDate: ${_this.snapshotDate}, snapshotSource: ${_this.snapshotSource}, createdAt: ${_this.createdAt})';
 }
 
 
@@ -66,7 +72,7 @@ class _$AccountSnapshotCopyWithImpl<$Res>
 /// Create a copy of AccountSnapshot
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? balance = null,Object? currency = null,Object? balanceBaseCurrency = freezed,Object? baseCurrency = freezed,Object? snapshotDate = null,Object? snapshotSource = freezed,Object? createdAt = freezed,}) {
-  return _then(_self.copyWith(
+  return _then(AccountSnapshot(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,balance: null == balance ? _self.balance : balance // ignore: cast_nullable_to_non_nullable
 as String,currency: null == currency ? _self.currency : currency // ignore: cast_nullable_to_non_nullable
@@ -241,16 +247,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _AccountSnapshot&&(identical(other.id, id) || other.id == id)&&(identical(other.balance, balance) || other.balance == balance)&&(identical(other.currency, currency) || other.currency == currency)&&(identical(other.balanceBaseCurrency, balanceBaseCurrency) || other.balanceBaseCurrency == balanceBaseCurrency)&&(identical(other.baseCurrency, baseCurrency) || other.baseCurrency == baseCurrency)&&(identical(other.snapshotDate, snapshotDate) || other.snapshotDate == snapshotDate)&&(identical(other.snapshotSource, snapshotSource) || other.snapshotSource == snapshotSource)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _AccountSnapshot&&(identical(other.id, id) || other.id == id)&&(identical(other.balance, balance) || other.balance == balance)&&(identical(other.currency, currency) || other.currency == currency)&&(identical(other.balanceBaseCurrency, balanceBaseCurrency) || other.balanceBaseCurrency == balanceBaseCurrency)&&(identical(other.baseCurrency, baseCurrency) || other.baseCurrency == baseCurrency)&&(identical(other.snapshotDate, snapshotDate) || other.snapshotDate == snapshotDate)&&(identical(other.snapshotSource, snapshotSource) || other.snapshotSource == snapshotSource)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,balance,currency,balanceBaseCurrency,baseCurrency,snapshotDate,snapshotSource,createdAt);
+int get hashCode {
+    return Object.hash(runtimeType,id,balance,currency,balanceBaseCurrency,baseCurrency,snapshotDate,snapshotSource,createdAt);
+}
 
 @override
 String toString() {
-  return 'AccountSnapshot(id: $id, balance: $balance, currency: $currency, balanceBaseCurrency: $balanceBaseCurrency, baseCurrency: $baseCurrency, snapshotDate: $snapshotDate, snapshotSource: $snapshotSource, createdAt: $createdAt)';
+    return 'AccountSnapshot(id: $id, balance: $balance, currency: $currency, balanceBaseCurrency: $balanceBaseCurrency, baseCurrency: $baseCurrency, snapshotDate: $snapshotDate, snapshotSource: $snapshotSource, createdAt: $createdAt)';
 }
 
 

@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // coverage:ignore-file
-// ignore_for_file: type=lint
+// ignore_for_file: type=lint, type=warning, deprecated_member_use, deprecated_member_use_from_same_package
 // ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
 part of 'ai_categorization.dart';
@@ -9,6 +9,7 @@ part of 'ai_categorization.dart';
 // FreezedGenerator
 // **************************************************************************
 
+// GENERATED CODE - DO NOT MODIFY BY HAND
 // dart format off
 T _$identity<T>(T value) => value;
 
@@ -28,16 +29,21 @@ $AiPricingCopyWith<AiPricing> get copyWith => _$AiPricingCopyWithImpl<AiPricing>
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is AiPricing&&(identical(other.model, model) || other.model == model)&&(identical(other.displayName, displayName) || other.displayName == displayName)&&(identical(other.inputPricePer1m, inputPricePer1m) || other.inputPricePer1m == inputPricePer1m)&&(identical(other.outputPricePer1m, outputPricePer1m) || other.outputPricePer1m == outputPricePer1m)&&(identical(other.checkedAt, checkedAt) || other.checkedAt == checkedAt)&&(identical(other.tableUpdated, tableUpdated) || other.tableUpdated == tableUpdated));
+  final _this = this as AiPricing;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is AiPricing&&(identical(other.model, _this.model) || other.model == _this.model)&&(identical(other.displayName, _this.displayName) || other.displayName == _this.displayName)&&(identical(other.inputPricePer1m, _this.inputPricePer1m) || other.inputPricePer1m == _this.inputPricePer1m)&&(identical(other.outputPricePer1m, _this.outputPricePer1m) || other.outputPricePer1m == _this.outputPricePer1m)&&(identical(other.checkedAt, _this.checkedAt) || other.checkedAt == _this.checkedAt)&&(identical(other.tableUpdated, _this.tableUpdated) || other.tableUpdated == _this.tableUpdated));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,model,displayName,inputPricePer1m,outputPricePer1m,checkedAt,tableUpdated);
+int get hashCode {
+  final _this = this as AiPricing;
+  return Object.hash(runtimeType,_this.model,_this.displayName,_this.inputPricePer1m,_this.outputPricePer1m,_this.checkedAt,_this.tableUpdated);
+}
 
 @override
 String toString() {
-  return 'AiPricing(model: $model, displayName: $displayName, inputPricePer1m: $inputPricePer1m, outputPricePer1m: $outputPricePer1m, checkedAt: $checkedAt, tableUpdated: $tableUpdated)';
+  final _this = this as AiPricing;
+  return 'AiPricing(model: ${_this.model}, displayName: ${_this.displayName}, inputPricePer1m: ${_this.inputPricePer1m}, outputPricePer1m: ${_this.outputPricePer1m}, checkedAt: ${_this.checkedAt}, tableUpdated: ${_this.tableUpdated})';
 }
 
 
@@ -66,7 +72,7 @@ class _$AiPricingCopyWithImpl<$Res>
 /// Create a copy of AiPricing
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') @override $Res call({Object? model = null,Object? displayName = null,Object? inputPricePer1m = freezed,Object? outputPricePer1m = freezed,Object? checkedAt = null,Object? tableUpdated = freezed,}) {
-  return _then(_self.copyWith(
+  return _then(AiPricing(
 model: null == model ? _self.model : model // ignore: cast_nullable_to_non_nullable
 as String,displayName: null == displayName ? _self.displayName : displayName // ignore: cast_nullable_to_non_nullable
 as String,inputPricePer1m: freezed == inputPricePer1m ? _self.inputPricePer1m : inputPricePer1m // ignore: cast_nullable_to_non_nullable
@@ -237,16 +243,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _AiPricing&&(identical(other.model, model) || other.model == model)&&(identical(other.displayName, displayName) || other.displayName == displayName)&&(identical(other.inputPricePer1m, inputPricePer1m) || other.inputPricePer1m == inputPricePer1m)&&(identical(other.outputPricePer1m, outputPricePer1m) || other.outputPricePer1m == outputPricePer1m)&&(identical(other.checkedAt, checkedAt) || other.checkedAt == checkedAt)&&(identical(other.tableUpdated, tableUpdated) || other.tableUpdated == tableUpdated));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _AiPricing&&(identical(other.model, model) || other.model == model)&&(identical(other.displayName, displayName) || other.displayName == displayName)&&(identical(other.inputPricePer1m, inputPricePer1m) || other.inputPricePer1m == inputPricePer1m)&&(identical(other.outputPricePer1m, outputPricePer1m) || other.outputPricePer1m == outputPricePer1m)&&(identical(other.checkedAt, checkedAt) || other.checkedAt == checkedAt)&&(identical(other.tableUpdated, tableUpdated) || other.tableUpdated == tableUpdated));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,model,displayName,inputPricePer1m,outputPricePer1m,checkedAt,tableUpdated);
+int get hashCode {
+    return Object.hash(runtimeType,model,displayName,inputPricePer1m,outputPricePer1m,checkedAt,tableUpdated);
+}
 
 @override
 String toString() {
-  return 'AiPricing(model: $model, displayName: $displayName, inputPricePer1m: $inputPricePer1m, outputPricePer1m: $outputPricePer1m, checkedAt: $checkedAt, tableUpdated: $tableUpdated)';
+    return 'AiPricing(model: $model, displayName: $displayName, inputPricePer1m: $inputPricePer1m, outputPricePer1m: $outputPricePer1m, checkedAt: $checkedAt, tableUpdated: $tableUpdated)';
 }
 
 
@@ -306,16 +314,21 @@ $AiConfigCopyWith<AiConfig> get copyWith => _$AiConfigCopyWithImpl<AiConfig>(thi
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is AiConfig&&(identical(other.configured, configured) || other.configured == configured)&&(identical(other.model, model) || other.model == model)&&(identical(other.pricing, pricing) || other.pricing == pricing)&&(identical(other.pricingSourceUrl, pricingSourceUrl) || other.pricingSourceUrl == pricingSourceUrl)&&const DeepCollectionEquality().equals(other.disclosedFields, disclosedFields));
+  final _this = this as AiConfig;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is AiConfig&&(identical(other.configured, _this.configured) || other.configured == _this.configured)&&(identical(other.model, _this.model) || other.model == _this.model)&&(identical(other.pricing, _this.pricing) || other.pricing == _this.pricing)&&(identical(other.pricingSourceUrl, _this.pricingSourceUrl) || other.pricingSourceUrl == _this.pricingSourceUrl)&&const DeepCollectionEquality().equals(other.disclosedFields, _this.disclosedFields));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,configured,model,pricing,pricingSourceUrl,const DeepCollectionEquality().hash(disclosedFields));
+int get hashCode {
+  final _this = this as AiConfig;
+  return Object.hash(runtimeType,_this.configured,_this.model,_this.pricing,_this.pricingSourceUrl,const DeepCollectionEquality().hash(_this.disclosedFields));
+}
 
 @override
 String toString() {
-  return 'AiConfig(configured: $configured, model: $model, pricing: $pricing, pricingSourceUrl: $pricingSourceUrl, disclosedFields: $disclosedFields)';
+  final _this = this as AiConfig;
+  return 'AiConfig(configured: ${_this.configured}, model: ${_this.model}, pricing: ${_this.pricing}, pricingSourceUrl: ${_this.pricingSourceUrl}, disclosedFields: ${_this.disclosedFields})';
 }
 
 
@@ -344,7 +357,7 @@ class _$AiConfigCopyWithImpl<$Res>
 /// Create a copy of AiConfig
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') @override $Res call({Object? configured = null,Object? model = null,Object? pricing = freezed,Object? pricingSourceUrl = null,Object? disclosedFields = null,}) {
-  return _then(_self.copyWith(
+  return _then(AiConfig(
 configured: null == configured ? _self.configured : configured // ignore: cast_nullable_to_non_nullable
 as bool,model: null == model ? _self.model : model // ignore: cast_nullable_to_non_nullable
 as String,pricing: freezed == pricing ? _self.pricing : pricing // ignore: cast_nullable_to_non_nullable
@@ -503,7 +516,7 @@ return $default(_that.configured,_that.model,_that.pricing,_that.pricingSourceUr
 @JsonSerializable()
 
 class _AiConfig implements AiConfig {
-  const _AiConfig({required this.configured, this.model = '', this.pricing, @JsonKey(name: 'pricing_source_url') this.pricingSourceUrl = '', @JsonKey(name: 'disclosed_fields') final  List<String> disclosedFields = const <String>[]}): _disclosedFields = disclosedFields;
+  const _AiConfig({required this.configured, this.model = '', this.pricing, @JsonKey(name: 'pricing_source_url') this.pricingSourceUrl = '', @JsonKey(name: 'disclosed_fields')  List<String> disclosedFields = const <String>[]}): _disclosedFields = disclosedFields;
   factory _AiConfig.fromJson(Map<String, dynamic> json) => _$AiConfigFromJson(json);
 
 @override final  bool configured;
@@ -531,16 +544,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _AiConfig&&(identical(other.configured, configured) || other.configured == configured)&&(identical(other.model, model) || other.model == model)&&(identical(other.pricing, pricing) || other.pricing == pricing)&&(identical(other.pricingSourceUrl, pricingSourceUrl) || other.pricingSourceUrl == pricingSourceUrl)&&const DeepCollectionEquality().equals(other._disclosedFields, _disclosedFields));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _AiConfig&&(identical(other.configured, configured) || other.configured == configured)&&(identical(other.model, model) || other.model == model)&&(identical(other.pricing, pricing) || other.pricing == pricing)&&(identical(other.pricingSourceUrl, pricingSourceUrl) || other.pricingSourceUrl == pricingSourceUrl)&&const DeepCollectionEquality().equals(other.disclosedFields, _disclosedFields));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,configured,model,pricing,pricingSourceUrl,const DeepCollectionEquality().hash(_disclosedFields));
+int get hashCode {
+    return Object.hash(runtimeType,configured,model,pricing,pricingSourceUrl,const DeepCollectionEquality().hash(_disclosedFields));
+}
 
 @override
 String toString() {
-  return 'AiConfig(configured: $configured, model: $model, pricing: $pricing, pricingSourceUrl: $pricingSourceUrl, disclosedFields: $disclosedFields)';
+    return 'AiConfig(configured: $configured, model: $model, pricing: $pricing, pricingSourceUrl: $pricingSourceUrl, disclosedFields: $disclosedFields)';
 }
 
 
@@ -614,16 +629,21 @@ $AiSuggestionCopyWith<AiSuggestion> get copyWith => _$AiSuggestionCopyWithImpl<A
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is AiSuggestion&&(identical(other.transactionId, transactionId) || other.transactionId == transactionId)&&(identical(other.bookingDate, bookingDate) || other.bookingDate == bookingDate)&&(identical(other.counterparty, counterparty) || other.counterparty == counterparty)&&(identical(other.description, description) || other.description == description)&&(identical(other.amount, amount) || other.amount == amount)&&(identical(other.currency, currency) || other.currency == currency)&&(identical(other.category, category) || other.category == category)&&(identical(other.isTransfer, isTransfer) || other.isTransfer == isTransfer)&&(identical(other.currentCategory, currentCategory) || other.currentCategory == currentCategory)&&(identical(other.isNewCategory, isNewCategory) || other.isNewCategory == isNewCategory));
+  final _this = this as AiSuggestion;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is AiSuggestion&&(identical(other.transactionId, _this.transactionId) || other.transactionId == _this.transactionId)&&(identical(other.bookingDate, _this.bookingDate) || other.bookingDate == _this.bookingDate)&&(identical(other.counterparty, _this.counterparty) || other.counterparty == _this.counterparty)&&(identical(other.description, _this.description) || other.description == _this.description)&&(identical(other.amount, _this.amount) || other.amount == _this.amount)&&(identical(other.currency, _this.currency) || other.currency == _this.currency)&&(identical(other.category, _this.category) || other.category == _this.category)&&(identical(other.isTransfer, _this.isTransfer) || other.isTransfer == _this.isTransfer)&&(identical(other.currentCategory, _this.currentCategory) || other.currentCategory == _this.currentCategory)&&(identical(other.isNewCategory, _this.isNewCategory) || other.isNewCategory == _this.isNewCategory));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,transactionId,bookingDate,counterparty,description,amount,currency,category,isTransfer,currentCategory,isNewCategory);
+int get hashCode {
+  final _this = this as AiSuggestion;
+  return Object.hash(runtimeType,_this.transactionId,_this.bookingDate,_this.counterparty,_this.description,_this.amount,_this.currency,_this.category,_this.isTransfer,_this.currentCategory,_this.isNewCategory);
+}
 
 @override
 String toString() {
-  return 'AiSuggestion(transactionId: $transactionId, bookingDate: $bookingDate, counterparty: $counterparty, description: $description, amount: $amount, currency: $currency, category: $category, isTransfer: $isTransfer, currentCategory: $currentCategory, isNewCategory: $isNewCategory)';
+  final _this = this as AiSuggestion;
+  return 'AiSuggestion(transactionId: ${_this.transactionId}, bookingDate: ${_this.bookingDate}, counterparty: ${_this.counterparty}, description: ${_this.description}, amount: ${_this.amount}, currency: ${_this.currency}, category: ${_this.category}, isTransfer: ${_this.isTransfer}, currentCategory: ${_this.currentCategory}, isNewCategory: ${_this.isNewCategory})';
 }
 
 
@@ -652,7 +672,7 @@ class _$AiSuggestionCopyWithImpl<$Res>
 /// Create a copy of AiSuggestion
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') @override $Res call({Object? transactionId = null,Object? bookingDate = null,Object? counterparty = null,Object? description = null,Object? amount = null,Object? currency = null,Object? category = freezed,Object? isTransfer = null,Object? currentCategory = freezed,Object? isNewCategory = null,}) {
-  return _then(_self.copyWith(
+  return _then(AiSuggestion(
 transactionId: null == transactionId ? _self.transactionId : transactionId // ignore: cast_nullable_to_non_nullable
 as int,bookingDate: null == bookingDate ? _self.bookingDate : bookingDate // ignore: cast_nullable_to_non_nullable
 as String,counterparty: null == counterparty ? _self.counterparty : counterparty // ignore: cast_nullable_to_non_nullable
@@ -834,16 +854,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _AiSuggestion&&(identical(other.transactionId, transactionId) || other.transactionId == transactionId)&&(identical(other.bookingDate, bookingDate) || other.bookingDate == bookingDate)&&(identical(other.counterparty, counterparty) || other.counterparty == counterparty)&&(identical(other.description, description) || other.description == description)&&(identical(other.amount, amount) || other.amount == amount)&&(identical(other.currency, currency) || other.currency == currency)&&(identical(other.category, category) || other.category == category)&&(identical(other.isTransfer, isTransfer) || other.isTransfer == isTransfer)&&(identical(other.currentCategory, currentCategory) || other.currentCategory == currentCategory)&&(identical(other.isNewCategory, isNewCategory) || other.isNewCategory == isNewCategory));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _AiSuggestion&&(identical(other.transactionId, transactionId) || other.transactionId == transactionId)&&(identical(other.bookingDate, bookingDate) || other.bookingDate == bookingDate)&&(identical(other.counterparty, counterparty) || other.counterparty == counterparty)&&(identical(other.description, description) || other.description == description)&&(identical(other.amount, amount) || other.amount == amount)&&(identical(other.currency, currency) || other.currency == currency)&&(identical(other.category, category) || other.category == category)&&(identical(other.isTransfer, isTransfer) || other.isTransfer == isTransfer)&&(identical(other.currentCategory, currentCategory) || other.currentCategory == currentCategory)&&(identical(other.isNewCategory, isNewCategory) || other.isNewCategory == isNewCategory));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,transactionId,bookingDate,counterparty,description,amount,currency,category,isTransfer,currentCategory,isNewCategory);
+int get hashCode {
+    return Object.hash(runtimeType,transactionId,bookingDate,counterparty,description,amount,currency,category,isTransfer,currentCategory,isNewCategory);
+}
 
 @override
 String toString() {
-  return 'AiSuggestion(transactionId: $transactionId, bookingDate: $bookingDate, counterparty: $counterparty, description: $description, amount: $amount, currency: $currency, category: $category, isTransfer: $isTransfer, currentCategory: $currentCategory, isNewCategory: $isNewCategory)';
+    return 'AiSuggestion(transactionId: $transactionId, bookingDate: $bookingDate, counterparty: $counterparty, description: $description, amount: $amount, currency: $currency, category: $category, isTransfer: $isTransfer, currentCategory: $currentCategory, isNewCategory: $isNewCategory)';
 }
 
 
@@ -912,16 +934,21 @@ $AiRuleSuggestionCopyWith<AiRuleSuggestion> get copyWith => _$AiRuleSuggestionCo
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is AiRuleSuggestion&&(identical(other.matchText, matchText) || other.matchText == matchText)&&(identical(other.category, category) || other.category == category)&&(identical(other.isRegex, isRegex) || other.isRegex == isRegex)&&(identical(other.isTransfer, isTransfer) || other.isTransfer == isTransfer)&&(identical(other.isNewCategory, isNewCategory) || other.isNewCategory == isNewCategory)&&(identical(other.replacesRuleId, replacesRuleId) || other.replacesRuleId == replacesRuleId)&&(identical(other.replacedMatchText, replacedMatchText) || other.replacedMatchText == replacedMatchText)&&(identical(other.placeBeforeRuleId, placeBeforeRuleId) || other.placeBeforeRuleId == placeBeforeRuleId)&&(identical(other.shadowedMatchText, shadowedMatchText) || other.shadowedMatchText == shadowedMatchText));
+  final _this = this as AiRuleSuggestion;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is AiRuleSuggestion&&(identical(other.matchText, _this.matchText) || other.matchText == _this.matchText)&&(identical(other.category, _this.category) || other.category == _this.category)&&(identical(other.isRegex, _this.isRegex) || other.isRegex == _this.isRegex)&&(identical(other.isTransfer, _this.isTransfer) || other.isTransfer == _this.isTransfer)&&(identical(other.isNewCategory, _this.isNewCategory) || other.isNewCategory == _this.isNewCategory)&&(identical(other.replacesRuleId, _this.replacesRuleId) || other.replacesRuleId == _this.replacesRuleId)&&(identical(other.replacedMatchText, _this.replacedMatchText) || other.replacedMatchText == _this.replacedMatchText)&&(identical(other.placeBeforeRuleId, _this.placeBeforeRuleId) || other.placeBeforeRuleId == _this.placeBeforeRuleId)&&(identical(other.shadowedMatchText, _this.shadowedMatchText) || other.shadowedMatchText == _this.shadowedMatchText));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,matchText,category,isRegex,isTransfer,isNewCategory,replacesRuleId,replacedMatchText,placeBeforeRuleId,shadowedMatchText);
+int get hashCode {
+  final _this = this as AiRuleSuggestion;
+  return Object.hash(runtimeType,_this.matchText,_this.category,_this.isRegex,_this.isTransfer,_this.isNewCategory,_this.replacesRuleId,_this.replacedMatchText,_this.placeBeforeRuleId,_this.shadowedMatchText);
+}
 
 @override
 String toString() {
-  return 'AiRuleSuggestion(matchText: $matchText, category: $category, isRegex: $isRegex, isTransfer: $isTransfer, isNewCategory: $isNewCategory, replacesRuleId: $replacesRuleId, replacedMatchText: $replacedMatchText, placeBeforeRuleId: $placeBeforeRuleId, shadowedMatchText: $shadowedMatchText)';
+  final _this = this as AiRuleSuggestion;
+  return 'AiRuleSuggestion(matchText: ${_this.matchText}, category: ${_this.category}, isRegex: ${_this.isRegex}, isTransfer: ${_this.isTransfer}, isNewCategory: ${_this.isNewCategory}, replacesRuleId: ${_this.replacesRuleId}, replacedMatchText: ${_this.replacedMatchText}, placeBeforeRuleId: ${_this.placeBeforeRuleId}, shadowedMatchText: ${_this.shadowedMatchText})';
 }
 
 
@@ -950,7 +977,7 @@ class _$AiRuleSuggestionCopyWithImpl<$Res>
 /// Create a copy of AiRuleSuggestion
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') @override $Res call({Object? matchText = null,Object? category = freezed,Object? isRegex = null,Object? isTransfer = null,Object? isNewCategory = null,Object? replacesRuleId = freezed,Object? replacedMatchText = freezed,Object? placeBeforeRuleId = freezed,Object? shadowedMatchText = freezed,}) {
-  return _then(_self.copyWith(
+  return _then(AiRuleSuggestion(
 matchText: null == matchText ? _self.matchText : matchText // ignore: cast_nullable_to_non_nullable
 as String,category: freezed == category ? _self.category : category // ignore: cast_nullable_to_non_nullable
 as String?,isRegex: null == isRegex ? _self.isRegex : isRegex // ignore: cast_nullable_to_non_nullable
@@ -1132,16 +1159,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _AiRuleSuggestion&&(identical(other.matchText, matchText) || other.matchText == matchText)&&(identical(other.category, category) || other.category == category)&&(identical(other.isRegex, isRegex) || other.isRegex == isRegex)&&(identical(other.isTransfer, isTransfer) || other.isTransfer == isTransfer)&&(identical(other.isNewCategory, isNewCategory) || other.isNewCategory == isNewCategory)&&(identical(other.replacesRuleId, replacesRuleId) || other.replacesRuleId == replacesRuleId)&&(identical(other.replacedMatchText, replacedMatchText) || other.replacedMatchText == replacedMatchText)&&(identical(other.placeBeforeRuleId, placeBeforeRuleId) || other.placeBeforeRuleId == placeBeforeRuleId)&&(identical(other.shadowedMatchText, shadowedMatchText) || other.shadowedMatchText == shadowedMatchText));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _AiRuleSuggestion&&(identical(other.matchText, matchText) || other.matchText == matchText)&&(identical(other.category, category) || other.category == category)&&(identical(other.isRegex, isRegex) || other.isRegex == isRegex)&&(identical(other.isTransfer, isTransfer) || other.isTransfer == isTransfer)&&(identical(other.isNewCategory, isNewCategory) || other.isNewCategory == isNewCategory)&&(identical(other.replacesRuleId, replacesRuleId) || other.replacesRuleId == replacesRuleId)&&(identical(other.replacedMatchText, replacedMatchText) || other.replacedMatchText == replacedMatchText)&&(identical(other.placeBeforeRuleId, placeBeforeRuleId) || other.placeBeforeRuleId == placeBeforeRuleId)&&(identical(other.shadowedMatchText, shadowedMatchText) || other.shadowedMatchText == shadowedMatchText));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,matchText,category,isRegex,isTransfer,isNewCategory,replacesRuleId,replacedMatchText,placeBeforeRuleId,shadowedMatchText);
+int get hashCode {
+    return Object.hash(runtimeType,matchText,category,isRegex,isTransfer,isNewCategory,replacesRuleId,replacedMatchText,placeBeforeRuleId,shadowedMatchText);
+}
 
 @override
 String toString() {
-  return 'AiRuleSuggestion(matchText: $matchText, category: $category, isRegex: $isRegex, isTransfer: $isTransfer, isNewCategory: $isNewCategory, replacesRuleId: $replacesRuleId, replacedMatchText: $replacedMatchText, placeBeforeRuleId: $placeBeforeRuleId, shadowedMatchText: $shadowedMatchText)';
+    return 'AiRuleSuggestion(matchText: $matchText, category: $category, isRegex: $isRegex, isTransfer: $isTransfer, isNewCategory: $isNewCategory, replacesRuleId: $replacesRuleId, replacedMatchText: $replacedMatchText, placeBeforeRuleId: $placeBeforeRuleId, shadowedMatchText: $shadowedMatchText)';
 }
 
 
@@ -1204,16 +1233,21 @@ $AiConsolidatedRuleCopyWith<AiConsolidatedRule> get copyWith => _$AiConsolidated
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is AiConsolidatedRule&&(identical(other.matchText, matchText) || other.matchText == matchText)&&(identical(other.category, category) || other.category == category)&&(identical(other.spreadMonths, spreadMonths) || other.spreadMonths == spreadMonths)&&const DeepCollectionEquality().equals(other.sources, sources));
+  final _this = this as AiConsolidatedRule;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is AiConsolidatedRule&&(identical(other.matchText, _this.matchText) || other.matchText == _this.matchText)&&(identical(other.category, _this.category) || other.category == _this.category)&&(identical(other.spreadMonths, _this.spreadMonths) || other.spreadMonths == _this.spreadMonths)&&const DeepCollectionEquality().equals(other.sources, _this.sources));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,matchText,category,spreadMonths,const DeepCollectionEquality().hash(sources));
+int get hashCode {
+  final _this = this as AiConsolidatedRule;
+  return Object.hash(runtimeType,_this.matchText,_this.category,_this.spreadMonths,const DeepCollectionEquality().hash(_this.sources));
+}
 
 @override
 String toString() {
-  return 'AiConsolidatedRule(matchText: $matchText, category: $category, spreadMonths: $spreadMonths, sources: $sources)';
+  final _this = this as AiConsolidatedRule;
+  return 'AiConsolidatedRule(matchText: ${_this.matchText}, category: ${_this.category}, spreadMonths: ${_this.spreadMonths}, sources: ${_this.sources})';
 }
 
 
@@ -1242,7 +1276,7 @@ class _$AiConsolidatedRuleCopyWithImpl<$Res>
 /// Create a copy of AiConsolidatedRule
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') @override $Res call({Object? matchText = null,Object? category = null,Object? spreadMonths = null,Object? sources = null,}) {
-  return _then(_self.copyWith(
+  return _then(AiConsolidatedRule(
 matchText: null == matchText ? _self.matchText : matchText // ignore: cast_nullable_to_non_nullable
 as String,category: null == category ? _self.category : category // ignore: cast_nullable_to_non_nullable
 as String,spreadMonths: null == spreadMonths ? _self.spreadMonths : spreadMonths // ignore: cast_nullable_to_non_nullable
@@ -1388,7 +1422,7 @@ return $default(_that.matchText,_that.category,_that.spreadMonths,_that.sources)
 @JsonSerializable()
 
 class _AiConsolidatedRule implements AiConsolidatedRule {
-  const _AiConsolidatedRule({@JsonKey(name: 'match_text') required this.matchText, required this.category, @JsonKey(name: 'spread_months') this.spreadMonths = 1, final  List<int> sources = const <int>[]}): _sources = sources;
+  const _AiConsolidatedRule({@JsonKey(name: 'match_text') required this.matchText, required this.category, @JsonKey(name: 'spread_months') this.spreadMonths = 1,  List<int> sources = const <int>[]}): _sources = sources;
   factory _AiConsolidatedRule.fromJson(Map<String, dynamic> json) => _$AiConsolidatedRuleFromJson(json);
 
 @override@JsonKey(name: 'match_text') final  String matchText;
@@ -1415,16 +1449,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _AiConsolidatedRule&&(identical(other.matchText, matchText) || other.matchText == matchText)&&(identical(other.category, category) || other.category == category)&&(identical(other.spreadMonths, spreadMonths) || other.spreadMonths == spreadMonths)&&const DeepCollectionEquality().equals(other._sources, _sources));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _AiConsolidatedRule&&(identical(other.matchText, matchText) || other.matchText == matchText)&&(identical(other.category, category) || other.category == category)&&(identical(other.spreadMonths, spreadMonths) || other.spreadMonths == spreadMonths)&&const DeepCollectionEquality().equals(other.sources, _sources));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,matchText,category,spreadMonths,const DeepCollectionEquality().hash(_sources));
+int get hashCode {
+    return Object.hash(runtimeType,matchText,category,spreadMonths,const DeepCollectionEquality().hash(_sources));
+}
 
 @override
 String toString() {
-  return 'AiConsolidatedRule(matchText: $matchText, category: $category, spreadMonths: $spreadMonths, sources: $sources)';
+    return 'AiConsolidatedRule(matchText: $matchText, category: $category, spreadMonths: $spreadMonths, sources: $sources)';
 }
 
 
@@ -1482,16 +1518,21 @@ $AiConsolidateResponseCopyWith<AiConsolidateResponse> get copyWith => _$AiConsol
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is AiConsolidateResponse&&const DeepCollectionEquality().equals(other.rules, rules)&&(identical(other.beforeCount, beforeCount) || other.beforeCount == beforeCount)&&(identical(other.afterCount, afterCount) || other.afterCount == afterCount)&&const DeepCollectionEquality().equals(other.disclosedFields, disclosedFields)&&(identical(other.usage, usage) || other.usage == usage));
+  final _this = this as AiConsolidateResponse;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is AiConsolidateResponse&&const DeepCollectionEquality().equals(other.rules, _this.rules)&&(identical(other.beforeCount, _this.beforeCount) || other.beforeCount == _this.beforeCount)&&(identical(other.afterCount, _this.afterCount) || other.afterCount == _this.afterCount)&&const DeepCollectionEquality().equals(other.disclosedFields, _this.disclosedFields)&&(identical(other.usage, _this.usage) || other.usage == _this.usage));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(rules),beforeCount,afterCount,const DeepCollectionEquality().hash(disclosedFields),usage);
+int get hashCode {
+  final _this = this as AiConsolidateResponse;
+  return Object.hash(runtimeType,const DeepCollectionEquality().hash(_this.rules),_this.beforeCount,_this.afterCount,const DeepCollectionEquality().hash(_this.disclosedFields),_this.usage);
+}
 
 @override
 String toString() {
-  return 'AiConsolidateResponse(rules: $rules, beforeCount: $beforeCount, afterCount: $afterCount, disclosedFields: $disclosedFields, usage: $usage)';
+  final _this = this as AiConsolidateResponse;
+  return 'AiConsolidateResponse(rules: ${_this.rules}, beforeCount: ${_this.beforeCount}, afterCount: ${_this.afterCount}, disclosedFields: ${_this.disclosedFields}, usage: ${_this.usage})';
 }
 
 
@@ -1520,7 +1561,7 @@ class _$AiConsolidateResponseCopyWithImpl<$Res>
 /// Create a copy of AiConsolidateResponse
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') @override $Res call({Object? rules = null,Object? beforeCount = null,Object? afterCount = null,Object? disclosedFields = null,Object? usage = freezed,}) {
-  return _then(_self.copyWith(
+  return _then(AiConsolidateResponse(
 rules: null == rules ? _self.rules : rules // ignore: cast_nullable_to_non_nullable
 as List<AiConsolidatedRule>,beforeCount: null == beforeCount ? _self.beforeCount : beforeCount // ignore: cast_nullable_to_non_nullable
 as int,afterCount: null == afterCount ? _self.afterCount : afterCount // ignore: cast_nullable_to_non_nullable
@@ -1679,7 +1720,7 @@ return $default(_that.rules,_that.beforeCount,_that.afterCount,_that.disclosedFi
 @JsonSerializable()
 
 class _AiConsolidateResponse implements AiConsolidateResponse {
-  const _AiConsolidateResponse({final  List<AiConsolidatedRule> rules = const <AiConsolidatedRule>[], @JsonKey(name: 'before_count') this.beforeCount = 0, @JsonKey(name: 'after_count') this.afterCount = 0, @JsonKey(name: 'disclosed_fields') final  List<String> disclosedFields = const <String>[], this.usage}): _rules = rules,_disclosedFields = disclosedFields;
+  const _AiConsolidateResponse({ List<AiConsolidatedRule> rules = const <AiConsolidatedRule>[], @JsonKey(name: 'before_count') this.beforeCount = 0, @JsonKey(name: 'after_count') this.afterCount = 0, @JsonKey(name: 'disclosed_fields')  List<String> disclosedFields = const <String>[], this.usage}): _rules = rules,_disclosedFields = disclosedFields;
   factory _AiConsolidateResponse.fromJson(Map<String, dynamic> json) => _$AiConsolidateResponseFromJson(json);
 
  final  List<AiConsolidatedRule> _rules;
@@ -1713,16 +1754,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _AiConsolidateResponse&&const DeepCollectionEquality().equals(other._rules, _rules)&&(identical(other.beforeCount, beforeCount) || other.beforeCount == beforeCount)&&(identical(other.afterCount, afterCount) || other.afterCount == afterCount)&&const DeepCollectionEquality().equals(other._disclosedFields, _disclosedFields)&&(identical(other.usage, usage) || other.usage == usage));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _AiConsolidateResponse&&const DeepCollectionEquality().equals(other.rules, _rules)&&(identical(other.beforeCount, beforeCount) || other.beforeCount == beforeCount)&&(identical(other.afterCount, afterCount) || other.afterCount == afterCount)&&const DeepCollectionEquality().equals(other.disclosedFields, _disclosedFields)&&(identical(other.usage, usage) || other.usage == usage));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(_rules),beforeCount,afterCount,const DeepCollectionEquality().hash(_disclosedFields),usage);
+int get hashCode {
+    return Object.hash(runtimeType,const DeepCollectionEquality().hash(_rules),beforeCount,afterCount,const DeepCollectionEquality().hash(_disclosedFields),usage);
+}
 
 @override
 String toString() {
-  return 'AiConsolidateResponse(rules: $rules, beforeCount: $beforeCount, afterCount: $afterCount, disclosedFields: $disclosedFields, usage: $usage)';
+    return 'AiConsolidateResponse(rules: $rules, beforeCount: $beforeCount, afterCount: $afterCount, disclosedFields: $disclosedFields, usage: $usage)';
 }
 
 
@@ -1793,16 +1836,21 @@ $AiUsageCopyWith<AiUsage> get copyWith => _$AiUsageCopyWithImpl<AiUsage>(this as
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is AiUsage&&(identical(other.inputTokens, inputTokens) || other.inputTokens == inputTokens)&&(identical(other.outputTokens, outputTokens) || other.outputTokens == outputTokens)&&(identical(other.estimatedCostUsd, estimatedCostUsd) || other.estimatedCostUsd == estimatedCostUsd));
+  final _this = this as AiUsage;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is AiUsage&&(identical(other.inputTokens, _this.inputTokens) || other.inputTokens == _this.inputTokens)&&(identical(other.outputTokens, _this.outputTokens) || other.outputTokens == _this.outputTokens)&&(identical(other.estimatedCostUsd, _this.estimatedCostUsd) || other.estimatedCostUsd == _this.estimatedCostUsd));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,inputTokens,outputTokens,estimatedCostUsd);
+int get hashCode {
+  final _this = this as AiUsage;
+  return Object.hash(runtimeType,_this.inputTokens,_this.outputTokens,_this.estimatedCostUsd);
+}
 
 @override
 String toString() {
-  return 'AiUsage(inputTokens: $inputTokens, outputTokens: $outputTokens, estimatedCostUsd: $estimatedCostUsd)';
+  final _this = this as AiUsage;
+  return 'AiUsage(inputTokens: ${_this.inputTokens}, outputTokens: ${_this.outputTokens}, estimatedCostUsd: ${_this.estimatedCostUsd})';
 }
 
 
@@ -1831,7 +1879,7 @@ class _$AiUsageCopyWithImpl<$Res>
 /// Create a copy of AiUsage
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') @override $Res call({Object? inputTokens = null,Object? outputTokens = null,Object? estimatedCostUsd = freezed,}) {
-  return _then(_self.copyWith(
+  return _then(AiUsage(
 inputTokens: null == inputTokens ? _self.inputTokens : inputTokens // ignore: cast_nullable_to_non_nullable
 as int,outputTokens: null == outputTokens ? _self.outputTokens : outputTokens // ignore: cast_nullable_to_non_nullable
 as int,estimatedCostUsd: freezed == estimatedCostUsd ? _self.estimatedCostUsd : estimatedCostUsd // ignore: cast_nullable_to_non_nullable
@@ -1996,16 +2044,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _AiUsage&&(identical(other.inputTokens, inputTokens) || other.inputTokens == inputTokens)&&(identical(other.outputTokens, outputTokens) || other.outputTokens == outputTokens)&&(identical(other.estimatedCostUsd, estimatedCostUsd) || other.estimatedCostUsd == estimatedCostUsd));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _AiUsage&&(identical(other.inputTokens, inputTokens) || other.inputTokens == inputTokens)&&(identical(other.outputTokens, outputTokens) || other.outputTokens == outputTokens)&&(identical(other.estimatedCostUsd, estimatedCostUsd) || other.estimatedCostUsd == estimatedCostUsd));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,inputTokens,outputTokens,estimatedCostUsd);
+int get hashCode {
+    return Object.hash(runtimeType,inputTokens,outputTokens,estimatedCostUsd);
+}
 
 @override
 String toString() {
-  return 'AiUsage(inputTokens: $inputTokens, outputTokens: $outputTokens, estimatedCostUsd: $estimatedCostUsd)';
+    return 'AiUsage(inputTokens: $inputTokens, outputTokens: $outputTokens, estimatedCostUsd: $estimatedCostUsd)';
 }
 
 
@@ -2062,16 +2112,21 @@ $AiSuggestResponseCopyWith<AiSuggestResponse> get copyWith => _$AiSuggestRespons
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is AiSuggestResponse&&const DeepCollectionEquality().equals(other.suggestions, suggestions)&&const DeepCollectionEquality().equals(other.rules, rules)&&(identical(other.sentCount, sentCount) || other.sentCount == sentCount)&&(identical(other.totalUncategorized, totalUncategorized) || other.totalUncategorized == totalUncategorized)&&const DeepCollectionEquality().equals(other.disclosedFields, disclosedFields)&&(identical(other.usage, usage) || other.usage == usage));
+  final _this = this as AiSuggestResponse;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is AiSuggestResponse&&const DeepCollectionEquality().equals(other.suggestions, _this.suggestions)&&const DeepCollectionEquality().equals(other.rules, _this.rules)&&(identical(other.sentCount, _this.sentCount) || other.sentCount == _this.sentCount)&&(identical(other.totalUncategorized, _this.totalUncategorized) || other.totalUncategorized == _this.totalUncategorized)&&const DeepCollectionEquality().equals(other.disclosedFields, _this.disclosedFields)&&(identical(other.usage, _this.usage) || other.usage == _this.usage));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(suggestions),const DeepCollectionEquality().hash(rules),sentCount,totalUncategorized,const DeepCollectionEquality().hash(disclosedFields),usage);
+int get hashCode {
+  final _this = this as AiSuggestResponse;
+  return Object.hash(runtimeType,const DeepCollectionEquality().hash(_this.suggestions),const DeepCollectionEquality().hash(_this.rules),_this.sentCount,_this.totalUncategorized,const DeepCollectionEquality().hash(_this.disclosedFields),_this.usage);
+}
 
 @override
 String toString() {
-  return 'AiSuggestResponse(suggestions: $suggestions, rules: $rules, sentCount: $sentCount, totalUncategorized: $totalUncategorized, disclosedFields: $disclosedFields, usage: $usage)';
+  final _this = this as AiSuggestResponse;
+  return 'AiSuggestResponse(suggestions: ${_this.suggestions}, rules: ${_this.rules}, sentCount: ${_this.sentCount}, totalUncategorized: ${_this.totalUncategorized}, disclosedFields: ${_this.disclosedFields}, usage: ${_this.usage})';
 }
 
 
@@ -2100,7 +2155,7 @@ class _$AiSuggestResponseCopyWithImpl<$Res>
 /// Create a copy of AiSuggestResponse
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') @override $Res call({Object? suggestions = null,Object? rules = null,Object? sentCount = null,Object? totalUncategorized = null,Object? disclosedFields = null,Object? usage = freezed,}) {
-  return _then(_self.copyWith(
+  return _then(AiSuggestResponse(
 suggestions: null == suggestions ? _self.suggestions : suggestions // ignore: cast_nullable_to_non_nullable
 as List<AiSuggestion>,rules: null == rules ? _self.rules : rules // ignore: cast_nullable_to_non_nullable
 as List<AiRuleSuggestion>,sentCount: null == sentCount ? _self.sentCount : sentCount // ignore: cast_nullable_to_non_nullable
@@ -2260,7 +2315,7 @@ return $default(_that.suggestions,_that.rules,_that.sentCount,_that.totalUncateg
 @JsonSerializable()
 
 class _AiSuggestResponse implements AiSuggestResponse {
-  const _AiSuggestResponse({final  List<AiSuggestion> suggestions = const <AiSuggestion>[], final  List<AiRuleSuggestion> rules = const <AiRuleSuggestion>[], @JsonKey(name: 'sent_count') this.sentCount = 0, @JsonKey(name: 'total_uncategorized') this.totalUncategorized = 0, @JsonKey(name: 'disclosed_fields') final  List<String> disclosedFields = const <String>[], this.usage}): _suggestions = suggestions,_rules = rules,_disclosedFields = disclosedFields;
+  const _AiSuggestResponse({ List<AiSuggestion> suggestions = const <AiSuggestion>[],  List<AiRuleSuggestion> rules = const <AiRuleSuggestion>[], @JsonKey(name: 'sent_count') this.sentCount = 0, @JsonKey(name: 'total_uncategorized') this.totalUncategorized = 0, @JsonKey(name: 'disclosed_fields')  List<String> disclosedFields = const <String>[], this.usage}): _suggestions = suggestions,_rules = rules,_disclosedFields = disclosedFields;
   factory _AiSuggestResponse.fromJson(Map<String, dynamic> json) => _$AiSuggestResponseFromJson(json);
 
  final  List<AiSuggestion> _suggestions;
@@ -2301,16 +2356,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _AiSuggestResponse&&const DeepCollectionEquality().equals(other._suggestions, _suggestions)&&const DeepCollectionEquality().equals(other._rules, _rules)&&(identical(other.sentCount, sentCount) || other.sentCount == sentCount)&&(identical(other.totalUncategorized, totalUncategorized) || other.totalUncategorized == totalUncategorized)&&const DeepCollectionEquality().equals(other._disclosedFields, _disclosedFields)&&(identical(other.usage, usage) || other.usage == usage));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _AiSuggestResponse&&const DeepCollectionEquality().equals(other.suggestions, _suggestions)&&const DeepCollectionEquality().equals(other.rules, _rules)&&(identical(other.sentCount, sentCount) || other.sentCount == sentCount)&&(identical(other.totalUncategorized, totalUncategorized) || other.totalUncategorized == totalUncategorized)&&const DeepCollectionEquality().equals(other.disclosedFields, _disclosedFields)&&(identical(other.usage, usage) || other.usage == usage));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(_suggestions),const DeepCollectionEquality().hash(_rules),sentCount,totalUncategorized,const DeepCollectionEquality().hash(_disclosedFields),usage);
+int get hashCode {
+    return Object.hash(runtimeType,const DeepCollectionEquality().hash(_suggestions),const DeepCollectionEquality().hash(_rules),sentCount,totalUncategorized,const DeepCollectionEquality().hash(_disclosedFields),usage);
+}
 
 @override
 String toString() {
-  return 'AiSuggestResponse(suggestions: $suggestions, rules: $rules, sentCount: $sentCount, totalUncategorized: $totalUncategorized, disclosedFields: $disclosedFields, usage: $usage)';
+    return 'AiSuggestResponse(suggestions: $suggestions, rules: $rules, sentCount: $sentCount, totalUncategorized: $totalUncategorized, disclosedFields: $disclosedFields, usage: $usage)';
 }
 
 

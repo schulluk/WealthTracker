@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // coverage:ignore-file
-// ignore_for_file: type=lint
+// ignore_for_file: type=lint, type=warning, deprecated_member_use, deprecated_member_use_from_same_package
 // ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
 part of 'profile.dart';
@@ -9,6 +9,7 @@ part of 'profile.dart';
 // FreezedGenerator
 // **************************************************************************
 
+// GENERATED CODE - DO NOT MODIFY BY HAND
 // dart format off
 T _$identity<T>(T value) => value;
 
@@ -28,16 +29,21 @@ $ProfileCopyWith<Profile> get copyWith => _$ProfileCopyWithImpl<Profile>(this as
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Profile&&(identical(other.baseCurrency, baseCurrency) || other.baseCurrency == baseCurrency)&&(identical(other.autoSyncEnabled, autoSyncEnabled) || other.autoSyncEnabled == autoSyncEnabled)&&(identical(other.sendWeeklyReport, sendWeeklyReport) || other.sendWeeklyReport == sendWeeklyReport)&&(identical(other.defaultChartRange, defaultChartRange) || other.defaultChartRange == defaultChartRange)&&(identical(other.defaultChartGranularity, defaultChartGranularity) || other.defaultChartGranularity == defaultChartGranularity)&&(identical(other.pushNotificationsEnabled, pushNotificationsEnabled) || other.pushNotificationsEnabled == pushNotificationsEnabled)&&(identical(other.pushWeeklyReport, pushWeeklyReport) || other.pushWeeklyReport == pushWeeklyReport)&&(identical(other.syncOnAppOpen, syncOnAppOpen) || other.syncOnAppOpen == syncOnAppOpen)&&(identical(other.monthlyAggregation, monthlyAggregation) || other.monthlyAggregation == monthlyAggregation)&&(identical(other.encryptionMigrated, encryptionMigrated) || other.encryptionMigrated == encryptionMigrated));
+  final _this = this as Profile;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Profile&&(identical(other.baseCurrency, _this.baseCurrency) || other.baseCurrency == _this.baseCurrency)&&(identical(other.autoSyncEnabled, _this.autoSyncEnabled) || other.autoSyncEnabled == _this.autoSyncEnabled)&&(identical(other.sendWeeklyReport, _this.sendWeeklyReport) || other.sendWeeklyReport == _this.sendWeeklyReport)&&(identical(other.defaultChartRange, _this.defaultChartRange) || other.defaultChartRange == _this.defaultChartRange)&&(identical(other.defaultChartGranularity, _this.defaultChartGranularity) || other.defaultChartGranularity == _this.defaultChartGranularity)&&(identical(other.pushNotificationsEnabled, _this.pushNotificationsEnabled) || other.pushNotificationsEnabled == _this.pushNotificationsEnabled)&&(identical(other.pushWeeklyReport, _this.pushWeeklyReport) || other.pushWeeklyReport == _this.pushWeeklyReport)&&(identical(other.syncOnAppOpen, _this.syncOnAppOpen) || other.syncOnAppOpen == _this.syncOnAppOpen)&&(identical(other.monthlyAggregation, _this.monthlyAggregation) || other.monthlyAggregation == _this.monthlyAggregation)&&(identical(other.encryptionMigrated, _this.encryptionMigrated) || other.encryptionMigrated == _this.encryptionMigrated));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,baseCurrency,autoSyncEnabled,sendWeeklyReport,defaultChartRange,defaultChartGranularity,pushNotificationsEnabled,pushWeeklyReport,syncOnAppOpen,monthlyAggregation,encryptionMigrated);
+int get hashCode {
+  final _this = this as Profile;
+  return Object.hash(runtimeType,_this.baseCurrency,_this.autoSyncEnabled,_this.sendWeeklyReport,_this.defaultChartRange,_this.defaultChartGranularity,_this.pushNotificationsEnabled,_this.pushWeeklyReport,_this.syncOnAppOpen,_this.monthlyAggregation,_this.encryptionMigrated);
+}
 
 @override
 String toString() {
-  return 'Profile(baseCurrency: $baseCurrency, autoSyncEnabled: $autoSyncEnabled, sendWeeklyReport: $sendWeeklyReport, defaultChartRange: $defaultChartRange, defaultChartGranularity: $defaultChartGranularity, pushNotificationsEnabled: $pushNotificationsEnabled, pushWeeklyReport: $pushWeeklyReport, syncOnAppOpen: $syncOnAppOpen, monthlyAggregation: $monthlyAggregation, encryptionMigrated: $encryptionMigrated)';
+  final _this = this as Profile;
+  return 'Profile(baseCurrency: ${_this.baseCurrency}, autoSyncEnabled: ${_this.autoSyncEnabled}, sendWeeklyReport: ${_this.sendWeeklyReport}, defaultChartRange: ${_this.defaultChartRange}, defaultChartGranularity: ${_this.defaultChartGranularity}, pushNotificationsEnabled: ${_this.pushNotificationsEnabled}, pushWeeklyReport: ${_this.pushWeeklyReport}, syncOnAppOpen: ${_this.syncOnAppOpen}, monthlyAggregation: ${_this.monthlyAggregation}, encryptionMigrated: ${_this.encryptionMigrated})';
 }
 
 
@@ -66,7 +72,7 @@ class _$ProfileCopyWithImpl<$Res>
 /// Create a copy of Profile
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') @override $Res call({Object? baseCurrency = null,Object? autoSyncEnabled = null,Object? sendWeeklyReport = null,Object? defaultChartRange = null,Object? defaultChartGranularity = null,Object? pushNotificationsEnabled = null,Object? pushWeeklyReport = null,Object? syncOnAppOpen = null,Object? monthlyAggregation = null,Object? encryptionMigrated = null,}) {
-  return _then(_self.copyWith(
+  return _then(Profile(
 baseCurrency: null == baseCurrency ? _self.baseCurrency : baseCurrency // ignore: cast_nullable_to_non_nullable
 as String,autoSyncEnabled: null == autoSyncEnabled ? _self.autoSyncEnabled : autoSyncEnabled // ignore: cast_nullable_to_non_nullable
 as bool,sendWeeklyReport: null == sendWeeklyReport ? _self.sendWeeklyReport : sendWeeklyReport // ignore: cast_nullable_to_non_nullable
@@ -245,16 +251,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Profile&&(identical(other.baseCurrency, baseCurrency) || other.baseCurrency == baseCurrency)&&(identical(other.autoSyncEnabled, autoSyncEnabled) || other.autoSyncEnabled == autoSyncEnabled)&&(identical(other.sendWeeklyReport, sendWeeklyReport) || other.sendWeeklyReport == sendWeeklyReport)&&(identical(other.defaultChartRange, defaultChartRange) || other.defaultChartRange == defaultChartRange)&&(identical(other.defaultChartGranularity, defaultChartGranularity) || other.defaultChartGranularity == defaultChartGranularity)&&(identical(other.pushNotificationsEnabled, pushNotificationsEnabled) || other.pushNotificationsEnabled == pushNotificationsEnabled)&&(identical(other.pushWeeklyReport, pushWeeklyReport) || other.pushWeeklyReport == pushWeeklyReport)&&(identical(other.syncOnAppOpen, syncOnAppOpen) || other.syncOnAppOpen == syncOnAppOpen)&&(identical(other.monthlyAggregation, monthlyAggregation) || other.monthlyAggregation == monthlyAggregation)&&(identical(other.encryptionMigrated, encryptionMigrated) || other.encryptionMigrated == encryptionMigrated));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Profile&&(identical(other.baseCurrency, baseCurrency) || other.baseCurrency == baseCurrency)&&(identical(other.autoSyncEnabled, autoSyncEnabled) || other.autoSyncEnabled == autoSyncEnabled)&&(identical(other.sendWeeklyReport, sendWeeklyReport) || other.sendWeeklyReport == sendWeeklyReport)&&(identical(other.defaultChartRange, defaultChartRange) || other.defaultChartRange == defaultChartRange)&&(identical(other.defaultChartGranularity, defaultChartGranularity) || other.defaultChartGranularity == defaultChartGranularity)&&(identical(other.pushNotificationsEnabled, pushNotificationsEnabled) || other.pushNotificationsEnabled == pushNotificationsEnabled)&&(identical(other.pushWeeklyReport, pushWeeklyReport) || other.pushWeeklyReport == pushWeeklyReport)&&(identical(other.syncOnAppOpen, syncOnAppOpen) || other.syncOnAppOpen == syncOnAppOpen)&&(identical(other.monthlyAggregation, monthlyAggregation) || other.monthlyAggregation == monthlyAggregation)&&(identical(other.encryptionMigrated, encryptionMigrated) || other.encryptionMigrated == encryptionMigrated));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,baseCurrency,autoSyncEnabled,sendWeeklyReport,defaultChartRange,defaultChartGranularity,pushNotificationsEnabled,pushWeeklyReport,syncOnAppOpen,monthlyAggregation,encryptionMigrated);
+int get hashCode {
+    return Object.hash(runtimeType,baseCurrency,autoSyncEnabled,sendWeeklyReport,defaultChartRange,defaultChartGranularity,pushNotificationsEnabled,pushWeeklyReport,syncOnAppOpen,monthlyAggregation,encryptionMigrated);
+}
 
 @override
 String toString() {
-  return 'Profile(baseCurrency: $baseCurrency, autoSyncEnabled: $autoSyncEnabled, sendWeeklyReport: $sendWeeklyReport, defaultChartRange: $defaultChartRange, defaultChartGranularity: $defaultChartGranularity, pushNotificationsEnabled: $pushNotificationsEnabled, pushWeeklyReport: $pushWeeklyReport, syncOnAppOpen: $syncOnAppOpen, monthlyAggregation: $monthlyAggregation, encryptionMigrated: $encryptionMigrated)';
+    return 'Profile(baseCurrency: $baseCurrency, autoSyncEnabled: $autoSyncEnabled, sendWeeklyReport: $sendWeeklyReport, defaultChartRange: $defaultChartRange, defaultChartGranularity: $defaultChartGranularity, pushNotificationsEnabled: $pushNotificationsEnabled, pushWeeklyReport: $pushWeeklyReport, syncOnAppOpen: $syncOnAppOpen, monthlyAggregation: $monthlyAggregation, encryptionMigrated: $encryptionMigrated)';
 }
 
 

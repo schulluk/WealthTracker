@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // coverage:ignore-file
-// ignore_for_file: type=lint
+// ignore_for_file: type=lint, type=warning, deprecated_member_use, deprecated_member_use_from_same_package
 // ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
 part of 'spending.dart';
@@ -9,6 +9,7 @@ part of 'spending.dart';
 // FreezedGenerator
 // **************************************************************************
 
+// GENERATED CODE - DO NOT MODIFY BY HAND
 // dart format off
 T _$identity<T>(T value) => value;
 
@@ -28,16 +29,21 @@ $SpendingMonthCopyWith<SpendingMonth> get copyWith => _$SpendingMonthCopyWithImp
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is SpendingMonth&&(identical(other.month, month) || other.month == month)&&(identical(other.income, income) || other.income == income)&&(identical(other.expenses, expenses) || other.expenses == expenses)&&(identical(other.net, net) || other.net == net)&&const DeepCollectionEquality().equals(other.byCategory, byCategory));
+  final _this = this as SpendingMonth;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is SpendingMonth&&(identical(other.month, _this.month) || other.month == _this.month)&&(identical(other.income, _this.income) || other.income == _this.income)&&(identical(other.expenses, _this.expenses) || other.expenses == _this.expenses)&&(identical(other.net, _this.net) || other.net == _this.net)&&const DeepCollectionEquality().equals(other.byCategory, _this.byCategory));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,month,income,expenses,net,const DeepCollectionEquality().hash(byCategory));
+int get hashCode {
+  final _this = this as SpendingMonth;
+  return Object.hash(runtimeType,_this.month,_this.income,_this.expenses,_this.net,const DeepCollectionEquality().hash(_this.byCategory));
+}
 
 @override
 String toString() {
-  return 'SpendingMonth(month: $month, income: $income, expenses: $expenses, net: $net, byCategory: $byCategory)';
+  final _this = this as SpendingMonth;
+  return 'SpendingMonth(month: ${_this.month}, income: ${_this.income}, expenses: ${_this.expenses}, net: ${_this.net}, byCategory: ${_this.byCategory})';
 }
 
 
@@ -66,7 +72,7 @@ class _$SpendingMonthCopyWithImpl<$Res>
 /// Create a copy of SpendingMonth
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') @override $Res call({Object? month = null,Object? income = null,Object? expenses = null,Object? net = null,Object? byCategory = null,}) {
-  return _then(_self.copyWith(
+  return _then(SpendingMonth(
 month: null == month ? _self.month : month // ignore: cast_nullable_to_non_nullable
 as String,income: null == income ? _self.income : income // ignore: cast_nullable_to_non_nullable
 as double,expenses: null == expenses ? _self.expenses : expenses // ignore: cast_nullable_to_non_nullable
@@ -213,7 +219,7 @@ return $default(_that.month,_that.income,_that.expenses,_that.net,_that.byCatego
 @JsonSerializable()
 
 class _SpendingMonth implements SpendingMonth {
-  const _SpendingMonth({required this.month, required this.income, required this.expenses, required this.net, @JsonKey(name: 'by_category') final  Map<String, double> byCategory = const <String, double>{}}): _byCategory = byCategory;
+  const _SpendingMonth({required this.month, required this.income, required this.expenses, required this.net, @JsonKey(name: 'by_category')  Map<String, double> byCategory = const <String, double>{}}): _byCategory = byCategory;
   factory _SpendingMonth.fromJson(Map<String, dynamic> json) => _$SpendingMonthFromJson(json);
 
 @override final  String month;
@@ -241,16 +247,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SpendingMonth&&(identical(other.month, month) || other.month == month)&&(identical(other.income, income) || other.income == income)&&(identical(other.expenses, expenses) || other.expenses == expenses)&&(identical(other.net, net) || other.net == net)&&const DeepCollectionEquality().equals(other._byCategory, _byCategory));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _SpendingMonth&&(identical(other.month, month) || other.month == month)&&(identical(other.income, income) || other.income == income)&&(identical(other.expenses, expenses) || other.expenses == expenses)&&(identical(other.net, net) || other.net == net)&&const DeepCollectionEquality().equals(other.byCategory, _byCategory));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,month,income,expenses,net,const DeepCollectionEquality().hash(_byCategory));
+int get hashCode {
+    return Object.hash(runtimeType,month,income,expenses,net,const DeepCollectionEquality().hash(_byCategory));
+}
 
 @override
 String toString() {
-  return 'SpendingMonth(month: $month, income: $income, expenses: $expenses, net: $net, byCategory: $byCategory)';
+    return 'SpendingMonth(month: $month, income: $income, expenses: $expenses, net: $net, byCategory: $byCategory)';
 }
 
 
@@ -309,16 +317,21 @@ $SpendingReportCopyWith<SpendingReport> get copyWith => _$SpendingReportCopyWith
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is SpendingReport&&(identical(other.mode, mode) || other.mode == mode)&&(identical(other.baseCurrency, baseCurrency) || other.baseCurrency == baseCurrency)&&(identical(other.granularity, granularity) || other.granularity == granularity)&&const DeepCollectionEquality().equals(other.categories, categories)&&const DeepCollectionEquality().equals(other.months, months)&&const DeepCollectionEquality().equals(other.budgets, budgets));
+  final _this = this as SpendingReport;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is SpendingReport&&(identical(other.mode, _this.mode) || other.mode == _this.mode)&&(identical(other.baseCurrency, _this.baseCurrency) || other.baseCurrency == _this.baseCurrency)&&(identical(other.granularity, _this.granularity) || other.granularity == _this.granularity)&&const DeepCollectionEquality().equals(other.categories, _this.categories)&&const DeepCollectionEquality().equals(other.months, _this.months)&&const DeepCollectionEquality().equals(other.budgets, _this.budgets));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,mode,baseCurrency,granularity,const DeepCollectionEquality().hash(categories),const DeepCollectionEquality().hash(months),const DeepCollectionEquality().hash(budgets));
+int get hashCode {
+  final _this = this as SpendingReport;
+  return Object.hash(runtimeType,_this.mode,_this.baseCurrency,_this.granularity,const DeepCollectionEquality().hash(_this.categories),const DeepCollectionEquality().hash(_this.months),const DeepCollectionEquality().hash(_this.budgets));
+}
 
 @override
 String toString() {
-  return 'SpendingReport(mode: $mode, baseCurrency: $baseCurrency, granularity: $granularity, categories: $categories, months: $months, budgets: $budgets)';
+  final _this = this as SpendingReport;
+  return 'SpendingReport(mode: ${_this.mode}, baseCurrency: ${_this.baseCurrency}, granularity: ${_this.granularity}, categories: ${_this.categories}, months: ${_this.months}, budgets: ${_this.budgets})';
 }
 
 
@@ -347,7 +360,7 @@ class _$SpendingReportCopyWithImpl<$Res>
 /// Create a copy of SpendingReport
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') @override $Res call({Object? mode = null,Object? baseCurrency = null,Object? granularity = null,Object? categories = null,Object? months = null,Object? budgets = null,}) {
-  return _then(_self.copyWith(
+  return _then(SpendingReport(
 mode: null == mode ? _self.mode : mode // ignore: cast_nullable_to_non_nullable
 as String,baseCurrency: null == baseCurrency ? _self.baseCurrency : baseCurrency // ignore: cast_nullable_to_non_nullable
 as String,granularity: null == granularity ? _self.granularity : granularity // ignore: cast_nullable_to_non_nullable
@@ -495,7 +508,7 @@ return $default(_that.mode,_that.baseCurrency,_that.granularity,_that.categories
 @JsonSerializable()
 
 class _SpendingReport implements SpendingReport {
-  const _SpendingReport({required this.mode, @JsonKey(name: 'base_currency') required this.baseCurrency, this.granularity = 'month', final  List<String> categories = const <String>[], final  List<SpendingMonth> months = const <SpendingMonth>[], final  Map<String, double> budgets = const <String, double>{}}): _categories = categories,_months = months,_budgets = budgets;
+  const _SpendingReport({required this.mode, @JsonKey(name: 'base_currency') required this.baseCurrency, this.granularity = 'month',  List<String> categories = const <String>[],  List<SpendingMonth> months = const <SpendingMonth>[],  Map<String, double> budgets = const <String, double>{}}): _categories = categories,_months = months,_budgets = budgets;
   factory _SpendingReport.fromJson(Map<String, dynamic> json) => _$SpendingReportFromJson(json);
 
 @override final  String mode;
@@ -536,16 +549,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SpendingReport&&(identical(other.mode, mode) || other.mode == mode)&&(identical(other.baseCurrency, baseCurrency) || other.baseCurrency == baseCurrency)&&(identical(other.granularity, granularity) || other.granularity == granularity)&&const DeepCollectionEquality().equals(other._categories, _categories)&&const DeepCollectionEquality().equals(other._months, _months)&&const DeepCollectionEquality().equals(other._budgets, _budgets));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _SpendingReport&&(identical(other.mode, mode) || other.mode == mode)&&(identical(other.baseCurrency, baseCurrency) || other.baseCurrency == baseCurrency)&&(identical(other.granularity, granularity) || other.granularity == granularity)&&const DeepCollectionEquality().equals(other.categories, _categories)&&const DeepCollectionEquality().equals(other.months, _months)&&const DeepCollectionEquality().equals(other.budgets, _budgets));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,mode,baseCurrency,granularity,const DeepCollectionEquality().hash(_categories),const DeepCollectionEquality().hash(_months),const DeepCollectionEquality().hash(_budgets));
+int get hashCode {
+    return Object.hash(runtimeType,mode,baseCurrency,granularity,const DeepCollectionEquality().hash(_categories),const DeepCollectionEquality().hash(_months),const DeepCollectionEquality().hash(_budgets));
+}
 
 @override
 String toString() {
-  return 'SpendingReport(mode: $mode, baseCurrency: $baseCurrency, granularity: $granularity, categories: $categories, months: $months, budgets: $budgets)';
+    return 'SpendingReport(mode: $mode, baseCurrency: $baseCurrency, granularity: $granularity, categories: $categories, months: $months, budgets: $budgets)';
 }
 
 
