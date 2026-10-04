@@ -1,7 +1,10 @@
 # Changelog
 
-## Next: 1.4.0
+## Next: 1.5.0
 
+- Bug fixes and improvements.
+
+## 1.4.0
 - VIAC accounts sync again after VIAC changed how it sends amounts, and the days missed meanwhile are filled in; should the format change again, the sync error says what VIAC returned instead of a cryptic decimal message, and never records a zero balance
 - Commerzbank accounts are now kept up to date by hand: the bank only offers scan-the-graphic photoTAN over its data interface, so the sync button and the credential fields are gone, the balance is entered as a snapshot, and transactions come from the CSV export
 - App transactions: search the list by text or amount, and one Show filter for everything, uncategorized only or transfers only
