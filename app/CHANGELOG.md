@@ -1,7 +1,10 @@
 # Changelog
 
-## Next: 1.5.0
+## Next: 1.6.0
 
+- Bug fixes and improvements.
+
+## 1.5.0
 - Morgan Stanley syncs again after a server restart; if the server's browser cannot start, the sync error now says so instead of asking for a JWT token
 - Swisscard syncs now read the transaction feed to its last page instead of stopping after the first 50 entries, and keep everything the login handed over (about a year), so the card's history no longer ends a month back
 - The code prompt's Checking button shows a spinner while the code is verified
