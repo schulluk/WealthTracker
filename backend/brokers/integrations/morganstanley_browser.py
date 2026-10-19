@@ -453,12 +453,24 @@ def browser_login(
     except (BrowserLoginUnavailable, BrowserLoginError):
         raise
     except Exception as exc:
-        # Surface Playwright launch/driver errors as "unavailable" so callers can
-        # fall back to the manual-JWT path instead of hard-failing the sync.
+        # Only a missing browser binary is "unavailable" (callers may then fall
+        # back to a manually provided JWT). Any other launch failure is a real
+        # error and must surface as one, not as "Chromium is not installed".
         msg = str(exc).lower()
-        if "executable doesn't exist" in msg or "playwright install" in msg or "browsertype.launch" in msg:
+        if "executable doesn't exist" in msg or "playwright install" in msg:
             raise BrowserLoginUnavailable(
                 "Chromium for Playwright is not installed. Run "
                 "`playwright install --with-deps chromium`."
             ) from exc
-        raise BrowserLoginError(f"Browser login failed: {exc}") from exc
+        # Playwright errors carry a long call log; keep it in the server log and
+        # give the user only the headline.
+        logger.error("MS browser: %s", exc)
+        if "missing x server" in msg or "without having a xserver" in msg:
+            raise BrowserLoginError(
+                "Headful Chromium found no X server on "
+                f"DISPLAY={os.environ.get('DISPLAY') or '(unset)'}. Xvfb is not "
+                "running — restart the backend container (its entrypoint starts "
+                "Xvfb when MS_SERVER_MODE=1)."
+            ) from exc
+        headline = str(exc).strip().splitlines()[0] if str(exc).strip() else repr(exc)
+        raise BrowserLoginError(f"Browser login failed: {headline}") from exc

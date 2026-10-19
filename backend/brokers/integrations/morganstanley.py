@@ -200,8 +200,8 @@ class MorganStanleyIntegration(BrokerIntegrationBase):
         Run the headless-browser login (username + password + TOTP seed).
 
         Returns an AuthResult on a definitive outcome (success or failure), or
-        None when the browser path is unavailable so the caller falls back to the
-        manual JWT path. On success, sets self._jwt_token + self.employee_id; the
+        None when the browser path is unavailable and a manual JWT is configured,
+        so the caller falls back to it. On success, sets self._jwt_token + self.employee_id; the
         rest of the integration (GraphQL fetch) then works unchanged.
         """
         from . import morganstanley_browser as msb
@@ -234,9 +234,17 @@ class MorganStanleyIntegration(BrokerIntegrationBase):
                 proxy=relay_proxy,  # None -> browser_login falls back to MS_PROXY env
             )
         except msb.BrowserLoginUnavailable as exc:
+            # Without a manual JWT the fallback can only print the DevTools
+            # instructions, which hides the real problem — report it instead.
+            if not (self._jwt_token and self.employee_id):
+                logger.error("Morgan Stanley: browser login unavailable: %s", exc)
+                return AuthResult(
+                    success=False,
+                    error_message=f"Morgan Stanley browser login is unavailable: {exc}",
+                )
             logger.warning(
                 "Morgan Stanley: browser login unavailable (%s); "
-                "falling back to manual JWT if provided.", exc,
+                "falling back to the manual JWT.", exc,
             )
             return None
         except msb.BrowserLoginError as exc:

@@ -36,9 +36,22 @@ fi
 if [ "${MS_SERVER_MODE}" = "1" ]; then
     export DISPLAY="${DISPLAY:-:99}"
     if ! pgrep -x Xvfb >/dev/null 2>&1; then
+        # A container restart (e.g. host reboot) keeps /tmp, so the previous run's
+        # lock survives. Its PID can match an unrelated process in the new run, and
+        # Xvfb then exits with "Server is already active". No Xvfb is running here,
+        # so the lock and socket are stale.
+        DISPLAY_NUM="${DISPLAY#:}"
+        DISPLAY_NUM="${DISPLAY_NUM%%.*}"
+        rm -f "/tmp/.X${DISPLAY_NUM}-lock" "/tmp/.X11-unix/X${DISPLAY_NUM}"
         echo "Starting Xvfb on ${DISPLAY}..."
         Xvfb "${DISPLAY}" -screen 0 1280x1024x24 -nolisten tcp &
-        sleep 1
+        for _ in 1 2 3 4 5; do
+            [ -S "/tmp/.X11-unix/X${DISPLAY_NUM}" ] && break
+            sleep 1
+        done
+        if ! pgrep -x Xvfb >/dev/null 2>&1; then
+            echo "WARNING: Xvfb failed to start on ${DISPLAY}; the Morgan Stanley browser login will fail." >&2
+        fi
     fi
 fi
 

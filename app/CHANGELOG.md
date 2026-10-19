@@ -2,7 +2,7 @@
 
 ## Next: 1.5.0
 
-- Bug fixes and improvements.
+- Morgan Stanley syncs again after a server restart; if the server's browser cannot start, the sync error now says so instead of asking for a JWT token
 
 ## 1.4.0
 - VIAC accounts sync again after VIAC changed how it sends amounts, and the days missed meanwhile are filled in; should the format change again, the sync error says what VIAC returned instead of a cryptic decimal message, and never records a zero balance
