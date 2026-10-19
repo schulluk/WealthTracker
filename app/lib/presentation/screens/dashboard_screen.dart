@@ -10,11 +10,13 @@ import 'dart:async';
 import '../../main.dart' show initialNotificationResponse, notificationTapStream;
 import '../providers/accounts_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/stale_sync_provider.dart';
 import '../providers/sync_provider.dart';
 import '../providers/wealth_provider.dart';
 import '../widgets/account_card.dart';
 import '../widgets/holdings_card.dart';
 import '../widgets/quick_snapshot_sheet.dart';
+import '../widgets/stale_sync_banner.dart';
 import '../widgets/sync_progress_dialog.dart';
 import '../widgets/two_factor_prompt.dart';
 import '../widgets/wealth_line_chart.dart';
@@ -53,10 +55,25 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   }
 
   void _onNotificationTap(String payload) {
-    if (payload == 'sync_reminder' && mounted) {
+    if (!mounted) return;
+    if (payload == 'sync_reminder') {
       debugPrint('Sync reminder notification tapped while app running, triggering sync');
       _syncAllAccounts();
+    } else if (payload.startsWith(staleSyncPayloadPrefix)) {
+      _syncAccountById(_accountIdOf(payload));
     }
+  }
+
+  /// The account a stale-sync notification is about.
+  int? _accountIdOf(String payload) =>
+      int.tryParse(payload.substring(staleSyncPayloadPrefix.length));
+
+  /// Start one account's sync, e.g. from the notification that it is overdue.
+  Future<void> _syncAccountById(int? id) async {
+    if (id == null) return;
+    final accounts = await ref.read(accountsProvider.future);
+    final account = accounts.where((a) => a.id == id).firstOrNull;
+    if (account != null && mounted) await _syncAccount(account);
   }
 
   @override
@@ -80,8 +97,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     bool syncedFromNotification = false;
 
     // 1. Check if app was launched from a sync reminder notification
-    final response = initialNotificationResponse;
-    if (response != null && response.payload == 'sync_reminder') {
+    final payload = initialNotificationResponse?.payload;
+    if (payload == 'sync_reminder') {
       debugPrint('App launched from sync reminder notification, triggering sync');
       initialNotificationResponse = null;
       syncedFromNotification = true;
@@ -89,6 +106,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
       await Future.delayed(const Duration(milliseconds: 500));
       if (mounted) {
         await _syncAllAccounts();
+      }
+    } else if (payload != null && payload.startsWith(staleSyncPayloadPrefix)) {
+      // Launched from "X has not synced for N days": sync that account; the
+      // sync on app open may still follow for the rest.
+      debugPrint('App launched from stale-sync notification: $payload');
+      initialNotificationResponse = null;
+
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (mounted) {
+        await _syncAccountById(_accountIdOf(payload));
       }
     }
 
@@ -421,6 +448,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
       }
     });
 
+    // Keep the "not synced for N days" notifications in step with the
+    // accounts: every successful sync moves its account's dates forward.
+    ref.listen<AsyncValue<List<Account>>>(accountsProvider, (previous, next) {
+      if (next is AsyncData<List<Account>>) {
+        unawaited(ref.read(staleSyncAlertsProvider).reschedule(next.value));
+      }
+    });
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Wealth Tracker'),
@@ -509,6 +544,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                   _showQuickSnapshotSheet(accountsNeeding);
                 }
               },
+            ),
+
+            // Accounts that need a code and have gone unsynced
+            StaleSyncBanner(
+              onSync: _syncAccount,
+              syncingAccountIds: _syncingAccounts,
             ),
 
             // Accounts Header

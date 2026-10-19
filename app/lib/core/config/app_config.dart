@@ -3,6 +3,13 @@ class AppConfig {
   /// Hours since last sync before sync-on-app-open triggers again.
   static const int syncSuppressionThresholdHours = 20;
 
+  /// Days since the last sync at which an account that needs a code (and is
+  /// therefore skipped by unattended syncs) is flagged, in three steps of
+  /// growing urgency.
+  static const int staleSyncNoticeDays = 21;
+  static const int staleSyncWarningDays = 25;
+  static const int staleSyncUrgentDays = 28;
+
   /// Default chart time range in days.
   static const int defaultChartRange = 365;
 

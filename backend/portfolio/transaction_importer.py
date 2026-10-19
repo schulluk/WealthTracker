@@ -402,6 +402,12 @@ def import_account_transactions(account, integration) -> int:
         start_date = latest - timedelta(days=OVERLAP_DAYS)
     else:
         start_date = end_date - timedelta(days=DEFAULT_LOOKBACK_DAYS)
+    # A broker that already holds a longer history (pulled with the login)
+    # gives it away for free: take all of it, so an account whose syncs only
+    # ever covered the recent days fills up without a manual backfill.
+    held_from = integration.prefetched_transactions_from()
+    if held_from and held_from < start_date:
+        start_date = held_from
 
     infos = integration.get_transactions(account.account_identifier, start_date, end_date)
     if not infos:

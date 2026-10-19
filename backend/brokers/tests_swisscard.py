@@ -5,7 +5,7 @@ answers the SPA's REST calls. What is verified here is the part that can break
 silently: which call happens when, that the SMS is not re-sent while the user
 holds a code, and how the portal's numbers map onto the app's model.
 """
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -13,6 +13,7 @@ from django.test import TestCase
 
 from brokers.integrations.swisscard import (
     ACCOUNTS_PATH,
+    FETCH_DAYS,
     OTP_PATH,
     PASSWORD_PATH,
     SwisscardIntegration,
@@ -90,6 +91,31 @@ class FakePage:
             import json as jsonlib
             return {'status': 200, 'text': jsonlib.dumps(_TRANSACTIONS)}
         return {'status': 404, 'text': ''}
+
+
+class _PagedPage(FakePage):
+    """Serves the transaction feed as two pages joined by an x-next cursor."""
+
+    def __init__(self, second_status=200, **kwargs):
+        super().__init__(**kwargs)
+        self.second_status = second_status
+
+    def evaluate(self, script, args):
+        method, path, body, _headers = args
+        if '/transactions' not in path:
+            return super().evaluate(script, args)
+        import json as jsonlib
+        self.calls.append((method, path, body))
+        if 'cursor=' not in path:
+            return {'status': 200, 'next': 'page two', 'text': jsonlib.dumps({
+                'summary': {'count': 2},
+                'transactions': [_TRANSACTIONS['transactions'][0]],
+            })}
+        return {'status': self.second_status, 'next': None,
+                'text': jsonlib.dumps({
+                    'summary': {'count': 2},
+                    'transactions': [_TRANSACTIONS['transactions'][1]],
+                })}
 
 
 class FakeContext:
@@ -208,6 +234,39 @@ class SwisscardFlowTests(TestCase):
             integration.get_transactions(
                 '40007155878', date(2025, 1, 1), date(2025, 2, 1)),
             [])
+
+    def test_transaction_feed_is_read_to_the_last_page(self):
+        # The feed answers 50 rows at a time and names the next page in an
+        # x-next header. Before that header was followed, a year of card use
+        # came back as its newest month.
+        page = _PagedPage()
+        integration = self._integration(page)
+        integration.complete_2fa('123456', {'storage_state': {'cookies': []}})
+        rows = integration.get_transactions(
+            '40007155878', date(2026, 1, 1), date(2026, 12, 31))
+        self.assertEqual({r.external_id for r in rows}, {'tx-1', 'tx-2'})
+        # The cursor went back as a query parameter, the window unchanged.
+        feed_calls = [c for c in page.calls if '/transactions' in c[1]]
+        self.assertEqual(len(feed_calls), 2)
+        self.assertNotIn('cursor', feed_calls[0][1])
+        self.assertIn('?cursor=page+two', feed_calls[1][1])
+        self.assertEqual(feed_calls[0][2], feed_calls[1][2])
+
+    def test_a_failed_later_page_keeps_the_pages_already_read(self):
+        page = _PagedPage(second_status=502)
+        integration = self._integration(page)
+        integration.complete_2fa('123456', {'storage_state': {'cookies': []}})
+        rows = integration.get_transactions(
+            '40007155878', date(2026, 1, 1), date(2026, 12, 31))
+        self.assertEqual([r.external_id for r in rows], ['tx-1'])
+
+    def test_the_login_window_is_offered_to_the_importer(self):
+        integration = self._integration(FakePage())
+        # Nothing fetched yet, nothing to offer.
+        self.assertIsNone(integration.prefetched_transactions_from())
+        integration.complete_2fa('123456', {'storage_state': {'cookies': []}})
+        self.assertEqual(integration.prefetched_transactions_from(),
+                         date.today() - timedelta(days=FETCH_DAYS))
 
     def test_a_recent_login_is_reused_instead_of_texting_again(self):
         from brokers.integrations import swisscard as mod

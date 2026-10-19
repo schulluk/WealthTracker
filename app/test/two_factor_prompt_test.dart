@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -77,6 +79,29 @@ void main() {
 
       expect(find.text('That SMS code was not accepted.'), findsOneWidget);
       expect(find.byType(TwoFactorPrompt), findsOneWidget);
+    });
+
+    testWidgets('shows a spinner on the button while the code is checked',
+        (tester) async {
+      final checking = Completer<String?>();
+      await tester.pumpWidget(_harness(TwoFactorPrompt(
+        accountName: 'Swisscard',
+        twoFaType: 'sms',
+        onSubmit: (_) => checking.future,
+      )));
+
+      await tester.enterText(find.byType(TextField), '123456');
+      await tester.tap(find.text('Confirm'));
+      await tester.pump();
+
+      expect(find.text('Checking…'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+      checking.complete('That SMS code was not accepted.');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.text('Confirm'), findsOneWidget);
     });
 
     testWidgets('refuses an empty code without calling the broker',

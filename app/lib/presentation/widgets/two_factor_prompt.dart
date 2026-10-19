@@ -119,7 +119,27 @@ class _TwoFactorPromptState extends State<TwoFactorPrompt> {
         ),
         FilledButton(
           onPressed: _busy ? null : _submit,
-          child: Text(_busy ? 'Checking…' : 'Confirm'),
+          child: _busy
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        // The same muted tone the disabled label gets.
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.38),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text('Checking…'),
+                  ],
+                )
+              : const Text('Confirm'),
         ),
       ],
     );

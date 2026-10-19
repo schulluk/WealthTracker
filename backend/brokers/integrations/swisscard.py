@@ -10,7 +10,8 @@ user-initiated and completes only once the SMS code is entered:
    half-finished flow.
 2. :meth:`complete_2fa` restores those cookies, posts the code, and pulls
    accounts and transactions straight away — the session is short-lived, so
-   everything is fetched in that one window and cached.
+   everything is fetched in that one window and cached. The transaction feed
+   is paged (50 rows, next cursor in an ``x-next`` header) and read to the end.
 
 Everything runs inside a real browser page. The portal's ``42.js`` (Airlock
 Anomaly Shield) signs each POST with an ``x-42`` header computed at runtime,
@@ -25,6 +26,7 @@ import time
 from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urlencode
 
 from .base import (
     AccountInfo,
@@ -49,6 +51,12 @@ ACCOUNTS_PATH = '/api/v1/accounts'
 # How much history one interactive login pulls. The session dies within
 # minutes, so everything that may be asked for later is fetched up front.
 FETCH_DAYS = 400
+
+# The transaction feed answers 50 rows per call and names the next page in an
+# ``x-next`` response header, which the SPA hands back as ``?cursor=``. A year
+# of card use is a handful of pages; the cap only stops a cursor that never
+# ends.
+MAX_TRANSACTION_PAGES = 200
 
 DEFAULT_TIMEOUT_MS = 60_000
 
@@ -108,7 +116,8 @@ async ([method, path, body, headers]) => {
       headers || {}),
     body: body ? JSON.stringify(body) : undefined,
   });
-  return {status: res.status, text: await res.text()};
+  return {status: res.status, text: await res.text(),
+          next: res.headers.get('x-next')};
 }
 """
 
@@ -120,7 +129,8 @@ _XHR_JS = """
   xhr.setRequestHeader('accept', 'application/json, text/plain, */*');
   if (body) xhr.setRequestHeader('content-type', 'application/json');
   for (const [k, v] of Object.entries(headers || {})) xhr.setRequestHeader(k, v);
-  xhr.onloadend = () => resolve({status: xhr.status, text: xhr.responseText});
+  xhr.onloadend = () => resolve({status: xhr.status, text: xhr.responseText,
+                                 next: xhr.getResponseHeader('x-next')});
   xhr.send(body ? JSON.stringify(body) : null);
 })
 """
@@ -199,17 +209,25 @@ class SwisscardIntegration(BrokerIntegrationBase):
         logger.warning('Swisscard: no x-42 header observed on the probe call')
         return 'fetch'
 
-    def _call(self, page, transport, method, path, body=None, headers=None):
+    def _call_raw(self, page, transport, method, path, body=None,
+                  headers=None) -> Dict[str, Any]:
+        """One request from inside the page: ``{status, text, next}``."""
         script = _FETCH_JS if transport == 'fetch' else _XHR_JS
-        result = page.evaluate(script, [method, path, body, headers or {}])
+        return page.evaluate(script, [method, path, body, headers or {}]) or {}
+
+    def _call(self, page, transport, method, path, body=None, headers=None):
+        result = self._call_raw(page, transport, method, path, body, headers)
         text = result.get('text') or ''
-        payload = None
-        if text:
-            try:
-                payload = json.loads(text)
-            except ValueError:
-                payload = None
-        return result.get('status'), payload, text
+        return result.get('status'), self._json(text), text
+
+    @staticmethod
+    def _json(text) -> Any:
+        if not text:
+            return None
+        try:
+            return json.loads(text)
+        except ValueError:
+            return None
 
     # -- authentication ---------------------------------------------------
 
@@ -374,24 +392,47 @@ class SwisscardIntegration(BrokerIntegrationBase):
         self._fetched_from = start
 
     def _fetch_transactions(self, page, transport, identifier, start, end):
-        """Read the SPA's own transaction feed for one account.
+        """Read the SPA's own transaction feed for one account, page by page.
 
         The JSON feed is preferred over the CSV export: every entry carries a
-        stable id, which makes dedup exact instead of text-based.
+        stable id, which makes dedup exact instead of text-based. It is paged:
+        the first call answers the newest 50 rows and an ``x-next`` header
+        naming the cursor of the page after, until the last page carries none.
+        The summary's count is the total over all pages.
         """
-        status, payload, _ = self._call(
-            page, transport, 'POST',
-            f'{ACCOUNTS_PATH}/{identifier}/transactions',
-            {'dateMin': start.isoformat(), 'dateMax': end.isoformat()},
-        )
-        if status != 200 or not isinstance(payload, dict):
+        base_path = f'{ACCOUNTS_PATH}/{identifier}/transactions'
+        window = {'dateMin': start.isoformat(), 'dateMax': end.isoformat()}
+        rows: List[Dict[str, Any]] = []
+        reported = None
+        cursor = None
+        for page_no in range(1, MAX_TRANSACTION_PAGES + 1):
+            path = base_path
+            if cursor:
+                path = f'{base_path}?{urlencode({"cursor": cursor})}'
+            result = self._call_raw(page, transport, 'POST', path, window)
+            status = result.get('status')
+            payload = self._json(result.get('text'))
+            if status != 200 or not isinstance(payload, dict):
+                logger.warning(
+                    'Swisscard: transaction fetch failed for %s '
+                    '(status %s, page %d)', identifier, status, page_no)
+                if not rows:
+                    return []
+                # Keep the pages already read; the next sync fetches again
+                # and dedup drops what is already stored.
+                break
+            page_rows = payload.get('transactions') or []
+            rows.extend(page_rows)
+            if reported is None:
+                reported = (payload.get('summary') or {}).get('count')
+            cursor = result.get('next')
+            if not cursor or not page_rows:
+                break
+        else:
             logger.warning(
-                'Swisscard: transaction fetch failed for %s (status %s)',
-                identifier, status)
-            return []
+                'Swisscard: gave up on %s after %d pages',
+                identifier, MAX_TRANSACTION_PAGES)
 
-        rows = payload.get('transactions') or []
-        reported = (payload.get('summary') or {}).get('count')
         if reported is not None and reported != len(rows):
             logger.warning(
                 'Swisscard: %s reports %s transactions but returned %d',
@@ -468,6 +509,10 @@ class SwisscardIntegration(BrokerIntegrationBase):
             balance_date=date.today(),
             raw_data={'posted_balance': str(amount)},
         )
+
+    def prefetched_transactions_from(self) -> Optional[date]:
+        """The login pulled FETCH_DAYS of history; the importer may keep it all."""
+        return self._fetched_from if self._transactions is not None else None
 
     def get_transactions(self, account_identifier: str, start_date: date,
                          end_date: date) -> List[TransactionInfo]:

@@ -4,11 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/config/app_config.dart';
 import '../../data/models/profile.dart';
 import '../../services/notification_service.dart';
+import '../providers/accounts_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/core_providers.dart';
 import '../providers/profile_provider.dart';
+import '../providers/stale_sync_provider.dart';
 import '../providers/sync_provider.dart';
 import '../providers/wealth_provider.dart';
 
@@ -515,6 +518,7 @@ class _SyncSettingsSectionState extends ConsumerState<_SyncSettingsSection> {
       NotificationFrequency.every3Days;
   bool _syncReminderShiftWeekend = false;
   bool _syncReminderSkipHolidays = false;
+  bool _staleSyncAlertsEnabled = true;
 
   @override
   void initState() {
@@ -531,6 +535,7 @@ class _SyncSettingsSectionState extends ConsumerState<_SyncSettingsSection> {
     final frequency = await notificationService.getSyncReminderFrequency();
     final shiftWeekend = await notificationService.getSyncReminderShiftWeekend();
     final skipHolidays = await notificationService.getSyncReminderSkipHolidays();
+    final staleAlerts = await notificationService.isStaleSyncAlertsEnabled();
     if (mounted) {
       setState(() {
         _syncReminderEnabled = enabled;
@@ -539,6 +544,7 @@ class _SyncSettingsSectionState extends ConsumerState<_SyncSettingsSection> {
         _syncReminderFrequency = frequency;
         _syncReminderShiftWeekend = shiftWeekend;
         _syncReminderSkipHolidays = skipHolidays;
+        _staleSyncAlertsEnabled = staleAlerts;
       });
     }
   }
@@ -567,34 +573,33 @@ class _SyncSettingsSectionState extends ConsumerState<_SyncSettingsSection> {
     }
   }
 
-  Future<void> _updateSyncReminder(bool enabled) async {
-    if (enabled) {
-      // When enabling, request notification permissions first
-      final notificationService = ref.read(notificationServiceProvider);
-      final result = await notificationService.requestPermissions();
-
-      switch (result) {
-        case NotificationPermissionResult.granted:
-          // Permission granted, proceed with enabling
-          break;
-        case NotificationPermissionResult.denied:
-          // Permission denied, don't enable
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Notification permission required for reminders'),
-              ),
-            );
-          }
-          return;
-        case NotificationPermissionResult.permanentlyDenied:
-          // Permission permanently denied, show dialog
-          if (mounted) {
-            await _showPermissionDeniedDialog();
-          }
-          return;
-      }
+  /// Ask for notification permission when switching something on; false
+  /// (with the reason shown) when it was refused.
+  Future<bool> _ensureNotificationPermission() async {
+    final notificationService = ref.read(notificationServiceProvider);
+    final result = await notificationService.requestPermissions();
+    switch (result) {
+      case NotificationPermissionResult.granted:
+        return true;
+      case NotificationPermissionResult.denied:
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Notification permission is required for this'),
+            ),
+          );
+        }
+        return false;
+      case NotificationPermissionResult.permanentlyDenied:
+        if (mounted) {
+          await _showPermissionDeniedDialog();
+        }
+        return false;
     }
+  }
+
+  Future<void> _updateSyncReminder(bool enabled) async {
+    if (enabled && !await _ensureNotificationPermission()) return;
 
     setState(() => _syncReminderEnabled = enabled);
     try {
@@ -618,8 +623,8 @@ class _SyncSettingsSectionState extends ConsumerState<_SyncSettingsSection> {
         title: const Text('Notifications Disabled'),
         content: const Text(
           'You have previously denied notification permissions. '
-          'To enable sync reminders, please allow notifications for Wealth Tracker '
-          'in your device settings.',
+          'To enable reminders and alerts, please allow notifications for '
+          'Wealth Tracker in your device settings.',
         ),
         actions: [
           TextButton(
@@ -659,6 +664,8 @@ class _SyncSettingsSectionState extends ConsumerState<_SyncSettingsSection> {
             hour: time.hour,
             minute: time.minute,
           );
+      // The unsynced-account alerts fire at the same time of day.
+      await _rescheduleStaleSyncAlerts();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -666,6 +673,31 @@ class _SyncSettingsSectionState extends ConsumerState<_SyncSettingsSection> {
         );
       }
     }
+  }
+
+  Future<void> _updateStaleSyncAlerts(bool enabled) async {
+    if (enabled && !await _ensureNotificationPermission()) return;
+
+    setState(() => _staleSyncAlertsEnabled = enabled);
+    try {
+      await ref
+          .read(notificationServiceProvider)
+          .setStaleSyncAlertsEnabled(enabled);
+      await _rescheduleStaleSyncAlerts();
+    } catch (e) {
+      setState(() => _staleSyncAlertsEnabled = !enabled);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update: $e')),
+        );
+      }
+    }
+  }
+
+  /// Hand the current account list to the alert scheduler.
+  Future<void> _rescheduleStaleSyncAlerts() async {
+    final accounts = await ref.read(accountsProvider.future);
+    await ref.read(staleSyncAlertsProvider).reschedule(accounts);
   }
 
   Future<void> _updateFrequency(NotificationFrequency value) async {
@@ -801,6 +833,16 @@ class _SyncSettingsSectionState extends ConsumerState<_SyncSettingsSection> {
             onChanged: _updateSkipHolidays,
           ),
         ],
+        SwitchListTile(
+          title: const Text('Unsynced account alerts'),
+          subtitle: const Text(
+            'Notify when an account that needs a code has gone '
+            '${AppConfig.staleSyncNoticeDays}, ${AppConfig.staleSyncWarningDays} '
+            'and ${AppConfig.staleSyncUrgentDays} days without a sync',
+          ),
+          value: _staleSyncAlertsEnabled,
+          onChanged: _updateStaleSyncAlerts,
+        ),
         if (syncState.lastSyncTime != null)
           ListTile(
             leading: const Icon(Icons.sync),

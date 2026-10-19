@@ -677,12 +677,15 @@ class TransactionImporterTests(TestCase):
         )
         self.TransactionInfo = TransactionInfo
 
-    def _fake_integration(self, infos):
+    def _fake_integration(self, infos, held_from=None):
         calls = []
 
         class Fake:
             def supports_transactions(self):
                 return True
+
+            def prefetched_transactions_from(self):
+                return held_from
 
             def get_transactions(self, identifier, start, end):
                 calls.append((identifier, start, end))
@@ -1126,6 +1129,19 @@ class TransactionImporterTests(TestCase):
         # Second run: start = newest imported booking_date - overlap.
         _, start, _ = integration.calls[1]
         self.assertEqual(start, date(2026, 8, 1) - timedelta(days=OVERLAP_DAYS))
+
+    def test_window_widens_to_what_the_broker_already_holds(self):
+        from datetime import timedelta
+        from portfolio.transaction_importer import import_account_transactions
+        # Swisscard pulls a year with the login; a sync must not throw most of
+        # it away just because the newest stored entry is recent.
+        held_from = date.today() - timedelta(days=500)
+        integration = self._fake_integration(
+            [self._info(external_id='R1')], held_from=held_from)
+        import_account_transactions(self.account, integration)
+        import_account_transactions(self.account, integration)
+        for _, start, _ in integration.calls:
+            self.assertEqual(start, held_from)
 
     def test_unsupported_integration_is_noop(self):
         from portfolio.transaction_importer import import_account_transactions

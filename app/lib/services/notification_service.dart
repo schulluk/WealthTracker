@@ -47,9 +47,23 @@ enum NotificationFrequency {
   }
 }
 
+/// One local notification to put on the platform's schedule.
+class LocalAlert {
+  final DateTime when;
+  final String body;
+  final String payload;
+
+  const LocalAlert({
+    required this.when,
+    required this.body,
+    required this.payload,
+  });
+}
+
 /// Service for managing local notifications, particularly sync reminders.
 class NotificationService {
   static const String _lastSyncAllKey = 'last_sync_all_timestamp';
+  static const String _staleSyncAlertsEnabledKey = 'stale_sync_alerts_enabled';
   static const String _syncReminderEnabledKey = 'sync_reminder_enabled';
   static const String _syncReminderHourKey = 'sync_reminder_hour';
   static const String _syncReminderMinuteKey = 'sync_reminder_minute';
@@ -73,6 +87,18 @@ class NotificationService {
   static const String _syncReminderChannelName = 'Sync Reminders';
   static const String _syncReminderChannelDesc =
       'Reminders to sync your accounts';
+
+  /// Alerts for accounts that need a code and have gone unsynced occupy ids
+  /// [_staleSyncBaseId] .. [_staleSyncBaseId] + [_staleSyncMaxCount] - 1:
+  /// three steps for up to ten such accounts, well inside iOS's limit of 64
+  /// pending notifications together with the reminders above.
+  static const int _staleSyncBaseId = 200;
+  static const int _staleSyncMaxCount = 30;
+
+  static const String _staleSyncChannelId = 'stale_sync';
+  static const String _staleSyncChannelName = 'Unsynced account alerts';
+  static const String _staleSyncChannelDesc =
+      'Alerts when an account that needs a code has not been synced for weeks';
 
   /// Suppression threshold in hours. If last sync was within this time,
   /// skip the sync-on-app-open.
@@ -273,6 +299,65 @@ class NotificationService {
     for (var i = 0; i < _syncReminderCount; i++) {
       await _notifications.cancel(id: _syncReminderBaseId + i);
     }
+  }
+
+  /// Replace the scheduled stale-sync alerts with [alerts].
+  ///
+  /// Each one is a one-shot notification on the day an account that needs a
+  /// code reaches the next step of being overdue. The whole set is cancelled
+  /// and re-scheduled from the current account list, so a sync in between
+  /// simply moves the dates; past dates are not passed in.
+  Future<void> scheduleStaleSyncAlerts(List<LocalAlert> alerts) async {
+    await initialize();
+    await cancelStaleSyncAlerts();
+
+    const androidDetails = AndroidNotificationDetails(
+      _staleSyncChannelId,
+      _staleSyncChannelName,
+      channelDescription: _staleSyncChannelDesc,
+      importance: Importance.defaultImportance,
+      priority: Priority.defaultPriority,
+      icon: '@mipmap/ic_launcher',
+    );
+    const details = NotificationDetails(
+      android: androidDetails,
+      iOS: DarwinNotificationDetails(),
+    );
+
+    final count = alerts.length < _staleSyncMaxCount
+        ? alerts.length
+        : _staleSyncMaxCount;
+    for (var i = 0; i < count; i++) {
+      final alert = alerts[i];
+      await _notifications.zonedSchedule(
+        id: _staleSyncBaseId + i,
+        title: 'Wealth Tracker',
+        body: alert.body,
+        scheduledDate: tz.TZDateTime.from(alert.when, tz.local),
+        notificationDetails: details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        payload: alert.payload,
+      );
+    }
+    debugPrint('Scheduled $count stale-sync alerts');
+  }
+
+  /// Cancel every scheduled stale-sync alert.
+  Future<void> cancelStaleSyncAlerts() async {
+    for (var i = 0; i < _staleSyncMaxCount; i++) {
+      await _notifications.cancel(id: _staleSyncBaseId + i);
+    }
+  }
+
+  /// Whether stale-sync alerts are wanted at all (on unless switched off).
+  Future<bool> isStaleSyncAlertsEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_staleSyncAlertsEnabledKey) ?? true;
+  }
+
+  Future<void> setStaleSyncAlertsEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_staleSyncAlertsEnabledKey, enabled);
   }
 
   /// Compute the next [count] future reminder times for [frequency].

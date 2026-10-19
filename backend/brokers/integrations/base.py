@@ -170,6 +170,19 @@ class BrokerIntegrationBase(ABC):
         """
         return []
 
+    def prefetched_transactions_from(self) -> Optional[date]:
+        """Start of the window ``get_transactions`` can answer from memory.
+
+        Some brokers hand over a long history in the same session that logs
+        in (Swisscard: the session dies within minutes, so a year is pulled
+        up front). The importer then stores all of it instead of only the
+        days around the newest stored entry — the extra rows cost no request,
+        and dedup drops what is already there. None, the default, means the
+        integration queries the range it is asked for and the importer keeps
+        its narrow window.
+        """
+        return None
+
     def get_transactions_for_range(
         self,
         account_identifier: str,
