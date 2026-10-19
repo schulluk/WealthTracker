@@ -1,6 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useImperativeHandle, type Ref } from 'react';
 import { RefreshCw, Plus, PlusCircle, AlertCircle, CheckCircle2, Clock, X, Trash2, History, MinusCircle, Settings, Upload, Download, Repeat, FileUp } from 'lucide-react';
 import { syncAccount, completeAccountAuth, deleteAccount, updateAccount, updateAccountCredentials, getAccountCredentials, getBroker, brokerCanSync } from '../api/client';
+import { needsAttendedSync } from '../utils/staleSync';
 import AddSnapshotModal from './AddSnapshotModal';
 import AddAccountModal from './AddAccountModal';
 import MigrateAccountModal from './MigrateAccountModal';
@@ -37,6 +38,7 @@ export interface Account {
   last_sync_at: string | null;
   last_sync_error: string;
   notes?: string;
+  created_at?: string;
   latest_snapshot: {
     balance: string;
     currency: string;
@@ -45,10 +47,22 @@ export interface Account {
   } | null;
 }
 
+/** What the dashboard can ask the table to do from outside its rows. */
+export interface AccountsTableHandle {
+  /**
+   * Start one account's sync exactly as its row's sync button does: the code
+   * prompt, the credentials dialog on an auth error and the toasts all come
+   * from the table. Resolves once the request is answered; a code prompt
+   * then stays open on its own.
+   */
+  sync: (accountId: number) => Promise<void>;
+}
+
 interface Props {
   accounts: Account[];
   baseCurrency: string;
   onRefresh: () => void;
+  ref?: Ref<AccountsTableHandle>;
 }
 
 interface CredentialField {
@@ -84,7 +98,18 @@ function daysSince(dateStr: string | null | undefined): number | null {
   return Math.floor((Date.now() - then) / 86_400_000);
 }
 
-function StatusIcon({ status, isManual, lastSyncAt, onClick }: { status: string; isManual?: boolean; lastSyncAt?: string | null; onClick?: () => void }) {
+// Accounts whose broker stops for a code are left out of every bulk run (the
+// app's Sync all, the server's daily sync); the tooltip says so, since
+// nothing else on the page does.
+const ATTENDED_SYNC_NOTE = '. Needs a code, so Sync all and the daily sync leave it out — sync it from its row';
+
+function StatusIcon({ status, isManual, attendedOnly, lastSyncAt, onClick }: {
+  status: string;
+  isManual?: boolean;
+  attendedOnly?: boolean;
+  lastSyncAt?: string | null;
+  onClick?: () => void;
+}) {
   if (isManual) {
     return (
       <Tooltip label="Manual account — values are entered by hand and not synced automatically">
@@ -109,16 +134,17 @@ function StatusIcon({ status, isManual, lastSyncAt, onClick }: { status: string;
       );
     default: {
       // Active — but flag amber if the last successful sync is getting old.
+      const note = attendedOnly ? ATTENDED_SYNC_NOTE : '';
       const age = daysSince(lastSyncAt);
       if (age !== null && age >= STALE_SYNC_DAYS) {
         return (
-          <Tooltip label={`Synced, but ${age} days ago — data may be out of date`}>
+          <Tooltip label={`Synced, but ${age} days ago — data may be out of date${note}`}>
             <CheckCircle2 size={14} className="status-stale" />
           </Tooltip>
         );
       }
       return (
-        <Tooltip label="Active — the last sync succeeded recently">
+        <Tooltip label={`Active — the last sync succeeded recently${note}`}>
           <CheckCircle2 size={14} className="status-active" />
         </Tooltip>
       );
@@ -152,7 +178,7 @@ function isAuthenticationError(errorMessage: string | undefined | null): boolean
   return authErrorPatterns.some(pattern => pattern.test(errorMessage));
 }
 
-export default function AccountsTable({ accounts, baseCurrency, onRefresh }: Props) {
+export default function AccountsTable({ accounts, baseCurrency, onRefresh, ref }: Props) {
   const [syncing, setSyncing] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Account | null>(null);
@@ -364,6 +390,11 @@ export default function AccountsTable({ accounts, baseCurrency, onRefresh }: Pro
     }
   };
 
+  // The dashboard's stale-sync notices start a sync through here, so they end
+  // in the same code prompt as the row button. No dependency list: the handle
+  // must always see the current accounts.
+  useImperativeHandle(ref, () => ({ sync: handleSync }));
+
   const handleAuthSubmit = async (code: string) => {
     if (!authPrompt) return;
     // A rejection here is shown inside the modal, so the code can be retyped.
@@ -443,6 +474,7 @@ export default function AccountsTable({ accounts, baseCurrency, onRefresh }: Pro
                       <StatusIcon
                         status={a.status}
                         isManual={a.is_manual}
+                        attendedOnly={needsAttendedSync(a)}
                         lastSyncAt={a.last_sync_at}
                         onClick={a.status === 'error' ? () => setErrorAccount(a) : undefined}
                       />

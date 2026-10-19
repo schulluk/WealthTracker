@@ -425,6 +425,48 @@ a:hover {
   filter: brightness(1.2);
 }
 
+/* Dashboard notices for accounts that need a code and have gone unsynced, one
+   per account. The level's status class (.status-stale, .status-pending,
+   .status-error) sets the text colour; the box tints itself from it. */
+.stale-sync-notices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.stale-sync-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+.stale-sync-notice > svg {
+  flex-shrink: 0;
+}
+.stale-sync-notice-text {
+  flex: 1;
+  min-width: 0;
+}
+.stale-sync-notice-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.stale-sync-notice-detail {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+.stale-sync-notice .btn {
+  flex-shrink: 0;
+  color: inherit;
+}
+.stale-sync-notice .btn:hover {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  color: inherit;
+}
+
 .error-details {
   background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.3);

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   getWealthSummary,
   getWealthHistory,
@@ -11,7 +11,9 @@ import WealthChart from '../components/WealthChart';
 import BreakdownChart from '../components/BreakdownChart';
 import RecentChanges from '../components/RecentChanges';
 import HoldingsTable from '../components/HoldingsTable';
-import AccountsTable, { type Account } from '../components/AccountsTable';
+import StaleSyncNotice from '../components/StaleSyncNotice';
+import AccountsTable, { type Account, type AccountsTableHandle } from '../components/AccountsTable';
+import { staleSyncStatuses } from '../utils/staleSync';
 
 interface Summary {
   total_wealth: number;
@@ -40,6 +42,11 @@ export default function DashboardPage() {
   const [defaultChartGranularity, setDefaultChartGranularity] = useState<'daily' | 'monthly'>('daily');
   // Bumped on every full refresh so HoldingsTable refetches after a sync.
   const [refreshKey, setRefreshKey] = useState(0);
+  // Accounts that need a code and have gone unsynced; their notices start the
+  // sync through the table, which owns the code prompt.
+  const accountsTable = useRef<AccountsTableHandle>(null);
+  const [noticeSyncing, setNoticeSyncing] = useState<number | null>(null);
+  const staleStatuses = useMemo(() => staleSyncStatuses(accounts, new Date()), [accounts]);
 
   const fetchAll = useCallback(async () => {
     setRefreshKey((k) => k + 1);
@@ -98,6 +105,15 @@ export default function DashboardPage() {
     }
   };
 
+  const handleNoticeSync = async (account: Account) => {
+    setNoticeSyncing(account.id);
+    try {
+      await accountsTable.current?.sync(account.id);
+    } finally {
+      setNoticeSyncing(null);
+    }
+  };
+
   if (loading) {
     return <div className="loading">Loading dashboard...</div>;
   }
@@ -106,6 +122,12 @@ export default function DashboardPage() {
 
   return (
     <div className="dashboard">
+      <StaleSyncNotice
+        statuses={staleStatuses}
+        syncingId={noticeSyncing}
+        onSync={handleNoticeSync}
+      />
+
       <WealthSummaryCard
         totalWealth={summary?.total_wealth ?? 0}
         baseCurrency={baseCurrency}
@@ -135,6 +157,7 @@ export default function DashboardPage() {
       <HoldingsTable refreshKey={refreshKey} />
 
       <AccountsTable
+        ref={accountsTable}
         accounts={accounts}
         baseCurrency={baseCurrency}
         onRefresh={fetchAll}

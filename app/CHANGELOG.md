@@ -6,6 +6,7 @@
 - Swisscard syncs now read the transaction feed to its last page instead of stopping after the first 50 entries, and keep everything the login handed over (about a year), so the card's history no longer ends a month back
 - The code prompt's Checking button shows a spinner while the code is verified
 - Accounts that need a code, and are therefore skipped by Sync all and the sync on app open, now say so when they go unsynced: a banner on the start screen and a notification at 21, 25 and 28 days, each more insistent; tapping either starts the sync, and the notifications can be switched off under Settings
+- Web: the same notice for unsynced accounts that need a code appears on the dashboard, with a Sync button that opens the code prompt, and the status tooltip of such accounts says they are left out of Sync all
 
 ## 1.4.0
 - VIAC accounts sync again after VIAC changed how it sends amounts, and the days missed meanwhile are filled in; should the format change again, the sync error says what VIAC returned instead of a cryptic decimal message, and never records a zero balance
