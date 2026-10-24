@@ -69,13 +69,13 @@ python ${APP_PATH}/manage.py collectstatic --noinput
 # Set up cron jobs if crontabs file exists
 if test -f "/crontabs"; then
     echo "Setting up cron jobs..."
-    # Export environment variables for cron (cron doesn't inherit container env).
-    # Include DISPLAY + MS_* + PLAYWRIGHT so cron-triggered syncs find the browser.
-    printenv | grep -E '^(DATABASE_URL|SECRET_KEY|FINTS_PRODUCT_ID|ADMIN_EMAIL|EMAIL_|DEFAULT_FROM_EMAIL|DEBUG|ALLOWED_HOSTS|DEMO_USERS|DISPLAY|MS_|PLAYWRIGHT)' | while IFS='=' read -r name value; do
-      echo "export ${name}=\"${value}\""
-    done > /etc/cron.env
+    # cron starts its jobs with an almost empty environment. Save the container's (DJANGO_*,
+    # DISPLAY, MS_*, PLAYWRIGHT_* and the rest), quoted for sh, and let every job's bash read it
+    # through BASH_ENV, so cron-triggered commands see the same settings as gunicorn.
+    python -c 'import os, re, shlex; print("".join(f"export {k}={shlex.quote(v)}\n" for k, v in sorted(os.environ.items()) if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", k) and k not in ("HOME", "OLDPWD", "PWD", "SHLVL", "_")))' > /etc/cron.env
+    chmod 600 /etc/cron.env
     service cron start
-    cat /crontabs | crontab -u root -
+    { echo 'SHELL=/bin/bash'; echo 'BASH_ENV=/etc/cron.env'; cat /crontabs; } | crontab -u root -
 fi
 
 # Start gunicorn with uvicorn worker
