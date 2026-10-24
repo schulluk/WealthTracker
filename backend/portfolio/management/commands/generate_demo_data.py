@@ -15,6 +15,7 @@ Environment variable alternative:
     DEMO_USERS=demo1:password1,demo2:password2
     python manage.py generate_demo_data
 """
+import logging
 import os
 import random
 from datetime import date, timedelta
@@ -33,6 +34,8 @@ from core.user_encryption import (
     pad_kek_for_fernet,
 )
 from portfolio.models import AccountSnapshot, FinancialAccount
+
+logger = logging.getLogger(__name__)
 
 # Demo account configurations
 # (name, broker_code, account_type, currency, is_manual, days_offset_for_newest)
@@ -89,27 +92,26 @@ class Command(BaseCommand):
                 user_pairs = env_users.split(',')
 
         if not user_pairs:
-            self.stderr.write(self.style.ERROR(
+            logger.error(
                 'No users specified. Use --users or set DEMO_USERS env var.\n'
                 'Example: --users demo1:password1 demo2:password2'
-            ))
+            )
             return
 
         # Parse user credentials
         users_to_create = []
-        for pair in user_pairs:
+        for number, pair in enumerate(user_pairs, start=1):
             if ':' not in pair:
-                self.stderr.write(self.style.ERROR(
-                    f'Invalid user format: {pair}. Expected username:password'
-                ))
+                # not the entry itself: it may be a password
+                logger.error('Invalid user entry #%d: expected username:password', number)
                 return
             username, password = pair.split(':', 1)
             users_to_create.append((username.strip(), password.strip()))
 
-        self.stdout.write(f'Processing {len(users_to_create)} demo users...')
+        logger.info('Processing %d demo users...', len(users_to_create))
 
         if dry_run:
-            self.stdout.write(self.style.WARNING('DRY RUN - no changes will be made'))
+            logger.warning('DRY RUN - no changes will be made')
 
         # First, validate that all usernames are either new or demo users
         self._validate_usernames([u[0] for u in users_to_create], dry_run)
@@ -121,7 +123,7 @@ class Command(BaseCommand):
         for username, password in users_to_create:
             self._create_demo_user(username, password, dry_run)
 
-        self.stdout.write(self.style.SUCCESS('Demo data generation complete'))
+        logger.info('Demo data generation complete')
 
     def _validate_usernames(self, usernames, dry_run):
         """
@@ -145,7 +147,7 @@ class Command(BaseCommand):
                 pass
 
         if not dry_run:
-            self.stdout.write('  All usernames validated')
+            logger.debug('All usernames validated')
 
     def _delete_demo_users(self, usernames, dry_run):
         """Delete demo users and all their associated data."""
@@ -157,24 +159,23 @@ class Command(BaseCommand):
                 if profile and profile.is_demo_user:
                     if dry_run:
                         account_count = FinancialAccount.objects.filter(user=user).count()
-                        self.stdout.write(
-                            f'  Would delete demo user "{username}" '
-                            f'with {account_count} accounts'
+                        logger.info(
+                            'Would delete demo user "%s" with %d accounts', username, account_count
                         )
                     else:
                         # Delete cascades to accounts and snapshots
                         user.delete()
-                        self.stdout.write(f'  Deleted demo user: {username}')
+                        logger.info('Deleted demo user: %s', username)
             except User.DoesNotExist:
                 pass
 
     @transaction.atomic
     def _create_demo_user(self, username, password, dry_run):
         """Create a demo user with accounts and snapshots."""
-        self.stdout.write(f'\nCreating demo user: {username}')
+        logger.info('Creating demo user: %s', username)
 
         if dry_run:
-            self.stdout.write('  Would create user with 5 demo accounts')
+            logger.info('Would create user %s with 5 demo accounts', username)
             return
 
         # Create user
@@ -183,7 +184,7 @@ class Command(BaseCommand):
             email=f'{username}@demo.local',
             password=password
         )
-        self.stdout.write(f'  Created user: {username}')
+        logger.debug('Created user: %s', username)
 
         # Get or create profile and mark as demo user
         profile, _ = UserProfile.objects.get_or_create(user=user)
@@ -245,7 +246,7 @@ class Command(BaseCommand):
         profile.encrypted_user_key = encrypted_user_key
         profile.encryption_migrated = True
 
-        self.stdout.write('  Set up per-user encryption')
+        logger.debug('Set up per-user encryption for %s', profile.user.username)
 
     def _create_demo_transactions(self, user):
         """Seed ~13 months of realistic transactions on the checking account.
@@ -261,9 +262,9 @@ class Command(BaseCommand):
             checking = FinancialAccount.objects.get(user=user, name='DKB Girokonto')
             savings = FinancialAccount.objects.get(user=user, name='Commerzbank Tagesgeld')
         except FinancialAccount.DoesNotExist:
-            self.stdout.write(self.style.WARNING(
-                '  Checking/savings demo accounts missing, skipping transactions'
-            ))
+            logger.warning(
+                'Checking/savings demo accounts missing for %s, skipping transactions', user.username
+            )
             return
 
         categories = {
@@ -327,9 +328,9 @@ class Command(BaseCommand):
         Transaction.objects.bulk_create(rows)
         categorized = apply_rules(user)
         transfers = detect_transfers(user)
-        self.stdout.write(
-            f'  Created {len(rows)} transactions '
-            f'({categorized} categorized, {transfers} marked as transfers)'
+        logger.debug(
+            'Created %d transactions for %s (%s categorized, %s marked as transfers)',
+            len(rows), user.username, categorized, transfers,
         )
 
     def _create_demo_accounts(self, user, profile):
@@ -341,9 +342,7 @@ class Command(BaseCommand):
             try:
                 broker = Broker.objects.get(code=broker_code)
             except Broker.DoesNotExist:
-                self.stdout.write(self.style.WARNING(
-                    f'  Broker "{broker_code}" not found, skipping account "{name}"'
-                ))
+                logger.warning('Broker "%s" not found, skipping account "%s"', broker_code, name)
                 continue
 
             # Create account
@@ -357,7 +356,7 @@ class Command(BaseCommand):
                 sync_enabled=False,
                 status='active',
             )
-            self.stdout.write(f'  Created account: {name}')
+            logger.debug('Created account "%s" for %s', name, user.username)
 
             # Generate snapshots
             newest_date = today - timedelta(days=days_offset)
@@ -409,7 +408,7 @@ class Command(BaseCommand):
             ))
 
         AccountSnapshot.objects.bulk_create(snapshots_to_create)
-        self.stdout.write(f'    Created {len(snapshots_to_create)} snapshots')
+        logger.debug('Created %d snapshots for account "%s"', len(snapshots_to_create), account.name)
 
     def _generate_balances(self, count):
         """

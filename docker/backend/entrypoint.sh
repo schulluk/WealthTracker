@@ -83,11 +83,11 @@ fi
 # an active TCP connection during 2FA - the bank closes dialogs that are
 # paused/serialized, making multi-worker 2FA impossible without Redis) and for
 # other in-memory state (discovery sessions, sync task queue).
+# gunicorn.conf.py sets the standard log line and leaves out the access log.
 python -m gunicorn \
   ${DJANGO_PROJECT_NAME}.asgi:application \
+  --config /etc/gunicorn/gunicorn.conf.py \
   --bind 0.0.0.0:8000 \
   --workers ${GUNICORN_WORKERS:-1} \
   --worker-class uvicorn_worker.UvicornWorker \
-  --chdir ${APP_PATH} \
-  --access-logformat "%({x-forwarded-for}i)s %(l)s %(u)s %(t)s \"%(r)s\" %(s)s %(b)s \"%(f)s\" \"%(a)s\"" \
-  --access-logfile -
+  --chdir ${APP_PATH}

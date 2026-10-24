@@ -42,7 +42,6 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'wealth.middleware.RequestLoggingMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -191,20 +190,18 @@ HISTORICAL_BACKFILL_BUFFER_DAYS = int(os.getenv('HISTORICAL_BACKFILL_BUFFER_DAYS
 # Skip backfill if we have a snapshot within this many days
 HISTORICAL_BACKFILL_SKIP_IF_RECENT_DAYS = int(os.getenv('HISTORICAL_BACKFILL_SKIP_IF_RECENT_DAYS', '2'))
 
-# Logging - JSON format for OpenObserve integration
+# Logging - everything goes to stdout as the standard log line (see logformat.py)
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
-        'json': {
-            '()': 'pythonjsonlogger.jsonlogger.JsonFormatter',
-            'format': '%(asctime)s %(levelname)s %(name)s %(module)s %(funcName)s %(lineno)d %(message)s',
-        },
+        'std': {'()': 'wealth.logformat.StdFormatter'},
     },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
-            'formatter': 'json',
+            'formatter': 'std',
+            'stream': 'ext://sys.stdout',
         },
     },
     'root': {
@@ -212,20 +209,14 @@ LOGGING = {
         'level': 'INFO',
     },
     'loggers': {
+        # propagate=False so that nothing reaches the console twice
         'django': {
             'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,
         },
-        'django.request': {
-            'handlers': ['console'],
-            'level': 'WARNING',
-            'propagate': False,
-        },
         'django.db.backends': {
-            'handlers': ['console'],
             'level': 'WARNING',
-            'propagate': False,
         },
     },
 }

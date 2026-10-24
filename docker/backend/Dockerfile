@@ -44,6 +44,7 @@ RUN . /venv-python/bin/activate && python3 -m pip install --no-cache-dir -r /tmp
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN . /venv-python/bin/activate && python3 -m playwright install --with-deps chromium
 
+COPY ./gunicorn.conf.py /etc/gunicorn/gunicorn.conf.py
 COPY ./entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

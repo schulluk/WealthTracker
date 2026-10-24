@@ -1,9 +1,12 @@
+import logging
 from datetime import date, datetime
 from decimal import Decimal
 
 from django.core.management.base import BaseCommand
 
 from exchange_rates.services import ExchangeRateService
+
+logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -49,23 +52,19 @@ class Command(BaseCommand):
             self._fix_missing_conversions()
 
     def _handle_latest(self):
-        self.stdout.write('Fetching latest exchange rates...')
+        logger.info('Fetching latest exchange rates...')
         rates = ExchangeRateService.fetch_latest_rates()
-        self.stdout.write(self.style.SUCCESS(
-            f'Fetched {len(rates)} new exchange rates for {date.today().isoformat()}'
-        ))
+        logger.info('Fetched %d new exchange rates for %s', len(rates), date.today().isoformat())
 
     def _handle_date(self, date_str):
         target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-        self.stdout.write(f'Fetching exchange rates for {target_date.isoformat()}...')
+        logger.info('Fetching exchange rates for %s...', target_date.isoformat())
         rates = ExchangeRateService.fetch_rates_for_date(target_date)
-        self.stdout.write(self.style.SUCCESS(
-            f'Fetched {len(rates)} new exchange rates for {target_date.isoformat()}'
-        ))
+        logger.info('Fetched %d new exchange rates for %s', len(rates), target_date.isoformat())
 
     def _handle_backfill(self, options):
         if not options['start']:
-            self.stderr.write(self.style.ERROR('--start is required for backfill'))
+            logger.error('--start is required for backfill')
             return
 
         start_date = datetime.strptime(options['start'], '%Y-%m-%d').date()
@@ -75,13 +74,11 @@ class Command(BaseCommand):
             else date.today()
         )
 
-        self.stdout.write(
-            f'Backfilling exchange rates from {start_date.isoformat()} to {end_date.isoformat()}...'
+        logger.info(
+            'Backfilling exchange rates from %s to %s...', start_date.isoformat(), end_date.isoformat()
         )
         count = ExchangeRateService.backfill_rates(start_date, end_date)
-        self.stdout.write(self.style.SUCCESS(
-            f'Backfilled {count} exchange rates'
-        ))
+        logger.info('Backfilled %d exchange rates', count)
 
     def _fix_missing_conversions(self):
         """Fix snapshots that are missing base currency conversions."""
@@ -95,7 +92,7 @@ class Command(BaseCommand):
         if not snapshots:
             return
 
-        self.stdout.write(f'Fixing {len(snapshots)} snapshots with missing conversions...')
+        logger.info('Fixing %d snapshots with missing conversions...', len(snapshots))
 
         fixed = 0
         for snapshot in snapshots:
@@ -125,6 +122,6 @@ class Command(BaseCommand):
                     fixed += 1
 
             except Exception as e:
-                self.stderr.write(f'Error fixing snapshot {snapshot.id}: {e}')
+                logger.error('Error fixing snapshot %s: %s', snapshot.id, e)
 
-        self.stdout.write(self.style.SUCCESS(f'Fixed {fixed} snapshot conversions'))
+        logger.info('Fixed %d snapshot conversions', fixed)

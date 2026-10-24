@@ -36,7 +36,6 @@ PyJWT==2.15.1
 playwright==1.63.0
 pyotp==2.10.0
 python-dotenv==1.2.4
-python-json-logger==4.2.0
 PyYAML==6.0.3
 regex==2026.9.29
 reportlab==5.0.1

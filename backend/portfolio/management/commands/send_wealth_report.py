@@ -48,22 +48,19 @@ class Command(BaseCommand):
         if target_user:
             users = users.filter(username=target_user)
 
-        self.stdout.write(f'Found {users.count()} users with weekly report enabled')
+        logger.info('Found %d users with weekly report enabled', users.count())
 
         sent_count = 0
         for user in users:
             if not user.email:
-                self.stdout.write(self.style.WARNING(
-                    f'Skipping {user.username}: no email address'
-                ))
+                logger.warning('Skipping %s: no email address', user.username)
                 continue
 
             try:
                 report = self._generate_report(user)
 
                 if dry_run:
-                    self.stdout.write(f'Would send to {user.email}:')
-                    self.stdout.write(report['body'][:500] + '...')
+                    logger.info('Would send to %s:\n%s...', user.email, report['body'][:500])
                 else:
                     send_mail(
                         subject=report['subject'],
@@ -72,15 +69,13 @@ class Command(BaseCommand):
                         recipient_list=[user.email],
                         fail_silently=False,
                     )
-                    self.stdout.write(self.style.SUCCESS(f'Sent to {user.email}'))
+                    logger.info('Sent to %s', user.username)  # no email addresses in the logs
                     sent_count += 1
 
             except Exception as e:
-                self.stdout.write(self.style.ERROR(
-                    f'Failed for {user.username}: {e}'
-                ))
+                logger.exception('Failed for %s: %s', user.username, e)
 
-        self.stdout.write(f'Sent {sent_count} emails')
+        logger.info('Sent %d emails', sent_count)
 
     def _generate_report(self, user):
         """Generate wealth report for a user."""

@@ -1,8 +1,9 @@
 # Wealth Tracker Cron Jobs
 # All times are server time
+# Output goes to the container's stdout (/proc/1/fd/1), next to gunicorn's.
 
 # Fetch exchange rates daily at 6:00 AM (fetch past week to catch any missed days)
-0 6 * * * . /etc/cron.env && cd /var/www/app && /venv-python/bin/python manage.py fetch_exchange_rates --backfill --start $(date -d "7 days ago" +\%Y-\%m-\%d) >> /var/log/cron.log 2>&1
+0 6 * * * . /etc/cron.env && cd /var/www/app && /venv-python/bin/python manage.py fetch_exchange_rates --backfill --start $(date -d "7 days ago" +\%Y-\%m-\%d) >> /proc/1/fd/1 2>&1
 
 # Send weekly wealth report emails on Mondays at 19:54
-54 19 * * 1 . /etc/cron.env && cd /var/www/app && /venv-python/bin/python manage.py send_wealth_report >> /var/log/cron.log 2>&1
+54 19 * * 1 . /etc/cron.env && cd /var/www/app && /venv-python/bin/python manage.py send_wealth_report >> /proc/1/fd/1 2>&1
