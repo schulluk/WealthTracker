@@ -1,0 +1,47 @@
+name: Store readiness
+
+# The canary. Once a week it asks Apple and Google everything a release
+# depends on and nothing else: the keys are accepted, write access is real,
+# the app is visible, the distribution certificate is not about to expire.
+#
+# It exists for the failures that have nothing to do with the code and show up
+# only when you are trying to ship: an agreement Apple quietly updated, a
+# service-account key someone rotated, a certificate that expired on Sunday.
+# Finding those on a Monday morning costs a coffee; finding them on release
+# night costs the release.
+#
+# A failed scheduled run emails the repo's watchers, which is the point.
+
+on:
+  schedule:
+    # Mondays, 06:40 UTC. Not on the hour: GitHub's scheduler queues heavily there.
+    - cron: '40 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  readiness:
+    name: Can we still ship?
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: production
+    steps:
+      - name: Preflight
+        uses: ./.github/actions/preflight
+        with:
+          platforms: both
+          # A version that cannot exist, so the version-state checks stay
+          # quiet and only the credentials and the certificate are examined.
+          version: 0.0.0
+          # CONFIGURE: the app's ids.
+          ios-bundle-id: ch.miniapps.wealthtracker
+          android-package: ch.miniapps.wealthtracker
+          play-track: production
+          probe-write: 'true'
+          cert-warn-days: '45'
+          asc-key-id: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          asc-issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          asc-key-p8-base64: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8_B64 }}
+          play-service-account-json: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}

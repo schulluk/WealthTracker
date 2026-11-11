@@ -1,0 +1,148 @@
+name: Setup toolchain
+description: >
+  Installs the one pinned toolchain an app is built and released with.
+  Everything is pinned on purpose: a floating version only ever discovers a
+  new release in the middle of a store release.
+
+inputs:
+  stack:
+    description: 'flutter | android-gradle | ios-xcode | none'
+    required: true
+  flutter-version:
+    description: 'Exact Flutter version, e.g. 3.47.4. Required for stack=flutter. Keep it equal to what developers run locally.'
+    default: ''
+  java-version:
+    description: >
+      Temurin JDK to install. Empty leaves the runner's default, which moves
+      with the image; pin it to what the project compiles against (a Flutter
+      project needs it too when its Gradle build is version-sensitive).
+    default: ''
+  android-sdk-packages:
+    description: 'Space-separated sdkmanager packages for stack=android-gradle.'
+    default: 'platforms;android-36 build-tools;36.0.0'
+  xcode-version:
+    description: 'Xcode to select on a macOS runner, e.g. 26.6. Empty leaves the runner default.'
+    default: ''
+  install-fastlane:
+    description: 'Install fastlane (needed for every store upload, not for a build).'
+    default: 'true'
+  fastlane-version:
+    description: 'Exact fastlane version, never "whatever RubyGems serves on release day".'
+    default: '2.240.1'
+  ruby-version:
+    description: "Ruby for fastlane. The runners' system Ruby is older than fastlane supports."
+    default: '3.3'
+  cap-gradle-memory:
+    description: >
+      Write a user-level gradle.properties capping the heap. Projects often ask
+      for 8 GB, which is more than a Linux runner has (7 GB) — that is a runner
+      OOM halfway through a release build.
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Check the inputs
+      shell: bash
+      run: |
+        set -euo pipefail
+        case "${{ inputs.stack }}" in
+          flutter|android-gradle|ios-xcode|none) ;;
+          *) echo "::error::stack must be flutter, android-gradle, ios-xcode or none (got '${{ inputs.stack }}')"; exit 1 ;;
+        esac
+        if [ "${{ inputs.stack }}" = flutter ] && [ -z "${{ inputs.flutter-version }}" ]; then
+          echo "::error::stack=flutter needs flutter-version. Pin it to the version you build with locally (flutter --version)."
+          exit 1
+        fi
+        if [ "${{ inputs.stack }}" = android-gradle ] && [ -z "${{ inputs.java-version }}" ]; then
+          echo "::error::stack=android-gradle needs java-version. Pin it to what the project compiles against (sourceCompatibility in app/build.gradle)."
+          exit 1
+        fi
+
+    # Third-party actions are pinned to a commit: a moved tag must not be able
+    # to run new code in a job that holds the signing key.
+    - name: Flutter
+      if: inputs.stack == 'flutter'
+      uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+      with:
+        flutter-version: ${{ inputs.flutter-version }}
+        channel: stable
+        cache: true
+
+    - name: Java
+      # Not tied to the stack: a Flutter project's Gradle build is just as
+      # sensitive to the JDK, and the runner's default changes with the image.
+      if: inputs.java-version != ''
+      uses: actions/setup-java@v6
+      with:
+        distribution: temurin
+        java-version: ${{ inputs.java-version }}
+
+    - name: Android SDK
+      if: inputs.stack == 'android-gradle'
+      shell: bash
+      env:
+        PACKAGES: ${{ inputs.android-sdk-packages }}
+      run: |
+        set -euo pipefail
+        # Deliberately not android-actions/setup-android: it installs the legacy
+        # `tools` package, which Google removed, so sdkmanager exits 1 with
+        # "Failed to find package 'tools'". The runner image ships an SDK; only
+        # what this project needs is added.
+        SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+        SDKMANAGER=$(ls "$SDK"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | sort -V | tail -1 || true)
+        if [ ! -x "${SDKMANAGER:-}" ]; then
+          echo "::error::No sdkmanager under $SDK/cmdline-tools."
+          exit 1
+        fi
+        yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+        # shellcheck disable=SC2086 # one argument per package, on purpose
+        "$SDKMANAGER" --install $PACKAGES > /dev/null
+        echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+        echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+
+    - name: Gradle
+      if: inputs.stack == 'android-gradle'
+      uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+
+    - name: Cap Gradle memory
+      if: inputs.cap-gradle-memory == 'true' && runner.os == 'Linux'
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p ~/.gradle
+        # The user-level file wins over the project's.
+        printf '%s\n' \
+          'org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -XX:ReservedCodeCacheSize=256m -XX:+HeapDumpOnOutOfMemoryError' \
+          'kotlin.daemon.jvmargs=-Xmx1g' >> ~/.gradle/gradle.properties
+
+    - name: Select Xcode
+      if: inputs.xcode-version != '' && runner.os == 'macOS'
+      shell: bash
+      env:
+        XCODE: ${{ inputs.xcode-version }}
+      run: |
+        set -euo pipefail
+        APP="/Applications/Xcode_${XCODE}.app"
+        if [ ! -d "$APP" ]; then
+          echo "::error::$APP is not on this runner. Installed: $(ls -d /Applications/Xcode*.app | tr '\n' ' ')"
+          exit 1
+        fi
+        sudo xcode-select -s "$APP"
+        xcodebuild -version
+
+    - name: Ruby
+      if: inputs.install-fastlane == 'true'
+      uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
+      with:
+        ruby-version: ${{ inputs.ruby-version }}
+
+    - name: Fastlane
+      if: inputs.install-fastlane == 'true'
+      shell: bash
+      env:
+        VERSION: ${{ inputs.fastlane-version }}
+      run: |
+        set -euo pipefail
+        gem install fastlane -v "$VERSION" --no-document
+        fastlane --version | tail -1
