@@ -81,7 +81,8 @@ jobs:
         if: ${{ !inputs.dry_run }}
         run: |
           set -euo pipefail
-          git fetch --quiet origin main
+          # No git fetch: the checkout keeps no credentials, so a fetch fails
+          # on a private repo, and fetch-depth: 0 already brought origin/main.
           if ! git merge-base --is-ancestor HEAD origin/main; then
             echo "::error::$(git rev-parse --short HEAD) is not on main. Only merged commits get released."
             exit 1
