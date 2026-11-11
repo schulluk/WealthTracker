@@ -153,7 +153,12 @@ if want ios; then
     fi
 
     if [ -n "$APP_ID" ] && BUILDS=$(asc_api GET "/v1/builds?filter[app]=$APP_ID&limit=1&sort=-uploadedDate" 2>/dev/null); then
-      NEC=$(echo "$BUILDS" | jq -r '.data[0].attributes.usesNonExemptEncryption // "unanswered"')
+      # Not `// "unanswered"`: jq's // also replaces false, and false ("uses
+      # no non-exempt encryption") is the answer most apps give. Only null is
+      # unanswered, and an app with no build yet has nothing to answer.
+      NEC=$(echo "$BUILDS" | jq -r 'if (.data | length) == 0 then "none"
+        else .data[0].attributes.usesNonExemptEncryption
+          | if . == null then "unanswered" else tostring end end')
       if [ "$NEC" = unanswered ]; then
         echo "::warning::The most recent build has no export-compliance answer, which is what \"Missing Compliance\" in TestFlight means. Set ITSAppUsesNonExemptEncryption in Info.plist so no build ever waits for that question."
       fi
