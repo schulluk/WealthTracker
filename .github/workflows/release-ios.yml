@@ -175,7 +175,8 @@ jobs:
           stack: ${{ inputs.stack }}
           flutter-version: ${{ inputs.flutter_version }}
           xcode-version: ${{ inputs.xcode_version }}
-          install-fastlane: ${{ inputs.dry_run == false }}
+          # Always: sigh fetches the App Store profiles, even for a dry run.
+          install-fastlane: 'true'
 
       - name: Preflight
         id: preflight
@@ -314,36 +315,79 @@ jobs:
             exit 1
           fi
 
+      - name: Provisioning profiles
+        # Automatic signing with an App Store Connect key goes for Apple's
+        # cloud-managed certificate, which only an Admin key may use: with an
+        # App Manager key the export fails ("Cloud signing permission error",
+        # then "No profiles ... were found"). So, like a local fastlane
+        # release: sigh finds or creates an App Store profile for the app and
+        # every extension in the archive, for the certificate in our keychain,
+        # and the export signs manually with those.
+        id: profiles
+        if: steps.gate.outputs.proceed == 'true'
+        working-directory: ${{ inputs.app_dir }}
+        env:
+          ARCHIVE: ${{ inputs.archive_path }}
+          APP_NAME: ${{ inputs.app_name }}
+        run: |
+          set -euo pipefail
+          APP="$ARCHIVE/Products/Applications/$APP_NAME"
+          [ -d "$APP" ] || { echo "::error::No $APP_NAME in $ARCHIVE (set archive_path / app_name)."; exit 1; }
+          IDS=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
+          for EXT in "$APP"/PlugIns/*.appex; do
+            [ -d "$EXT" ] || continue
+            IDS="$IDS $(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$EXT/Info.plist")"
+          done
+          OUT="$RUNNER_TEMP/profiles"
+          mkdir -p "$OUT" "$HOME/Library/MobileDevice/Provisioning Profiles" \
+            "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+          : > "$OUT/map.tsv"
+          for ID in $IDS; do
+            fastlane sigh \
+              --api_key_path "$RUNNER_TEMP/asc-key.json" \
+              --app_identifier "$ID" \
+              --platform ios \
+              --output_path "$OUT" \
+              --filename "$ID.mobileprovision" \
+              --skip_install true
+            security cms -D -i "$OUT/$ID.mobileprovision" > "$OUT/$ID.plist"
+            UUID=$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$OUT/$ID.plist")
+            cp "$OUT/$ID.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.mobileprovision"
+            cp "$OUT/$ID.mobileprovision" "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/$UUID.mobileprovision"
+            printf '%s\t%s\n' "$ID" "$UUID" >> "$OUT/map.tsv"
+            echo "::notice::App Store profile for $ID: $(/usr/libexec/PlistBuddy -c 'Print :Name' "$OUT/$ID.plist")"
+          done
+
       - name: Export IPA
         if: steps.gate.outputs.proceed == 'true'
         working-directory: ${{ inputs.app_dir }}
         env:
           ARCHIVE: ${{ inputs.archive_path }}
           TEAM_ID: ${{ inputs.apple_team_id }}
-          KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          ISSUER: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
           set -euo pipefail
           [ -d "$ARCHIVE" ] || { echo "::error::No archive at $ARCHIVE (set archive_path)."; exit 1; }
-          printf '%s\n' \
-            '<?xml version="1.0" encoding="UTF-8"?>' \
-            '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
-            '<plist version="1.0">' '<dict>' \
-            '  <key>method</key><string>app-store-connect</string>' \
-            '  <key>signingStyle</key><string>automatic</string>' \
-            "  <key>teamID</key><string>$TEAM_ID</string>" \
-            '</dict>' '</plist>' > "$RUNNER_TEMP/ExportOptions.plist"
+          # Manual signing with the profiles from the step before and the
+          # certificate in our keychain; no cloud signing, no Admin key.
+          python3 - "$RUNNER_TEMP/profiles/map.tsv" "$TEAM_ID" "$SIGN_IDENTITY" "$RUNNER_TEMP/ExportOptions.plist" <<'PY'
+          import plistlib, sys
+          map_path, team, identity, out = sys.argv[1:]
+          with open(map_path) as f:
+              profiles = dict(line.rstrip("\n").split("\t") for line in f if line.strip())
+          with open(out, "wb") as f:
+              plistlib.dump({
+                  "method": "app-store-connect",
+                  "signingStyle": "manual",
+                  "teamID": team,
+                  "signingCertificate": identity,
+                  "provisioningProfiles": profiles,
+              }, f)
+          PY
 
-          # -allowProvisioningUpdates with the API key lets Apple create or
-          # update the profile, which is why no match repository is needed.
           xcodebuild -exportArchive \
             -archivePath "$ARCHIVE" \
             -exportPath "$RUNNER_TEMP/ipa" \
-            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$RUNNER_TEMP/asc-key.p8" \
-            -authenticationKeyID "$KEY_ID" \
-            -authenticationKeyIssuerID "$ISSUER"
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"
           IPA=$(find "$RUNNER_TEMP/ipa" -name '*.ipa' -print -quit)
           [ -n "$IPA" ] || { echo "::error::The export produced no IPA."; exit 1; }
           echo "IPA_PATH=$IPA" >> "$GITHUB_ENV"
