@@ -146,6 +146,9 @@ jobs:
       app_dir: app
       flutter_version: '3.47.4'
       xcode_version: '27.2'
+      # macos-26 tops out at Xcode 26.6; xcode-27 is GitHub's preview image
+      # with 27.0 to 27.2, the Xcode the app is built with locally.
+      runner: xcode-27
       bundle_id: ch.miniapps.wealthtracker
       apple_team_id: ${{ vars.APPLE_TEAM_ID }}
       # No Runner.entitlements: no push, no app groups, nothing to repair.

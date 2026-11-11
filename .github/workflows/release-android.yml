@@ -173,6 +173,21 @@ jobs:
             exit 1
           fi
 
+      - name: Free disk space
+        # A Flutter release build (Gradle caches, the NDK, every ABI) ran the
+        # hosted Ubuntu runner out of disk mid-build (CakeDay, 2026-11-11).
+        # These preinstalled toolchains are never used by this job; the
+        # Android SDK and the JDKs stay.
+        if: runner.os == 'Linux'
+        run: |
+          set -uo pipefail
+          before=$(df -h / | awk 'NR==2 {print $4}')
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost \
+            /usr/share/swift /opt/hostedtoolcache/CodeQL /usr/local/lib/node_modules \
+            /usr/local/share/powershell /usr/local/share/chromium /opt/microsoft /opt/google || true
+          docker image prune --all --force > /dev/null 2>&1 || true
+          echo "::notice::Disk: $before free before, $(df -h / | awk 'NR==2 {print $4}') free after cleanup"
+
       - name: Setup toolchain
         uses: ./.github/actions/setup-toolchain
         with:
