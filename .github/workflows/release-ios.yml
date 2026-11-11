@@ -20,6 +20,10 @@ name: Release build (iOS)
 #     (reject_if_possible); a review Apple already started cannot be undone,
 #     which is what track=testflight is for.
 #   * a dry run archives, signs and exports, and uploads nothing.
+#   * the macOS job never waits for Apple's processing: it uploads and ends.
+#     Waiting there bills macOS minutes (ten times Linux) for a sleep, so
+#     TestFlight's What to Test is attached by a Linux job, and an App Store
+#     submission waits in the caller's Linux submit job.
 
 on:
   workflow_call:
@@ -55,7 +59,7 @@ on:
         type: string
         default: ''
       release_notes:
-        description: "TestFlight 'What to Test'. Ignored on the appstore track, where the notes belong to the store listing."
+        description: "TestFlight 'What to Test', attached by a Linux job once Apple lists the build. Ignored on the appstore track, where the notes belong to the store listing."
         type: string
         default: ''
       flutter_version:
@@ -64,6 +68,15 @@ on:
         default: ''
       xcode_version:
         description: 'e.g. 26.6. Empty leaves the runner default, which moves without warning.'
+        type: string
+        default: ''
+      pre_build_command:
+        description: >
+          Shell run in app_dir before the build, for tooling an Xcode build
+          phase shells out to that a runner does not ship. The one that bites
+          every Firebase project is `dart pub global activate flutterfire_cli`:
+          without it the Crashlytics symbol-upload phase fails the archive with
+          `flutterfire: command not found`. Not a place to build.
         type: string
         default: ''
       build_command:
@@ -273,6 +286,15 @@ jobs:
         if: steps.gate.outputs.proceed == 'true' && inputs.stack == 'flutter'
         working-directory: ${{ inputs.app_dir }}
         run: flutter pub get
+
+      - name: Pre-build command
+        if: steps.gate.outputs.proceed == 'true' && inputs.pre_build_command != ''
+        working-directory: ${{ inputs.app_dir }}
+        env:
+          COMMAND: ${{ inputs.pre_build_command }}
+        run: |
+          set -euo pipefail
+          bash -c "$COMMAND"
 
       - name: Archive
         if: steps.gate.outputs.proceed == 'true'
@@ -538,19 +560,20 @@ jobs:
         env:
           TRACK: ${{ inputs.track }}
           BUNDLE_ID: ${{ inputs.bundle_id }}
-          NOTES: ${{ inputs.release_notes }}
           LOG: ${{ runner.temp }}/asc-upload.log
         run: |
           set -uo pipefail
           if [ "$TRACK" = testflight ]; then
             # pilot appends the build and touches no App Store version, so it
-            # works while an earlier version is in review.
+            # works while an earlier version is in review. No --changelog and
+            # no waiting: with either, pilot sits on this runner until Apple
+            # has processed the build. The testflight-notes job attaches the
+            # notes from Linux.
             fastlane pilot upload \
               --api_key_path "$RUNNER_TEMP/asc-key.json" \
               --app_identifier "$BUNDLE_ID" \
               --ipa "$IPA_PATH" \
-              ${NOTES:+--changelog "$NOTES"} \
-              --skip_waiting_for_build_processing false 2>&1 | tee "$LOG"
+              --skip_waiting_for_build_processing true 2>&1 | tee "$LOG"
             rc=${PIPESTATUS[0]}
           else
             # deliver creates the App Store version. reject_if_possible
@@ -622,3 +645,67 @@ jobs:
             echo "| track | \`$TRACK\` |"
             echo "| result | $TEXT |"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # TestFlight's What to Test can be set once Apple lists the uploaded build,
+  # usually a few minutes after the upload and long before processing ends.
+  # That wait is a sleep, and it belongs on Linux.
+  testflight-notes:
+    name: TestFlight notes ${{ inputs.version }}
+    needs: ios
+    if: >-
+      inputs.track == 'testflight' && inputs.release_notes != ''
+      && !inputs.dry_run && needs.ios.outputs.review == 'uploaded'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: ${{ inputs.environment }}
+    steps:
+      # Once vendored, the action below is a local path, which only resolves
+      # after a checkout.
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup toolchain
+        uses: ./.github/actions/setup-toolchain
+        with:
+          stack: none
+
+      - name: Attach What to Test
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          ISSUER: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          P8_B64: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8_B64 }}
+          BUNDLE_ID: ${{ inputs.bundle_id }}
+          VERSION: ${{ inputs.version }}
+          BUILD_NUMBER: ${{ needs.ios.outputs.build_number }}
+          NOTES: ${{ inputs.release_notes }}
+          LOG: ${{ runner.temp }}/testflight-notes.log
+        run: |
+          set -uo pipefail
+          printf '%s' "$P8_B64" | base64 --decode > "$RUNNER_TEMP/asc.p8"
+          trap 'rm -f "$RUNNER_TEMP/asc.p8" "$RUNNER_TEMP/asc.json"' EXIT
+          jq -n --arg id "$KEY_ID" --arg issuer "$ISSUER" --rawfile key "$RUNNER_TEMP/asc.p8" \
+            '{key_id: $id, issuer_id: $issuer, key: $key, duration: 1200, in_house: false}' > "$RUNNER_TEMP/asc.json"
+          # Until Apple lists the build, pilot answers "No build to
+          # distribute!", the one failure worth retrying. From then on it sets
+          # the notes even while the build is still processing, and with
+          # --skip_waiting_for_build_processing it returns right after.
+          # --app_platform because there is no IPA here to read it from.
+          for attempt in $(seq 1 40); do
+            fastlane pilot distribute \
+              --api_key_path "$RUNNER_TEMP/asc.json" \
+              --app_identifier "$BUNDLE_ID" \
+              --app_platform ios \
+              --app_version "$VERSION" \
+              --build_number "$BUILD_NUMBER" \
+              --changelog "$NOTES" \
+              --distribute_external false \
+              --skip_waiting_for_build_processing true 2>&1 | tee "$LOG"
+            rc=${PIPESTATUS[0]}
+            [ "$rc" -eq 0 ] && exit 0
+            grep -q "No build to distribute" "$LOG" || exit "$rc"
+            echo "Build $BUILD_NUMBER is not listed yet (attempt $attempt of 40), trying again in a minute."
+            sleep 60
+          done
+          echo "::error::Apple did not list build $BUILD_NUMBER within 40 minutes. The build is uploaded; only What to Test is missing, and can be added in App Store Connect."
+          exit 1
