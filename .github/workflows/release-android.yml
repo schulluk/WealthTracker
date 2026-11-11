@@ -66,6 +66,13 @@ on:
       java_version:
         type: string
         default: '21'
+      pre_build_command:
+        description: >
+          Shell run in app_dir before the build, for tooling a Gradle task or
+          build script shells out to that a runner does not ship, e.g.
+          `dart pub global activate flutterfire_cli`. Not a place to build.
+        type: string
+        default: ''
       build_command:
         description: >
           Override the build. Required for stack=android-gradle, because every
@@ -299,6 +306,15 @@ jobs:
         if: steps.gate.outputs.proceed == 'true' && inputs.stack == 'flutter'
         working-directory: ${{ inputs.app_dir }}
         run: flutter pub get
+
+      - name: Pre-build command
+        if: steps.gate.outputs.proceed == 'true' && inputs.pre_build_command != ''
+        working-directory: ${{ inputs.app_dir }}
+        env:
+          COMMAND: ${{ inputs.pre_build_command }}
+        run: |
+          set -euo pipefail
+          bash -c "$COMMAND"
 
       - name: Build AAB
         if: steps.gate.outputs.proceed == 'true'

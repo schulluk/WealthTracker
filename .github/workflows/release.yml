@@ -176,6 +176,11 @@ jobs:
     timeout-minutes: 150
     environment: production
     steps:
+      # A local action only resolves after a checkout.
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
       - uses: ./.github/actions/setup-toolchain
         with:
           stack: none
