@@ -185,6 +185,9 @@ jobs:
         with:
           stack: none
       - name: Submit for review
+        # deliver without a binary asks "Do you want to setup deliver?" unless
+        # it finds fastlane/metadata here; --force does not skip that question.
+        working-directory: app/ios
         env:
           KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           ISSUER: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
