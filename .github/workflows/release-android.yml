@@ -1,0 +1,510 @@
+name: Release build (Android)
+
+# Builds a signed AAB and uploads it to Google Play.
+#
+# Reusable: an app repo's orchestrator calls this with `uses:` and
+# `secrets: inherit`. Everything stack-specific sits in two places — the
+# toolchain step and the build command — so Flutter, a native Gradle project
+# and anything else share the rest.
+#
+# Deliberate choices, each one a release that stopped once:
+#   * preflight asks Google whether this can ship before the build, not after.
+#   * the version code comes from the clock, so it always rises and no two
+#     builds (CI or laptop) can collide.
+#   * the bundle's signing certificate is compared with the registered upload
+#     key before the upload, because Play's rejection does not name the cause.
+#   * secrets are written to files, never passed as arguments, and removed again.
+#   * every store error goes through explain-store-error, which names the fix.
+#   * a dry run builds and signs everything and uploads nothing.
+
+on:
+  workflow_call:
+    inputs:
+      stack:
+        description: 'flutter | android-gradle'
+        type: string
+        required: true
+      version:
+        description: 'X.Y.Z. The version name; the code comes from the clock.'
+        type: string
+        required: true
+      package_name:
+        description: 'Play package name, e.g. ch.example.app'
+        type: string
+        required: true
+      app_dir:
+        description: 'Directory holding the app project (where pubspec.yaml or gradlew lives).'
+        type: string
+        default: '.'
+      track:
+        description: 'internal | alpha | beta | production'
+        type: string
+        default: internal
+      release_status:
+        description: >
+          completed = upload and send for review (managed publishing then holds
+          it until someone presses Publish). draft = upload only; required for
+          an app that has never been published.
+        type: string
+        default: completed
+      build_number:
+        description: 'Override the version code. Empty means seconds since 2026-01-01 UTC.'
+        type: string
+        default: ''
+      release_notes:
+        description: "Play's What's new, at most 500 characters."
+        type: string
+        default: ''
+      release_notes_locale:
+        description: 'Locale directory the notes are written to.'
+        type: string
+        default: en-US
+      flutter_version:
+        description: 'Required for stack=flutter.'
+        type: string
+        default: ''
+      java_version:
+        type: string
+        default: '21'
+      build_command:
+        description: >
+          Override the build. Required for stack=android-gradle, because every
+          project names its version properties differently. VERSION and
+          BUILD_NUMBER are in the environment; run from app_dir.
+        type: string
+        default: ''
+      extra_build_args:
+        description: 'Appended to the default Flutter build command, e.g. --dart-define-from-file=.env.production'
+        type: string
+        default: ''
+      artifact_path:
+        description: 'AAB path relative to app_dir. Empty means the stack default.'
+        type: string
+        default: ''
+      key_alias:
+        description: 'Keystore alias (not a secret).'
+        type: string
+        default: upload
+      keystore_path:
+        description: >
+          Where to write the keystore, relative to app_dir. Empty writes it to
+          the runner temp dir. Set it when the Gradle signingConfig expects the
+          file at a fixed place, e.g. app/release.keystore.
+        type: string
+        default: ''
+      key_properties_path:
+        description: "Flutter's key.properties, relative to app_dir. Empty writes none."
+        type: string
+        default: android/key.properties
+      preflight:
+        description: 'Ask Google whether this can ship before building.'
+        type: boolean
+        default: true
+      dry_run:
+        description: 'Build and sign, upload nothing. Play still validates the upload.'
+        type: boolean
+        default: false
+      runner:
+        type: string
+        default: ubuntu-24.04
+      environment:
+        description: 'GitHub environment holding the secrets.'
+        type: string
+        default: production
+      timeout_minutes:
+        type: number
+        default: 60
+    outputs:
+      build_number:
+        description: 'The version code that was built.'
+        value: ${{ jobs.android.outputs.build_number }}
+      review:
+        description: 'sent | draft | held | dry-run | skipped'
+        value: ${{ jobs.android.outputs.review }}
+    secrets:
+      # All optional here and checked at runtime instead, so a missing one
+      # names itself and says how to create it.
+      ANDROID_KEYSTORE_B64:
+        required: false
+      ANDROID_KEYSTORE_PASSWORD:
+        required: false
+      ANDROID_KEY_PASSWORD:
+        required: false
+      ANDROID_UPLOAD_KEY_SHA1:
+        required: false
+      GOOGLE_PLAY_SERVICE_ACCOUNT_JSON:
+        required: false
+      # Build-time values that must not be committed (a RevenueCat key, an
+      # API endpoint), as one flat JSON object; the Flutter build gets it via
+      # --dart-define-from-file. tools/set-store-secrets.sh --dart-defines sets it.
+      DART_DEFINES_JSON:
+        required: false
+
+jobs:
+  android:
+    name: Android ${{ inputs.version }}
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: ${{ inputs.timeout_minutes }}
+    environment: ${{ inputs.environment }}
+    outputs:
+      build_number: ${{ steps.resolve.outputs.build_number }}
+      review: ${{ steps.upload.outputs.review || 'skipped' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check the secrets
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          PLAY_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -n "$KEYSTORE" ] || missing="$missing ANDROID_KEYSTORE_B64"
+          [ -n "$STORE_PASSWORD" ] || missing="$missing ANDROID_KEYSTORE_PASSWORD"
+          [ -n "$KEY_PASSWORD" ] || missing="$missing ANDROID_KEY_PASSWORD"
+          if [ "$DRY_RUN" != true ] && [ -z "$PLAY_JSON" ]; then
+            missing="$missing GOOGLE_PLAY_SERVICE_ACCOUNT_JSON"
+          fi
+          if [ -n "$missing" ]; then
+            echo "::error::Missing on the ${{ inputs.environment }} environment:$missing. The store-release skill sets them: skills/store-release/references/secrets.md"
+            exit 1
+          fi
+
+      - name: Free disk space
+        # A Flutter release build (Gradle caches, the NDK, every ABI) ran the
+        # hosted Ubuntu runner out of disk mid-build (CakeDay, 2026-11-11).
+        # These preinstalled toolchains are never used by this job; the
+        # Android SDK and the JDKs stay.
+        if: runner.os == 'Linux'
+        run: |
+          set -uo pipefail
+          before=$(df -h / | awk 'NR==2 {print $4}')
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost \
+            /usr/share/swift /opt/hostedtoolcache/CodeQL /usr/local/lib/node_modules \
+            /usr/local/share/powershell /usr/local/share/chromium /opt/microsoft /opt/google || true
+          docker image prune --all --force > /dev/null 2>&1 || true
+          echo "::notice::Disk: $before free before, $(df -h / | awk 'NR==2 {print $4}') free after cleanup"
+
+      - name: Setup toolchain
+        uses: ./.github/actions/setup-toolchain
+        with:
+          stack: ${{ inputs.stack }}
+          flutter-version: ${{ inputs.flutter_version }}
+          java-version: ${{ inputs.java_version }}
+          install-fastlane: ${{ inputs.dry_run == false }}
+
+      - name: Preflight
+        id: preflight
+        if: inputs.preflight && !inputs.dry_run
+        uses: ./.github/actions/preflight
+        with:
+          platforms: android
+          version: ${{ inputs.version }}
+          android-package: ${{ inputs.package_name }}
+          play-track: ${{ inputs.track }}
+          play-service-account-json: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+
+      - name: Held back
+        id: gate
+        env:
+          OK: ${{ steps.preflight.outcome == 'skipped' && 'true' || steps.preflight.outputs.android_ok }}
+          REASON: ${{ steps.preflight.outputs.android_reason }}
+        run: |
+          set -euo pipefail
+          if [ "$OK" = false ]; then
+            echo "::warning::Android is held back this run, so nothing is built: $REASON"
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Resolve version code and paths
+        id: resolve
+        if: steps.gate.outputs.proceed == 'true'
+        env:
+          GIVEN: ${{ inputs.build_number }}
+          STACK: ${{ inputs.stack }}
+          APP_DIR: ${{ inputs.app_dir }}
+          ARTIFACT: ${{ inputs.artifact_path }}
+        run: |
+          set -euo pipefail
+          if [ -n "$GIVEN" ]; then
+            CODE="$GIVEN"
+          else
+            # Seconds since 2026-01-01 UTC, not the Unix epoch: Play caps
+            # versionCode at 2100000000, raw epoch seconds reach that in 2036,
+            # and a versionCode can never be lowered again. ~65 years of
+            # headroom. Never move this constant forward.
+            CODE=$(( $(date -u +%s) - 1767225600 ))
+          fi
+          if [ "$CODE" -le 0 ] || [ "$CODE" -ge 2100000000 ]; then
+            echo "::error::versionCode $CODE is outside Play's range (1..2099999999). Is the runner clock sane?"
+            exit 1
+          fi
+          if [ -n "$ARTIFACT" ]; then
+            REL="$ARTIFACT"
+          elif [ "$STACK" = flutter ]; then
+            REL=build/app/outputs/bundle/release/app-release.aab
+          else
+            REL=app/build/outputs/bundle/release/app-release.aab
+          fi
+          WS="$REL"
+          [ "$APP_DIR" != "." ] && WS="$APP_DIR/$REL"
+          {
+            echo "build_number=$CODE"
+            echo "aab_relative=$REL"
+            echo "aab_workspace=$WS"
+          } >> "$GITHUB_OUTPUT"
+          echo "::notice title=Android::${{ inputs.version }} (versionCode $CODE)"
+
+      - name: Write the signing key
+        if: steps.gate.outputs.proceed == 'true'
+        working-directory: ${{ inputs.app_dir }}
+        env:
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ inputs.key_alias }}
+          KEYSTORE_REL: ${{ inputs.keystore_path }}
+          KEY_PROPERTIES: ${{ inputs.key_properties_path }}
+        run: |
+          set -euo pipefail
+          if [ -n "$KEYSTORE_REL" ]; then
+            mkdir -p "$(dirname "$KEYSTORE_REL")"
+            KEYSTORE_ABS="$(pwd)/$KEYSTORE_REL"
+          else
+            KEYSTORE_ABS="$RUNNER_TEMP/release.keystore"
+          fi
+          printf '%s' "$ANDROID_KEYSTORE_B64" | base64 -d > "$KEYSTORE_ABS"
+          chmod 600 "$KEYSTORE_ABS"
+          if [ -n "$KEY_PROPERTIES" ]; then
+            mkdir -p "$(dirname "$KEY_PROPERTIES")"
+            printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=%s\n' \
+              "$STORE_PASSWORD" "$KEY_PASSWORD" "$KEY_ALIAS" "$KEYSTORE_ABS" > "$KEY_PROPERTIES"
+            chmod 600 "$KEY_PROPERTIES"
+          fi
+          # Also in the environment, for a Gradle signingConfig that reads it
+          # there (the native projects do).
+          {
+            echo "KEYSTORE_PATH=$KEYSTORE_ABS"
+            echo "KEYSTORE_PASSWORD=$STORE_PASSWORD"
+            echo "KEY_ALIAS=$KEY_ALIAS"
+            echo "KEY_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+
+      - name: Dependencies
+        if: steps.gate.outputs.proceed == 'true' && inputs.stack == 'flutter'
+        working-directory: ${{ inputs.app_dir }}
+        run: flutter pub get
+
+      - name: Build AAB
+        if: steps.gate.outputs.proceed == 'true'
+        working-directory: ${{ inputs.app_dir }}
+        env:
+          VERSION: ${{ inputs.version }}
+          BUILD_NUMBER: ${{ steps.resolve.outputs.build_number }}
+          STACK: ${{ inputs.stack }}
+          COMMAND: ${{ inputs.build_command }}
+          EXTRA: ${{ inputs.extra_build_args }}
+          DEFINES: ${{ secrets.DART_DEFINES_JSON }}
+        run: |
+          set -uo pipefail
+          # Build defines from the DART_DEFINES_JSON secret go in as a file:
+          # a --dart-define argument would be in every process listing.
+          DART_DEFINES_ARG=""
+          if [ -n "$DEFINES" ]; then
+            DEFINES_FILE="$RUNNER_TEMP/dart-defines.json"
+            trap 'rm -f "$DEFINES_FILE"' EXIT
+            printf '%s' "$DEFINES" > "$DEFINES_FILE"
+            chmod 600 "$DEFINES_FILE"
+            if ! python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert isinstance(d, dict) and d; print("::notice::Build defines: " + ", ".join(sorted(d)))' "$DEFINES_FILE"; then
+              echo "::error::DART_DEFINES_JSON is not a non-empty JSON object."
+              exit 1
+            fi
+            DART_DEFINES_ARG="--dart-define-from-file=$DEFINES_FILE"
+          fi
+          # A build_command can pass it on itself.
+          export DART_DEFINES_ARG
+          if [ -n "$COMMAND" ]; then
+            BUILD="$COMMAND"
+          elif [ "$STACK" = flutter ]; then
+            BUILD="flutter build appbundle --release --build-name=$VERSION --build-number=$BUILD_NUMBER $EXTRA $DART_DEFINES_ARG"
+          else
+            echo "::error::stack=android-gradle needs build_command: every Gradle project names its version properties differently. VERSION and BUILD_NUMBER are in the environment."
+            exit 1
+          fi
+          # Two attempts: a runner lost mid-build or a flaky dependency fetch
+          # is the most common Android failure and costs nothing to retry.
+          for attempt in 1 2; do
+            echo "::group::Build attempt $attempt"
+            if bash -c "$BUILD"; then
+              echo "::endgroup::"
+              exit 0
+            fi
+            echo "::endgroup::"
+            [ "$attempt" = 2 ] && break
+            echo "::warning::Build attempt $attempt failed, retrying once."
+            sleep 15
+          done
+          exit 1
+
+      - name: Verify the bundle
+        if: steps.gate.outputs.proceed == 'true'
+        env:
+          AAB: ${{ steps.resolve.outputs.aab_workspace }}
+          EXPECTED_SHA1: ${{ secrets.ANDROID_UPLOAD_KEY_SHA1 }}
+        run: |
+          set -euo pipefail
+          if [ ! -f "$AAB" ]; then
+            echo "::error::No bundle at $AAB. Set artifact_path if this project writes it elsewhere."
+            exit 1
+          fi
+          # Play rejects a bundle signed with the wrong key with a message that
+          # does not name the cause, so compare here.
+          SHA1=$(keytool -printcert -jarfile "$AAB" | grep -m1 'SHA1:' | tr -d ' ' | cut -d: -f2-)
+          ACTUAL=$(printf '%s' "$SHA1" | tr -d ':' | tr '[:lower:]' '[:upper:]')
+          EXPECTED=$(printf '%s' "${EXPECTED_SHA1:-}" | tr -d ' :' | tr '[:lower:]' '[:upper:]')
+          if [ -n "$EXPECTED" ] && [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "::error::The bundle is signed with $ACTUAL but Play expects the upload key $EXPECTED. ANDROID_KEYSTORE_B64 or key_alias is wrong."
+            exit 1
+          fi
+          [ -n "$EXPECTED" ] || echo "::notice::ANDROID_UPLOAD_KEY_SHA1 is not set, so the signing key was not checked against Play's."
+          echo "::notice::Bundle $(du -h "$AAB" | cut -f1), signed with $ACTUAL"
+
+      - name: Upload artifact
+        if: always() && steps.gate.outputs.proceed == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-${{ inputs.version }}-${{ steps.resolve.outputs.build_number }}
+          path: ${{ steps.resolve.outputs.aab_workspace }}
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Release notes
+        id: notes
+        if: steps.gate.outputs.proceed == 'true'
+        env:
+          NOTES: ${{ inputs.release_notes }}
+          LOCALE: ${{ inputs.release_notes_locale }}
+        run: |
+          set -euo pipefail
+          DIR="$RUNNER_TEMP/play-notes/$LOCALE/changelogs"
+          mkdir -p "$DIR"
+          # Checked before the upload, not after: Play refuses more than 500
+          # characters per language, and finding that out at the end wastes the
+          # whole build.
+          if [ ${#NOTES} -gt 500 ]; then
+            echo "::error::The release notes are ${#NOTES} characters; Play's What's new takes 500."
+            exit 1
+          fi
+          if [ -n "$NOTES" ]; then
+            printf '%s' "$NOTES" > "$DIR/default.txt"
+            echo "dir=$RUNNER_TEMP/play-notes" >> "$GITHUB_OUTPUT"
+            echo "::notice::What's new ($LOCALE, ${#NOTES} characters) ready."
+          else
+            echo "dir=" >> "$GITHUB_OUTPUT"
+            echo "::notice::No release notes given, so Play keeps the previous text."
+          fi
+
+      - name: Upload to Google Play
+        id: upload
+        if: steps.gate.outputs.proceed == 'true'
+        working-directory: ${{ inputs.app_dir }}
+        env:
+          AAB: ${{ github.workspace }}/${{ steps.resolve.outputs.aab_workspace }}
+          PLAY_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          NOTES_DIR: ${{ steps.notes.outputs.dir }}
+          PACKAGE: ${{ inputs.package_name }}
+          TRACK: ${{ inputs.track }}
+          RELEASE_STATUS: ${{ inputs.release_status }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          LOG: ${{ runner.temp }}/supply.log
+        run: |
+          set -uo pipefail
+          KEY="$RUNNER_TEMP/play-service-account.json"
+          # To a file, never an argument, and gone again at the end.
+          printf '%s' "$PLAY_JSON" > "$KEY"
+          chmod 600 "$KEY"
+          trap 'rm -f "$KEY"' EXIT
+
+          supply() {
+            # `supply` works straight from the CLI, so no Fastfile is needed
+            # and this workflow does not care what the app's own fastlane setup
+            # looks like. skip_upload_* keeps it to the binary: the store
+            # listing is a different job with a different blast radius.
+            fastlane supply \
+              --package_name "$PACKAGE" \
+              --aab "$AAB" \
+              --track "$TRACK" \
+              --release_status "$RELEASE_STATUS" \
+              --json_key "$KEY" \
+              ${NOTES_DIR:+--metadata_path "$NOTES_DIR"} \
+              --skip_upload_metadata true \
+              --skip_upload_images true \
+              --skip_upload_screenshots true \
+              --rescue_changes_not_sent_for_review false \
+              "$@" 2>&1 | tee -a "$LOG"
+            return "${PIPESTATUS[0]}"
+          }
+
+          if [ "$DRY_RUN" = true ]; then
+            # Play validates the whole upload and commits nothing.
+            supply --validate_only true || exit 1
+            echo "review=dry-run" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if supply; then
+            if [ "$RELEASE_STATUS" = completed ]; then REVIEW=sent; else REVIEW=draft; fi
+          elif grep -q 'changesNotSentForReview' "$LOG"; then
+            # After a rejection Play takes changes for review only from the
+            # Console. fastlane would retry this silently
+            # (rescue_changes_not_sent_for_review, off above) and the run would
+            # claim "sent". The refused edit was never committed, so upload
+            # again, held for the Console.
+            supply --changes_not_sent_for_review true || exit 1
+            REVIEW=held
+          else
+            exit 1
+          fi
+          echo "review=$REVIEW" >> "$GITHUB_OUTPUT"
+
+      - name: Explain the store error
+        if: failure() && steps.upload.outcome == 'failure'
+        uses: ./.github/actions/explain-store-error
+        with:
+          platform: android
+          log: ${{ runner.temp }}/supply.log
+
+      - name: Summary
+        if: always()
+        env:
+          VERSION: ${{ inputs.version }}
+          CODE: ${{ steps.resolve.outputs.build_number }}
+          TRACK: ${{ inputs.track }}
+          STATUS: ${{ inputs.release_status }}
+          REVIEW: ${{ steps.upload.outputs.review }}
+          PROCEED: ${{ steps.gate.outputs.proceed }}
+          REASON: ${{ steps.preflight.outputs.android_reason }}
+        run: |
+          set -euo pipefail
+          case "${REVIEW:-}" in
+            sent) TEXT="sent for review; with managed publishing on, Publish in Play Console ships it" ;;
+            draft) TEXT="uploaded as a draft: press Send for review in Play Console" ;;
+            held) TEXT="**uploaded but not sent**: Play takes this app's changes for review only from the Console. Publishing overview, Send for review. Re-running would upload a second build" ;;
+            dry-run) TEXT="dry run: Play validated the upload, nothing was committed" ;;
+            *) [ "$PROCEED" = true ] && TEXT="the upload did not finish" || TEXT="held back: $REASON" ;;
+          esac
+          {
+            echo "### Android $VERSION"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| versionCode | \`${CODE:-n/a}\` |"
+            echo "| track | \`$TRACK\` |"
+            echo "| status | \`$STATUS\` |"
+            echo "| result | $TEXT |"
+          } >> "$GITHUB_STEP_SUMMARY"

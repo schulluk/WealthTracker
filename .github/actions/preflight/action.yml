@@ -1,0 +1,107 @@
+name: Release preflight
+description: >
+  Asks Apple and Google whether this release can happen, before a single build
+  starts: the keys are accepted, write access is real (which is how an
+  outstanding agreement shows up), the app is visible, no review is in flight,
+  the distribution certificate is not about to expire. A shared failure stops
+  the run in seconds; one blocked platform is held back while the other ships.
+
+inputs:
+  platforms:
+    description: 'both | ios | android'
+    default: both
+  version:
+    description: 'X.Y.Z being released'
+    required: true
+  ios-bundle-id:
+    description: 'Required when iOS is in the run.'
+    default: ''
+  android-package:
+    description: 'Required when Android is in the run.'
+    default: ''
+  ios-track:
+    description: 'appstore | testflight. A TestFlight upload touches no App Store version, so review states do not block it.'
+    default: appstore
+  play-track:
+    description: 'internal | alpha | beta | production'
+    default: internal
+  probe-write:
+    description: >
+      Prove write access with a write that changes nothing (the editable
+      version's copyright, set to the value it already has). Apple exposes no
+      agreements endpoint, so this is the only way to learn before the build
+      that an agreement is outstanding. On for the weekly readiness run; cheap
+      enough to leave on for releases.
+    default: 'true'
+  cert-warn-days:
+    description: 'Warn this many days before the newest distribution certificate expires.'
+    default: '30'
+  asc-key-id:
+    description: 'App Store Connect API key id (not secret).'
+    default: ''
+  asc-issuer-id:
+    description: 'App Store Connect issuer id (not secret).'
+    default: ''
+  asc-key-p8-base64:
+    description: 'base64 of the AuthKey_*.p8 (secret).'
+    default: ''
+  play-service-account-json:
+    description: 'The Play service account JSON (secret).'
+    default: ''
+
+outputs:
+  ios_ok:
+    description: 'false when iOS is held back this run.'
+    value: ${{ steps.run.outputs.ios_ok }}
+  android_ok:
+    description: 'false when Android is held back this run.'
+    value: ${{ steps.run.outputs.android_ok }}
+  ios_reason:
+    description: 'Why iOS is held back.'
+    value: ${{ steps.run.outputs.ios_reason }}
+  android_reason:
+    description: 'Why Android is held back.'
+    value: ${{ steps.run.outputs.android_reason }}
+
+runs:
+  using: composite
+  steps:
+    - name: Write the store keys
+      shell: bash
+      env:
+        ASC_P8_B64: ${{ inputs.asc-key-p8-base64 }}
+        PLAY_JSON: ${{ inputs.play-service-account-json }}
+      run: |
+        set -euo pipefail
+        # To files, never to arguments: an argument shows up in a process listing.
+        if [ -n "$ASC_P8_B64" ]; then
+          printf '%s' "$ASC_P8_B64" | base64 --decode > "$RUNNER_TEMP/preflight-asc.p8"
+          chmod 600 "$RUNNER_TEMP/preflight-asc.p8"
+        fi
+        if [ -n "$PLAY_JSON" ]; then
+          printf '%s' "$PLAY_JSON" > "$RUNNER_TEMP/preflight-play.json"
+          chmod 600 "$RUNNER_TEMP/preflight-play.json"
+        fi
+
+    - name: Preflight
+      id: run
+      shell: bash
+      env:
+        PLATFORMS: ${{ inputs.platforms }}
+        VERSION: ${{ inputs.version }}
+        IOS_BUNDLE_ID: ${{ inputs.ios-bundle-id }}
+        ANDROID_PACKAGE: ${{ inputs.android-package }}
+        IOS_TRACK: ${{ inputs.ios-track }}
+        PLAY_TRACK: ${{ inputs.play-track }}
+        PROBE_WRITE: ${{ inputs.probe-write }}
+        CERT_WARN_DAYS: ${{ inputs.cert-warn-days }}
+        APP_STORE_CONNECT_API_KEY_ID: ${{ inputs.asc-key-id }}
+        APP_STORE_CONNECT_ISSUER_ID: ${{ inputs.asc-issuer-id }}
+        ASC_KEY_PATH: ${{ runner.temp }}/preflight-asc.p8
+        GOOGLE_PLAY_JSON_KEY_PATH: ${{ runner.temp }}/preflight-play.json
+      run: bash "${{ github.action_path }}/scripts/preflight.sh"
+
+    - name: Shred the keys
+      if: always()
+      shell: bash
+      run: rm -f "$RUNNER_TEMP/preflight-asc.p8" "$RUNNER_TEMP/preflight-play.json"

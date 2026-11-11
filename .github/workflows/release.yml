@@ -1,0 +1,210 @@
+name: Release
+
+# Copy to .github/workflows/release.yml in the app repo and fill in the
+# CONFIGURE block. Everything else is shared: the two reusable workflows do
+# the building, signing, verifying and uploading.
+#
+# This ships the NEXT version of an app that is already set up: it exists in
+# both consoles, the listing, screenshots, ratings and agreements are done, and
+# a human has released it by hand at least once. It never creates an app,
+# touches the listing or replaces screenshots.
+#
+# To test a change to this file, dispatch it with dry_run: both platforms
+# build and sign, and nothing is uploaded.
+
+run-name: >-
+  ${{ inputs.version }} ${{ inputs.platforms }}${{ inputs.dry_run && ' (dry run)' || '' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, X.Y.Z'
+        type: string
+        required: true
+      platforms:
+        description: 'Which stores'
+        type: choice
+        options: [both, ios, android]
+        default: both
+      ios_track:
+        description: 'appstore = create the App Store version. testflight = only append the build (works while an earlier version is in review).'
+        type: choice
+        options: [appstore, testflight]
+        default: appstore
+      play_track:
+        description: 'Play track'
+        type: choice
+        options: [internal, alpha, beta, production]
+        default: internal
+      release_notes:
+        description: "Play's What's new (max 500 characters) and TestFlight's What to Test. Empty keeps the previous text."
+        type: string
+        default: ''
+      submit:
+        description: 'Submit for review after uploading. Leave off until one release has gone through with it off.'
+        type: boolean
+        default: false
+      dry_run:
+        description: 'Build and sign everything, upload nothing.'
+        type: boolean
+        default: false
+
+concurrency:
+  # Never two uploads for one app at once, and never cancel one halfway
+  # through a store upload. A dry run gets its own group so testing the
+  # pipeline cannot cancel a real release.
+  group: release-${{ inputs.dry_run && 'dry' || 'real' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      ios: ${{ steps.plan.outputs.ios }}
+      android: ${{ steps.plan.outputs.android }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Only commits on main may be released
+        # A dry run is how a branch gets tested, so this applies to real runs
+        # only — otherwise the one way to exercise a pipeline change is also
+        # the one thing this check forbids.
+        if: ${{ !inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          # No git fetch: the checkout keeps no credentials, so a fetch fails
+          # on a private repo, and fetch-depth: 0 already brought origin/main.
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::$(git rev-parse --short HEAD) is not on main. Only merged commits get released."
+            exit 1
+          fi
+
+      - name: Check the version
+        id: plan
+        env:
+          VERSION: ${{ inputs.version }}
+          PLATFORMS: ${{ inputs.platforms }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Version '$VERSION' is not X.Y.Z."
+            exit 1
+          fi
+          # Keep the version honest against the changelog: WealthTracker ships
+          # what sits under "## Next: X.Y.Z" in app/CHANGELOG.md.
+          if ! grep -qE "^## (Next:? )?$VERSION( !)?[[:space:]]*$" app/CHANGELOG.md; then
+            echo "::error::app/CHANGELOG.md has no '## Next: $VERSION' section."
+            exit 1
+          fi
+          IOS=true; ANDROID=true
+          [ "$PLATFORMS" = android ] && IOS=false
+          [ "$PLATFORMS" = ios ] && ANDROID=false
+          echo "ios=$IOS" >> "$GITHUB_OUTPUT"
+          echo "android=$ANDROID" >> "$GITHUB_OUTPUT"
+
+  # ─────────────────────────── CONFIGURE ───────────────────────────
+  # stack, the ids, the toolchain versions and the paths. Everything else
+  # has a default that fits a standard Flutter project.
+
+  android:
+    name: Android
+    needs: prepare
+    if: needs.prepare.outputs.android == 'true'
+    uses: ./.github/workflows/release-android.yml
+    with:
+      stack: flutter
+      app_dir: app
+      flutter_version: '3.47.4'
+      java_version: '17'
+      package_name: ch.miniapps.wealthtracker
+      key_alias: ${{ vars.ANDROID_KEY_ALIAS }}
+      version: ${{ inputs.version }}
+      track: ${{ inputs.play_track }}
+      # completed sends the release for review; with managed publishing on in
+      # Play Console it still waits for a human to press Publish. draft is for
+      # an app that has never been published.
+      release_status: ${{ inputs.submit && 'completed' || 'draft' }}
+      release_notes: ${{ inputs.release_notes }}
+      dry_run: ${{ inputs.dry_run }}
+    secrets: inherit
+
+  ios:
+    name: iOS
+    needs: prepare
+    if: needs.prepare.outputs.ios == 'true'
+    uses: ./.github/workflows/release-ios.yml
+    with:
+      stack: flutter
+      app_dir: app
+      flutter_version: '3.47.4'
+      xcode_version: '27.2'
+      # macos-26 tops out at Xcode 26.6; xcode-27 is GitHub's preview image
+      # with 27.0 to 27.2, the Xcode the app is built with locally.
+      runner: xcode-27
+      bundle_id: ch.miniapps.wealthtracker
+      apple_team_id: ${{ vars.APPLE_TEAM_ID }}
+      # No Runner.entitlements: no push, no app groups, nothing to repair.
+      entitlements_path: ''
+      version: ${{ inputs.version }}
+      track: ${{ inputs.ios_track }}
+      release_notes: ${{ inputs.release_notes }}
+      dry_run: ${{ inputs.dry_run }}
+    secrets: inherit
+
+  # Submitting for review is deliberately a separate, opt-in job: it is the one
+  # step a human usually wants to look at, and Apple needs the build processed
+  # first (up to two hours), which is API polling and belongs on Linux where
+  # the minutes are ten times cheaper.
+  submit-ios:
+    name: iOS submit
+    needs: [prepare, ios]
+    if: >-
+      inputs.submit && !inputs.dry_run
+      && needs.prepare.outputs.ios == 'true'
+      && needs.ios.result == 'success'
+      && inputs.ios_track == 'appstore'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    environment: production
+    steps:
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          stack: none
+      - name: Submit for review
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          ISSUER: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          P8_B64: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8_B64 }}
+          # CONFIGURE: same bundle id as the ios job.
+          BUNDLE_ID: ch.miniapps.wealthtracker
+          VERSION: ${{ inputs.version }}
+          BUILD_NUMBER: ${{ needs.ios.outputs.build_number }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$P8_B64" | base64 --decode > "$RUNNER_TEMP/asc.p8"
+          jq -n --arg id "$KEY_ID" --arg issuer "$ISSUER" --rawfile key "$RUNNER_TEMP/asc.p8" \
+            '{key_id: $id, issuer_id: $issuer, key: $key, duration: 1200, in_house: false}' > "$RUNNER_TEMP/asc.json"
+          trap 'rm -f "$RUNNER_TEMP/asc.p8" "$RUNNER_TEMP/asc.json"' EXIT
+          # No binary upload: this attaches the build the ios job already
+          # uploaded to the version and sends that version to review.
+          fastlane deliver \
+            --api_key_path "$RUNNER_TEMP/asc.json" \
+            --app_identifier "$BUNDLE_ID" \
+            --app_version "$VERSION" \
+            --build_number "$BUILD_NUMBER" \
+            --skip_binary_upload true \
+            --skip_screenshots true \
+            --skip_metadata true \
+            --submit_for_review true \
+            --automatic_release false \
+            --run_precheck_before_submit false \
+            --force true
