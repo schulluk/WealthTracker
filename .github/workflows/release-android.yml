@@ -52,13 +52,22 @@ on:
         type: string
         default: ''
       release_notes:
-        description: "Play's What's new, at most 500 characters."
+        description: >
+          Play's What's new. Over 500 characters, whole lines are kept from the
+          top, plus the last line, so a changelog section fits as it is.
         type: string
         default: ''
       release_notes_locale:
         description: 'Locale directory the notes are written to.'
         type: string
         default: en-US
+      release_notes_fallbacks:
+        description: >
+          One line per other listing language, `<locale>=<text>`, e.g.
+          `de-DE=Fehlerbehebungen und Verbesserungen.` Only written when there
+          are notes.
+        type: string
+        default: ''
       flutter_version:
         description: 'Required for stack=flutter.'
         type: string
@@ -405,25 +414,59 @@ jobs:
         env:
           NOTES: ${{ inputs.release_notes }}
           LOCALE: ${{ inputs.release_notes_locale }}
+          FALLBACKS: ${{ inputs.release_notes_fallbacks }}
         run: |
           set -euo pipefail
-          DIR="$RUNNER_TEMP/play-notes/$LOCALE/changelogs"
-          mkdir -p "$DIR"
-          # Checked before the upload, not after: Play refuses more than 500
+          # Fitted before the upload, not after: Play refuses more than 500
           # characters per language, and finding that out at the end wastes the
           # whole build.
-          if [ ${#NOTES} -gt 500 ]; then
-            echo "::error::The release notes are ${#NOTES} characters; Play's What's new takes 500."
-            exit 1
-          fi
-          if [ -n "$NOTES" ]; then
-            printf '%s' "$NOTES" > "$DIR/default.txt"
-            echo "dir=$RUNNER_TEMP/play-notes" >> "$GITHUB_OUTPUT"
-            echo "::notice::What's new ($LOCALE, ${#NOTES} characters) ready."
-          else
-            echo "dir=" >> "$GITHUB_OUTPUT"
-            echo "::notice::No release notes given, so Play keeps the previous text."
-          fi
+          python3 - "$RUNNER_TEMP/play-notes" <<'PY'
+          import os, sys
+          root, limit = sys.argv[1], 500
+          notes = os.environ["NOTES"].strip()
+          out = os.environ["GITHUB_OUTPUT"]
+
+          def fit(text):
+              """Whole lines from the top, plus the last line, within limit."""
+              if len(text) <= limit:
+                  return text, 0
+              lines = [l for l in text.splitlines() if l.strip()]
+              last, kept = lines[-1], []
+              for line in lines[:-1]:
+                  if len("\n".join(kept + [line, last])) > limit:
+                      break
+                  kept.append(line)
+              fitted = "\n".join(kept + [last])
+              if len(fitted) > limit:  # not even one line fits: cut at a word
+                  fitted = text[: limit - 3].rsplit(" ", 1)[0] + "..."
+                  return fitted, len(lines)
+              return fitted, len(lines) - len(kept) - 1
+
+          def write(locale, text):
+              d = os.path.join(root, locale, "changelogs")
+              os.makedirs(d, exist_ok=True)
+              with open(os.path.join(d, "default.txt"), "w", encoding="utf-8") as f:
+                  f.write(text)
+
+          if not notes:
+              print("::notice::No release notes given, so Play keeps the previous text.")
+              open(out, "a").write("dir=\n")
+              sys.exit(0)
+          fitted, dropped = fit(notes)
+          write(os.environ["LOCALE"], fitted)
+          left = f", {dropped} line(s) left out to fit {limit}" if dropped else ""
+          print(f"::notice::What's new ({os.environ['LOCALE']}, {len(fitted)} characters{left}) ready.")
+          for line in os.environ["FALLBACKS"].splitlines():
+              if not line.strip():
+                  continue
+              locale, sep, text = line.partition("=")
+              if not sep or not text.strip():
+                  print(f"::error::release_notes_fallbacks line without <locale>=<text>: {line}")
+                  sys.exit(1)
+              write(locale.strip(), fit(text.strip())[0])
+              print(f"  fallback for {locale.strip()}")
+          open(out, "a").write(f"dir={root}\n")
+          PY
 
       - name: Upload to Google Play
         id: upload

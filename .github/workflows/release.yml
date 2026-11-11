@@ -38,7 +38,7 @@ on:
         options: [internal, alpha, beta, production]
         default: internal
       release_notes:
-        description: "Play's What's new (max 500 characters) and TestFlight's What to Test. Empty keeps the previous text."
+        description: "Overrides the changelog. Empty takes this version's section of app/CHANGELOG.md: in full for TestFlight's What to Test and the App Store's What's New, whole lines within 500 characters for Play."
         type: string
         default: ''
       submit:
@@ -68,6 +68,7 @@ jobs:
     outputs:
       ios: ${{ steps.plan.outputs.ios }}
       android: ${{ steps.plan.outputs.android }}
+      notes: ${{ steps.notes.outputs.notes }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -111,6 +112,35 @@ jobs:
           echo "ios=$IOS" >> "$GITHUB_OUTPUT"
           echo "android=$ANDROID" >> "$GITHUB_OUTPUT"
 
+      - name: Release notes from the changelog
+        id: notes
+        env:
+          VERSION: ${{ inputs.version }}
+          # The notes are everything between "## Next: X.Y.Z" (or "## X.Y.Z")
+          # and the next "## " heading. Play keeps whole lines from the top
+          # plus the last line within 500 characters, so the lines that matter
+          # most go first.
+          CHANGELOG: app/CHANGELOG.md
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os, re, secrets
+          path, version = os.environ["CHANGELOG"], os.environ["VERSION"]
+          notes = ""
+          if os.path.isfile(path):
+              text = open(path, encoding="utf-8").read()
+              heading = r"^##\s+(?:Next:?\s+)?" + re.escape(version) + r"(?:\s*!)?\s*$"
+              m = re.search(heading + r"\n(.*?)(?=^##\s|\Z)", text, re.M | re.S)
+              notes = m.group(1).strip() if m else ""
+          if notes:
+              print(f"::notice::Release notes from {path}: {len(notes)} characters, {len(notes.splitlines())} lines.")
+          else:
+              print(f"::notice::No section for {version} in {path}, so the stores keep their previous notes unless release_notes is set.")
+          eof = "EOF_" + secrets.token_hex(8)
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write(f"notes<<{eof}\n{notes}\n{eof}\n")
+          PY
+
   # ─────────────────────────── CONFIGURE ───────────────────────────
   # stack, the ids, the toolchain versions and the paths. Everything else
   # has a default that fits a standard Flutter project.
@@ -133,7 +163,8 @@ jobs:
       # Play Console it still waits for a human to press Publish. draft is for
       # an app that has never been published.
       release_status: ${{ inputs.submit && 'completed' || 'draft' }}
-      release_notes: ${{ inputs.release_notes }}
+      # English is the only listing language, so no fallbacks are needed.
+      release_notes: ${{ inputs.release_notes || needs.prepare.outputs.notes }}
       dry_run: ${{ inputs.dry_run }}
     secrets: inherit
 
@@ -156,7 +187,8 @@ jobs:
       entitlements_path: ''
       version: ${{ inputs.version }}
       track: ${{ inputs.ios_track }}
-      release_notes: ${{ inputs.release_notes }}
+      # English is the only App Store localization, so no fallbacks are needed.
+      release_notes: ${{ inputs.release_notes || needs.prepare.outputs.notes }}
       dry_run: ${{ inputs.dry_run }}
     secrets: inherit
 

@@ -24,6 +24,9 @@ name: Release build (iOS)
 #     Waiting there bills macOS minutes (ten times Linux) for a sleep, so
 #     TestFlight's What to Test is attached by a Linux job, and an App Store
 #     submission waits in the caller's Linux submit job.
+#   * on the appstore track a Linux job writes What's New and the App Review
+#     contact to the new version. Apple carries neither over from the last
+#     version and refuses a submission without them.
 
 on:
   workflow_call:
@@ -59,7 +62,21 @@ on:
         type: string
         default: ''
       release_notes:
-        description: "TestFlight 'What to Test', attached by a Linux job once Apple lists the build. Ignored on the appstore track, where the notes belong to the store listing."
+        description: >
+          TestFlight's What to Test (track testflight) or the App Store
+          version's What's New (track appstore), written by a Linux job after
+          the upload. Emoji are removed for the App Store, which refuses them.
+        type: string
+        default: ''
+      release_notes_locale:
+        description: 'The App Store localization the notes are written to.'
+        type: string
+        default: en-US
+      release_notes_fallbacks:
+        description: >
+          Track appstore: one line per other localization of the version,
+          `<locale>=<text>`, e.g. `de-DE=Fehlerbehebungen und Verbesserungen.`
+          Apple refuses a submission while any localization has no What's New.
         type: string
         default: ''
       flutter_version:
@@ -148,6 +165,16 @@ on:
       # API endpoint), as one flat JSON object; the Flutter build gets it via
       # --dart-define-from-file. tools/set-store-secrets.sh --dart-defines sets it.
       DART_DEFINES_JSON:
+        required: false
+      # The App Review contact for track appstore. Apple wants it on every
+      # version and does not copy it from the previous one.
+      APP_REVIEW_FIRST_NAME:
+        required: false
+      APP_REVIEW_LAST_NAME:
+        required: false
+      APP_REVIEW_EMAIL:
+        required: false
+      APP_REVIEW_PHONE:
         required: false
 
 jobs:
@@ -709,3 +736,129 @@ jobs:
           done
           echo "::error::Apple did not list build $BUILD_NUMBER within 40 minutes. The build is uploaded; only What to Test is missing, and can be added in App Store Connect."
           exit 1
+
+  # What's New and the App Review contact for the App Store version the upload
+  # just created or reused. Neither is copied from the previous version, and a
+  # submission without them is refused, so this runs before the caller's
+  # submit job (which waits for this whole workflow). It talks only to the
+  # API, so it runs on Linux.
+  appstore-notes:
+    name: App Store notes ${{ inputs.version }}
+    needs: ios
+    if: >-
+      inputs.track == 'appstore' && !inputs.dry_run
+      && needs.ios.outputs.review == 'uploaded'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: ${{ inputs.environment }}
+    steps:
+      # Once vendored, the action below is a local path, which only resolves
+      # after a checkout.
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup toolchain
+        uses: ./.github/actions/setup-toolchain
+        with:
+          stack: none
+
+      - name: Write What's New and the review contact
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          ISSUER: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          P8_B64: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8_B64 }}
+          BUNDLE_ID: ${{ inputs.bundle_id }}
+          VERSION: ${{ inputs.version }}
+          NOTES: ${{ inputs.release_notes }}
+          LOCALE: ${{ inputs.release_notes_locale }}
+          FALLBACKS: ${{ inputs.release_notes_fallbacks }}
+          REVIEW_FIRST_NAME: ${{ secrets.APP_REVIEW_FIRST_NAME }}
+          REVIEW_LAST_NAME: ${{ secrets.APP_REVIEW_LAST_NAME }}
+          REVIEW_EMAIL: ${{ secrets.APP_REVIEW_EMAIL }}
+          REVIEW_PHONE: ${{ secrets.APP_REVIEW_PHONE }}
+        run: |
+          set -euo pipefail
+          WORK="$RUNNER_TEMP/appstore-notes"
+          # A tree shaped like an app's fastlane/metadata, holding only what
+          # this job sets. deliver sends a field only when it has a file, so
+          # the description, keywords and everything else stay as they are.
+          python3 - "$WORK" <<'PY'
+          import os, re, sys
+          work, limit = sys.argv[1], 4000
+          meta = os.path.join(work, "fastlane", "metadata")
+          env = os.environ
+          wrote = []
+
+          def write(rel, text):
+              path = os.path.join(meta, rel)
+              os.makedirs(os.path.dirname(path), exist_ok=True)
+              with open(path, "w", encoding="utf-8") as f:
+                  f.write(text)
+
+          def clean(text):
+              # Apple refuses emoji in What's New.
+              text = re.sub("[\U0001F000-\U0001FFFF☀-➿️‍]", "", text)
+              text = "\n".join(re.sub(r"[ \t]{2,}", " ", l).rstrip() for l in text.strip().splitlines())
+              if len(text) <= limit:
+                  return text
+              lines, kept = [l for l in text.splitlines() if l.strip()], []
+              for line in lines[:-1]:
+                  if len("\n".join(kept + [line, lines[-1]])) > limit:
+                      break
+                  kept.append(line)
+              print(f"::warning::What's New is {len(text)} characters; kept {len(kept) + 1} of {len(lines)} lines to fit {limit}.")
+              return "\n".join(kept + [lines[-1]])
+
+          notes = clean(env["NOTES"])
+          if notes:
+              write(f"{env['LOCALE']}/release_notes.txt", notes)
+              wrote.append(f"What's New ({env['LOCALE']}, {len(notes)} characters)")
+              for line in env["FALLBACKS"].splitlines():
+                  if not line.strip():
+                      continue
+                  locale, sep, text = line.partition("=")
+                  if not sep or not text.strip():
+                      print(f"::error::release_notes_fallbacks line without <locale>=<text>: {line}")
+                      sys.exit(1)
+                  write(f"{locale.strip()}/release_notes.txt", clean(text))
+                  wrote.append(f"What's New ({locale.strip()})")
+          else:
+              print("::notice::No release notes, so What's New stays as it is.")
+
+          contact = {k: env[f"REVIEW_{k.upper()}"].strip() for k in ("first_name", "last_name", "email", "phone")}
+          if all(contact.values()):
+              for key, name in (("first_name", "first_name"), ("last_name", "last_name"),
+                                ("email", "email_address"), ("phone", "phone_number")):
+                  write(f"review_information/{name}.txt", contact[key])
+              wrote.append("the App Review contact")
+          elif any(contact.values()):
+              print("::error::Only some of APP_REVIEW_FIRST_NAME, _LAST_NAME, _EMAIL, _PHONE are set; set all four or none.")
+              sys.exit(1)
+          else:
+              print("::warning::No APP_REVIEW_* secrets, so the version keeps whatever review contact it has. Apple refuses a submission without one.")
+
+          os.makedirs(work, exist_ok=True)
+          with open(os.path.join(work, "wrote.txt"), "w") as f:
+              f.write("\n".join(wrote))
+          PY
+          [ -s "$WORK/wrote.txt" ] || exit 0
+          echo "Writing: $(paste -sd ',' "$WORK/wrote.txt" | sed 's/,/, /g')"
+
+          printf '%s' "$P8_B64" | base64 --decode > "$RUNNER_TEMP/asc.p8"
+          trap 'rm -f "$RUNNER_TEMP/asc.p8" "$RUNNER_TEMP/asc.json"' EXIT
+          jq -n --arg id "$KEY_ID" --arg issuer "$ISSUER" --rawfile key "$RUNNER_TEMP/asc.p8" \
+            '{key_id: $id, issuer_id: $issuer, key: $key, duration: 1200, in_house: false}' > "$RUNNER_TEMP/asc.json"
+          # Run inside the tree: deliver without a binary asks whether to set
+          # itself up unless it finds fastlane/metadata in the working
+          # directory, and --force does not skip that question.
+          cd "$WORK"
+          fastlane deliver \
+            --api_key_path "$RUNNER_TEMP/asc.json" \
+            --app_identifier "$BUNDLE_ID" \
+            --app_version "$VERSION" \
+            --skip_binary_upload true \
+            --skip_screenshots true \
+            --submit_for_review false \
+            --run_precheck_before_submit false \
+            --force true
