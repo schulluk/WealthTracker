@@ -9,19 +9,32 @@ name: Release
 # a human has released it by hand at least once. It never creates an app,
 # touches the listing or replaces screenshots.
 #
+# The version and the release notes come from the changelog. "## Next" ships
+# as the newest "## X.Y.Z" plus one minor (bump: patch or major for the
+# others); the stores get its "### Public" part, or store.yml's default line
+# when that is empty. Once a release went to review (submit), "## Next"
+# becomes "## X.Y.Z (date)", a new "## Next" opens, and the built commit is
+# tagged vX.Y.Z. Until then every run builds the same version again, so
+# TestFlight and internal builds never use up a number.
+#
+# Dispatched on a vX.Y.Z tag instead of main, it repeats that release: same
+# version, same notes. That is how a platform that failed is sent again.
+#
 # To test a change to this file, dispatch it with dry_run: both platforms
-# build and sign, and nothing is uploaded.
+# build and sign, and nothing is uploaded or committed.
 
 run-name: >-
-  ${{ inputs.version }} ${{ inputs.platforms }}${{ inputs.dry_run && ' (dry run)' || '' }}
+  ${{ github.ref_type == 'tag' && format('Repeat {0}', github.ref_name) || format('Next ({0})', inputs.bump) }}
+  ${{ inputs.platforms }}${{ inputs.dry_run && ' (dry run)' || '' }}
 
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Version to release, X.Y.Z'
-        type: string
-        required: true
+      bump:
+        description: 'How far ## Next counts on from the last release. Ignored on a vX.Y.Z tag.'
+        type: choice
+        options: [minor, patch, major]
+        default: minor
       platforms:
         description: 'Which stores'
         type: choice
@@ -38,15 +51,15 @@ on:
         options: [internal, alpha, beta, production]
         default: internal
       release_notes:
-        description: "Overrides the changelog. Empty takes this version's section of app/CHANGELOG.md: in full for TestFlight's What to Test and the App Store's What's New, whole lines within 500 characters for Play."
+        description: "Overrides the changelog. Empty takes ## Next's ### Public: in full for TestFlight and the App Store, whole lines within 500 characters for Play."
         type: string
         default: ''
       submit:
-        description: 'Submit for review after uploading. Leave off until one release has gone through with it off.'
+        description: 'Submit for review after uploading, and mark ## Next as released. Leave off until one release has gone through with it off.'
         type: boolean
         default: false
       dry_run:
-        description: 'Build and sign everything, upload nothing.'
+        description: 'Build and sign everything, upload and commit nothing.'
         type: boolean
         default: false
 
@@ -65,10 +78,18 @@ jobs:
     name: Prepare
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    env:
+      # CONFIGURE: the changelog and store.yml, from the repository root.
+      CHANGELOG: app/CHANGELOG.md
+      STORE_FILE: app/store.yml
     outputs:
-      ios: ${{ steps.plan.outputs.ios }}
-      android: ${{ steps.plan.outputs.android }}
-      notes: ${{ steps.notes.outputs.notes }}
+      version: ${{ steps.plan.outputs.version }}
+      mode: ${{ steps.plan.outputs.mode }}
+      notes: ${{ steps.plan.outputs.notes }}
+      changelog: ${{ steps.paths.outputs.changelog }}
+      store_file: ${{ steps.paths.outputs.store_file }}
+      ios: ${{ steps.platforms.outputs.ios }}
+      android: ${{ steps.platforms.outputs.android }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -89,61 +110,38 @@ jobs:
             exit 1
           fi
 
-      - name: Check the version
+      - name: Version and notes from the changelog
         id: plan
+        uses: ./.github/actions/changelog
+        with:
+          command: plan
+          changelog: ${{ env.CHANGELOG }}
+          store: ${{ env.STORE_FILE }}
+          bump: ${{ inputs.bump }}
+
+      - name: Platforms
+        id: platforms
         env:
-          VERSION: ${{ inputs.version }}
           PLATFORMS: ${{ inputs.platforms }}
         run: |
           set -euo pipefail
-          if ! printf '%s' "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::Version '$VERSION' is not X.Y.Z."
-            exit 1
-          fi
-          # Keep the version honest against the changelog: WealthTracker ships
-          # what sits under "## Next: X.Y.Z" in app/CHANGELOG.md.
-          if ! grep -qE "^## (Next:? )?$VERSION( !)?[[:space:]]*$" app/CHANGELOG.md; then
-            echo "::error::app/CHANGELOG.md has no '## Next: $VERSION' section."
-            exit 1
-          fi
           IOS=true; ANDROID=true
           [ "$PLATFORMS" = android ] && IOS=false
           [ "$PLATFORMS" = ios ] && ANDROID=false
           echo "ios=$IOS" >> "$GITHUB_OUTPUT"
           echo "android=$ANDROID" >> "$GITHUB_OUTPUT"
 
-      - name: Release notes from the changelog
-        id: notes
-        env:
-          VERSION: ${{ inputs.version }}
-          # The notes are everything between "## Next: X.Y.Z" (or "## X.Y.Z")
-          # and the next "## " heading. Play keeps whole lines from the top
-          # plus the last line within 500 characters, so the lines that matter
-          # most go first.
-          CHANGELOG: app/CHANGELOG.md
+      - name: Hand on the paths
+        id: paths
         run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import os, re, secrets
-          path, version = os.environ["CHANGELOG"], os.environ["VERSION"]
-          notes = ""
-          if os.path.isfile(path):
-              text = open(path, encoding="utf-8").read()
-              heading = r"^##\s+(?:Next:?\s+)?" + re.escape(version) + r"(?:\s*!)?\s*$"
-              m = re.search(heading + r"\n(.*?)(?=^##\s|\Z)", text, re.M | re.S)
-              notes = m.group(1).strip() if m else ""
-          if notes:
-              print(f"::notice::Release notes from {path}: {len(notes)} characters, {len(notes.splitlines())} lines.")
-          else:
-              print(f"::notice::No section for {version} in {path}, so the stores keep their previous notes unless release_notes is set.")
-          eof = "EOF_" + secrets.token_hex(8)
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
-              out.write(f"notes<<{eof}\n{notes}\n{eof}\n")
-          PY
+          echo "changelog=$CHANGELOG" >> "$GITHUB_OUTPUT"
+          echo "store_file=$STORE_FILE" >> "$GITHUB_OUTPUT"
 
   # ─────────────────────────── CONFIGURE ───────────────────────────
   # stack, the ids, the toolchain versions and the paths. Everything else
-  # has a default that fits a standard Flutter project.
+  # has a default that fits a standard Flutter project. Facts about the
+  # listing (the App Review contact, What's New in the other languages) go
+  # into store.yml, not here.
 
   android:
     name: Android
@@ -157,14 +155,14 @@ jobs:
       java_version: '17'
       package_name: ch.miniapps.wealthtracker
       key_alias: ${{ vars.ANDROID_KEY_ALIAS }}
-      version: ${{ inputs.version }}
+      version: ${{ needs.prepare.outputs.version }}
       track: ${{ inputs.play_track }}
       # completed sends the release for review; with managed publishing on in
       # Play Console it still waits for a human to press Publish. draft is for
       # an app that has never been published.
       release_status: ${{ inputs.submit && 'completed' || 'draft' }}
-      # English is the only listing language, so no fallbacks are needed.
       release_notes: ${{ inputs.release_notes || needs.prepare.outputs.notes }}
+      store_file: ${{ needs.prepare.outputs.store_file }}
       dry_run: ${{ inputs.dry_run }}
     secrets: inherit
 
@@ -185,17 +183,18 @@ jobs:
       apple_team_id: ${{ vars.APPLE_TEAM_ID }}
       # No Runner.entitlements: no push, no app groups, nothing to repair.
       entitlements_path: ''
-      version: ${{ inputs.version }}
+      version: ${{ needs.prepare.outputs.version }}
       track: ${{ inputs.ios_track }}
-      # English is the only App Store localization, so no fallbacks are needed.
       release_notes: ${{ inputs.release_notes || needs.prepare.outputs.notes }}
+      store_file: ${{ needs.prepare.outputs.store_file }}
       dry_run: ${{ inputs.dry_run }}
     secrets: inherit
 
   # Submitting for review is deliberately a separate, opt-in job: it is the one
   # step a human usually wants to look at, and Apple needs the build processed
   # first (up to two hours), which is API polling and belongs on Linux where
-  # the minutes are ten times cheaper.
+  # the minutes are ten times cheaper. Every version is released as soon as
+  # Apple approves it; the ios workflow sets that on the version.
   submit-ios:
     name: iOS submit
     needs: [prepare, ios]
@@ -208,7 +207,10 @@ jobs:
     timeout-minutes: 150
     environment: production
     steps:
-      # A local action only resolves after a checkout.
+      # Needed once this file is vendored: vendor-store-release.sh rewrites the
+      # `uses:` below to ./.github/actions/setup-toolchain, and a local action
+      # only resolves if the repository is checked out first. Harmless while the
+      # reference is still remote.
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
@@ -217,8 +219,14 @@ jobs:
         with:
           stack: none
       - name: Submit for review
-        # deliver without a binary asks "Do you want to setup deliver?" unless
-        # it finds fastlane/metadata here; --force does not skip that question.
+        # CONFIGURE: the directory that holds fastlane/ (app_dir + /ios for a
+        # standard Flutter layout). Run deliver anywhere else and, because
+        # --skip_binary_upload leaves it nothing to do but metadata, it goes
+        # looking for a deliver configuration, finds none, and asks "Do you
+        # want to setup deliver?" -- an instant crash on a runner:
+        # "Could not retrieve response as fastlane runs in non-interactive
+        # mode". --force does not suppress it; the question comes before any
+        # config is read. The ios job never hits this because it passes an IPA.
         working-directory: app/ios
         env:
           KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
@@ -226,7 +234,7 @@ jobs:
           P8_B64: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8_B64 }}
           # CONFIGURE: same bundle id as the ios job.
           BUNDLE_ID: ch.miniapps.wealthtracker
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ needs.prepare.outputs.version }}
           BUILD_NUMBER: ${{ needs.ios.outputs.build_number }}
         run: |
           set -euo pipefail
@@ -235,7 +243,9 @@ jobs:
             '{key_id: $id, issuer_id: $issuer, key: $key, duration: 1200, in_house: false}' > "$RUNNER_TEMP/asc.json"
           trap 'rm -f "$RUNNER_TEMP/asc.p8" "$RUNNER_TEMP/asc.json"' EXIT
           # No binary upload: this attaches the build the ios job already
-          # uploaded to the version and sends that version to review.
+          # uploaded to the version and sends that version to review. The
+          # release type is not set here: next to --skip_metadata deliver
+          # ignores --automatic_release, so the ios workflow sets it.
           fastlane deliver \
             --api_key_path "$RUNNER_TEMP/asc.json" \
             --app_identifier "$BUNDLE_ID" \
@@ -245,6 +255,37 @@ jobs:
             --skip_screenshots true \
             --skip_metadata true \
             --submit_for_review true \
-            --automatic_release false \
             --run_precheck_before_submit false \
             --force true
+
+  # Once a store has this version for review, the changelog says so: "## Next"
+  # becomes "## X.Y.Z (date)", a new "## Next" opens, and the commit that was
+  # built is tagged vX.Y.Z. It runs even when the other platform failed,
+  # because the version is taken now; dispatch this workflow on the tag to
+  # send the failed one again. Lines added to "## Next" while the release ran
+  # stay there.
+  changelog:
+    name: Changelog
+    needs: [prepare, android, ios, submit-ios]
+    if: >-
+      always() && inputs.submit && !inputs.dry_run
+      && needs.prepare.outputs.mode == 'new'
+      && (needs.submit-ios.result == 'success'
+          || (inputs.play_track == 'production'
+              && contains(fromJSON('["sent","held"]'), needs.android.outputs.review)))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: ./.github/actions/changelog
+        with:
+          command: release
+          changelog: ${{ needs.prepare.outputs.changelog }}
+          version: ${{ needs.prepare.outputs.version }}
+          released-ref: ${{ github.sha }}

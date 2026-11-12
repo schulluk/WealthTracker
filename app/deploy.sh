@@ -15,6 +15,13 @@ export SKIP_SLOW_FASTLANE_WARNING=1
 IOS_OK=0
 ANDROID_OK=0
 
+# The same script the CI release uses: "## Next" in CHANGELOG.md ships as the
+# newest "## X.Y.Z" plus one minor. Read before the lanes run, because a
+# successful submit turns "## Next" into that version at the end.
+CHANGELOG_RB="$SCRIPT_DIR/../.github/actions/changelog/changelog.rb"
+VERSION=$(ruby "$CHANGELOG_RB" version --changelog "$SCRIPT_DIR/CHANGELOG.md") || exit 1
+echo "=== CHANGELOG: ## Next ships as $VERSION ==="
+
 echo "=== iOS: fastlane $LANE ==="
 (cd "$SCRIPT_DIR/ios" && fastlane "$LANE") && IOS_OK=1
 
@@ -46,12 +53,12 @@ else
 fi
 echo "==============================="
 
-# After a fully successful submit, bump CHANGELOG.md to the next version
-# so the next `beta` run starts from a fresh "## Next: …" section.
+# After a fully successful submit, "## Next" becomes "## $VERSION (date)" and
+# a fresh, empty "## Next" opens above it. Commit and tag (v$VERSION) by hand.
 if [ "$LANE" = "submit" ] && [ $IOS_OK -eq 1 ] && [ $ANDROID_OK -eq 1 ]; then
   echo ""
-  echo "=== Bumping CHANGELOG.md for next version ==="
-  ruby "$SCRIPT_DIR/scripts/bump_changelog.rb"
+  echo "=== CHANGELOG.md: ## Next released as $VERSION ==="
+  ruby "$CHANGELOG_RB" release --changelog "$SCRIPT_DIR/CHANGELOG.md" --version "$VERSION"
 fi
 
 if [ $IOS_OK -eq 0 ] || [ $ANDROID_OK -eq 0 ]; then

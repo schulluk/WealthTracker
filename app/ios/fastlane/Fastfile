@@ -23,73 +23,64 @@ TEAM_ID = "7PSHT7LSVZ"
 RELEASES_DIR = File.expand_path("../../_releases", __dir__)
 
 # --- CHANGELOG helpers ---
+#
+# Version and release notes come from CHANGELOG.md through the script the CI
+# release uses too (.github/actions/changelog/changelog.rb at the repository
+# root, vendored from ai-skills), so a laptop release and CI count alike:
+# "## Next" ships as the newest "## X.Y.Z" plus one minor, the stores get its
+# "### Public" part (or store.yml's default line), and deploy.sh turns
+# "## Next" into the version once both stores took a submission. store.yml
+# next to CHANGELOG.md holds what the stores need that is not secret.
+require File.expand_path("../../../.github/actions/changelog/changelog", __dir__)
 
 def changelog_path
   File.expand_path("../../CHANGELOG.md", __dir__)
 end
 
+def store_yml_path
+  File.expand_path("../../store.yml", __dir__)
+end
+
+def store_info
+  ::Changelog.store(store_yml_path)
+rescue ::Changelog::Error => e
+  UI.user_error!(e.message)
+end
+
 def changelog_version
-  path = changelog_path
-  UI.user_error!("CHANGELOG.md not found at #{path}") unless File.exist?(path)
-  content = File.read(path)
-  match = content.match(/^## Next:?\s+(\d+\.\d+\.\d+)/)
-  unless match
-    UI.user_error!(
-      "No '## Next: X.Y.Z' heading found in CHANGELOG.md. " \
-      "Add one (e.g. '## Next: 1.4.0') before running beta."
-    )
-  end
-  version = match[1]
-  UI.message("CHANGELOG version: #{version}")
+  version = ::Changelog.next_version(changelog_path)
+  UI.message("CHANGELOG: ## Next ships as #{version}")
   version
+rescue ::Changelog::Error => e
+  UI.user_error!(e.message)
 end
 
 def changelog_notes
-  content = File.read(changelog_path)
-  section = content.match(/^## Next:?\s+\d+\.\d+\.\d+\s*\n(.*?)(?=^## |\z)/m)
-  return "" unless section
-  section[1].strip
+  ::Changelog.store_notes(changelog_path, store_yml_path)
+rescue ::Changelog::Error => e
+  UI.user_error!(e.message)
 end
 
-# --- Auto-bump version (iOS: iTunes API only) ---
+# --- Release type ---
 
-def auto_bump_version
-  content = File.read(changelog_path)
-  if content.match?(/^## Next:?\s+\d+\.\d+\.\d+\s*!/)
-    UI.message("Version is pinned (!) — skipping auto-bump")
-    return
-  end
+# Every version goes live as soon as Apple approves it. deliver applies
+# `automatic_release` only while it uploads metadata and ignores it next to
+# `skip_metadata`, which is how the submit lane calls it, so the release type
+# is set on the version directly.
+def release_when_approved(version)
+  after_approval = Spaceship::ConnectAPI::AppStoreVersion::ReleaseType::AFTER_APPROVAL
+  return if version.release_type == after_approval
+  version.update(attributes: { release_type: after_approval })
+  UI.message("#{version.version_string} goes live as soon as Apple approves it.")
+end
 
-  current = changelog_version
-  production_versions = []
-
-  begin
-    require 'net/http'
-    require 'json'
-    uri = URI("https://itunes.apple.com/lookup?bundleId=ch.miniapps.wealthtracker&country=CH")
-    response = Net::HTTP.get(uri)
-    data = JSON.parse(response)
-    if data["resultCount"].to_i > 0
-      ios_version = data["results"][0]["version"]
-      production_versions << ios_version if ios_version
-    end
-  rescue => e
-    UI.important("Could not check App Store production: #{e.message}")
-  end
-
-  if production_versions.include?(current)
-    major, minor, patch = current.split('.').map(&:to_i)
-    new_version = "#{major}.#{minor}.#{patch + 1}"
-    UI.important("Version #{current} already in production. Bumping to #{new_version}")
-
-    content = File.read(changelog_path)
-    content.sub!(
-      /^## Next:?\s+#{Regexp.escape(current)}/,
-      "## Next: #{new_version}\n\n- Bug fixes and improvements.\n\n## #{current}"
-    )
-    File.write(changelog_path, content)
-    UI.success("CHANGELOG.md updated: #{current} -> #{new_version}")
-  end
+# The App Store version record for [version_string], or nil when App Store
+# Connect has none (no build uploaded yet for that version).
+def app_store_version(version_string)
+  app = Spaceship::ConnectAPI::App.find(APP_IDENTIFIER)
+  app.get_app_store_versions(
+    filter: { versionString: version_string, platform: Spaceship::ConnectAPI::Platform::IOS }
+  ).first
 end
 
 # --- Certificate validation ---
@@ -206,16 +197,29 @@ def write_release_notes
   version = changelog_version
   notes = strip_emoji_for_ios(changelog_notes)
   if notes.empty?
-    UI.important("No release notes found under '## Next: #{version}' in CHANGELOG.md")
+    UI.important("No release notes for ## Next in CHANGELOG.md")
     return version
   end
 
+  # iOS: no emoji, max 4000 chars
   metadata_dir = File.expand_path("metadata", __dir__)
+  notes_config = store_info["release_notes"] || {}
+  locale = notes_config["locale"].to_s.strip
+  locale = "en-US" if locale.empty?
 
-  en_path = File.join(metadata_dir, "en-US", "release_notes.txt")
+  # The changelog's language: full notes
+  en_path = File.join(metadata_dir, locale, "release_notes.txt")
   File.write(en_path, notes[0, 4000])
+  UI.message("Wrote release notes to #{en_path}")
 
   write_copyright
+
+  # Every other localization: its fixed line from store.yml (release_notes.app_store)
+  fallbacks = notes_config["app_store"] || {}
+  fallbacks.each do |other, text|
+    path = File.join(metadata_dir, other, "release_notes.txt")
+    File.write(path, text) if File.exist?(File.dirname(path))
+  end
 
   version
 end
@@ -330,7 +334,6 @@ platform :ios do
   desc "Build and upload to TestFlight"
   lane :beta do
     validate_signing_cert
-    auto_bump_version
     version = write_release_notes
     clean_old_release(version, "ipa")
     setup_ci if ENV['CI']
@@ -356,7 +359,8 @@ platform :ios do
         app_version: version,
         build_number: build_num.to_s,
         metadata_path: "fastlane/metadata",
-        skip_metadata: false
+        skip_metadata: false,
+        automatic_release: true
       )
     rescue => e
       UI.error("App Store upload failed: #{e.message}")
@@ -370,12 +374,19 @@ platform :ios do
     version = changelog_version
     write_copyright
     setup_asc_key
+
+    # deliver ignores automatic_release next to skip_metadata, so the release
+    # type goes onto the version before it is submitted.
+    asc_version = app_store_version(version)
+    UI.user_error!("No App Store version #{version} on App Store Connect; run `beta` first.") unless asc_version
+    release_when_approved(asc_version)
+
     deliver(
       skip_binary_upload: true,
       skip_screenshots: true,
       skip_metadata: true,
       submit_for_review: true,
-      automatic_release: false,
+      automatic_release: true,
       force: true,
       precheck_include_in_app_purchases: false,
       app_identifier: APP_IDENTIFIER,
@@ -394,7 +405,8 @@ platform :ios do
       force: true,
       precheck_include_in_app_purchases: false,
       app_identifier: APP_IDENTIFIER,
-      metadata_path: "fastlane/metadata"
+      metadata_path: "fastlane/metadata",
+      automatic_release: true
     )
   end
 
@@ -411,7 +423,7 @@ platform :ios do
     upload_to_app_store(
       ipa: ipa_path,
       submit_for_review: false,
-      automatic_release: false,
+      automatic_release: true,
       force: true,
       skip_metadata: true,
       skip_screenshots: true,

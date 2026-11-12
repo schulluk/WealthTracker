@@ -58,14 +58,22 @@ on:
         type: string
         default: ''
       release_notes_locale:
-        description: 'Locale directory the notes are written to.'
+        description: >
+          Locale directory the notes are written to. Empty takes store.yml's
+          release_notes.locale, and en-US without one.
         type: string
-        default: en-US
+        default: ''
       release_notes_fallbacks:
         description: >
           One line per other listing language, `<locale>=<text>`, e.g.
           `de-DE=Fehlerbehebungen und Verbesserungen.` Only written when there
-          are notes.
+          are notes. Empty takes store.yml's release_notes.play.
+        type: string
+        default: ''
+      store_file:
+        description: >
+          The app's store.yml, from the repository root, for the What's new
+          of the other languages. See shared/store-release/templates/store.yml.
         type: string
         default: ''
       flutter_version:
@@ -408,6 +416,14 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
+      - name: Read store.yml
+        id: store
+        if: steps.gate.outputs.proceed == 'true'
+        uses: ./.github/actions/changelog
+        with:
+          command: store
+          store: ${{ inputs.store_file }}
+
       - name: Release notes
         id: notes
         if: steps.gate.outputs.proceed == 'true'
@@ -415,16 +431,30 @@ jobs:
           NOTES: ${{ inputs.release_notes }}
           LOCALE: ${{ inputs.release_notes_locale }}
           FALLBACKS: ${{ inputs.release_notes_fallbacks }}
+          STORE_JSON: ${{ steps.store.outputs.store }}
         run: |
           set -euo pipefail
           # Fitted before the upload, not after: Play refuses more than 500
           # characters per language, and finding that out at the end wastes the
           # whole build.
           python3 - "$RUNNER_TEMP/play-notes" <<'PY'
-          import os, sys
+          import json, os, sys
           root, limit = sys.argv[1], 500
           notes = os.environ["NOTES"].strip()
           out = os.environ["GITHUB_OUTPUT"]
+          notes_cfg = json.loads(os.environ["STORE_JSON"] or "{}").get("release_notes") or {}
+          locale = os.environ["LOCALE"].strip() or str(notes_cfg.get("locale") or "").strip() or "en-US"
+          fallbacks = []
+          for line in os.environ["FALLBACKS"].splitlines():
+              if not line.strip():
+                  continue
+              loc, sep, text = line.partition("=")
+              if not sep or not text.strip():
+                  print(f"::error::release_notes_fallbacks line without <locale>=<text>: {line}")
+                  sys.exit(1)
+              fallbacks.append((loc.strip(), text.strip()))
+          if not fallbacks:
+              fallbacks = [(str(k), str(v).strip()) for k, v in (notes_cfg.get("play") or {}).items()]
 
           def fit(text):
               """Whole lines from the top, plus the last line, within limit."""
@@ -453,18 +483,14 @@ jobs:
               open(out, "a").write("dir=\n")
               sys.exit(0)
           fitted, dropped = fit(notes)
-          write(os.environ["LOCALE"], fitted)
+          write(locale, fitted)
           left = f", {dropped} line(s) left out to fit {limit}" if dropped else ""
-          print(f"::notice::What's new ({os.environ['LOCALE']}, {len(fitted)} characters{left}) ready.")
-          for line in os.environ["FALLBACKS"].splitlines():
-              if not line.strip():
+          print(f"::notice::What's new ({locale}, {len(fitted)} characters{left}) ready.")
+          for loc, text in fallbacks:
+              if loc == locale:
                   continue
-              locale, sep, text = line.partition("=")
-              if not sep or not text.strip():
-                  print(f"::error::release_notes_fallbacks line without <locale>=<text>: {line}")
-                  sys.exit(1)
-              write(locale.strip(), fit(text.strip())[0])
-              print(f"  fallback for {locale.strip()}")
+              write(loc, fit(text)[0])
+              print(f"  fallback for {loc}")
           open(out, "a").write(f"dir={root}\n")
           PY
 

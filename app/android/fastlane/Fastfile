@@ -29,89 +29,42 @@ def build_number
 end
 
 # --- CHANGELOG helpers ---
+#
+# Version and release notes come from CHANGELOG.md through the script the CI
+# release uses too (.github/actions/changelog/changelog.rb at the repository
+# root, vendored from ai-skills), so a laptop release and CI count alike:
+# "## Next" ships as the newest "## X.Y.Z" plus one minor, the stores get its
+# "### Public" part (or store.yml's default line), and deploy.sh turns
+# "## Next" into the version once both stores took a submission. store.yml
+# next to CHANGELOG.md holds what the stores need that is not secret.
+require File.expand_path("../../../.github/actions/changelog/changelog", __dir__)
 
 def changelog_path
   File.expand_path("../../CHANGELOG.md", __dir__)
 end
 
+def store_yml_path
+  File.expand_path("../../store.yml", __dir__)
+end
+
+def store_info
+  ::Changelog.store(store_yml_path)
+rescue ::Changelog::Error => e
+  UI.user_error!(e.message)
+end
+
 def changelog_version
-  path = changelog_path
-  UI.user_error!("CHANGELOG.md not found at #{path}") unless File.exist?(path)
-  content = File.read(path)
-  match = content.match(/^## Next:?\s+(\d+\.\d+\.\d+)/)
-  unless match
-    UI.user_error!(
-      "No '## Next: X.Y.Z' heading found in CHANGELOG.md. " \
-      "Add one (e.g. '## Next: 1.4.0') before running beta."
-    )
-  end
-  version = match[1]
-  UI.message("CHANGELOG version: #{version}")
+  version = ::Changelog.next_version(changelog_path)
+  UI.message("CHANGELOG: ## Next ships as #{version}")
   version
+rescue ::Changelog::Error => e
+  UI.user_error!(e.message)
 end
 
 def changelog_notes
-  content = File.read(changelog_path)
-  section = content.match(/^## Next:?\s+\d+\.\d+\.\d+\s*\n(.*?)(?=^## |\z)/m)
-  return "" unless section
-  section[1].strip
-end
-
-# --- Auto-bump version (Android: checks both stores) ---
-
-def auto_bump_version
-  content = File.read(changelog_path)
-  if content.match?(/^## Next:?\s+\d+\.\d+\.\d+\s*!/)
-    UI.message("Version is pinned (!) — skipping auto-bump")
-    return
-  end
-
-  current = changelog_version
-  production_versions = []
-
-  # Check Google Play production
-  begin
-    json_key = ENV['PLAY_STORE_JSON_KEY']
-    if json_key && File.exist?(json_key)
-      names = google_play_track_release_names(
-        track: "production",
-        json_key: json_key,
-        package_name: PACKAGE_NAME
-      )
-      production_versions.concat(names) if names
-    end
-  rescue => e
-    UI.important("Could not check Play Store production: #{e.message}")
-  end
-
-  # Check App Store production via public iTunes API
-  begin
-    require 'net/http'
-    require 'json'
-    uri = URI("https://itunes.apple.com/lookup?bundleId=ch.miniapps.wealthtracker&country=CH")
-    response = Net::HTTP.get(uri)
-    data = JSON.parse(response)
-    if data["resultCount"].to_i > 0
-      ios_version = data["results"][0]["version"]
-      production_versions << ios_version if ios_version
-    end
-  rescue => e
-    UI.important("Could not check App Store production: #{e.message}")
-  end
-
-  if production_versions.include?(current)
-    major, minor, patch = current.split('.').map(&:to_i)
-    new_version = "#{major}.#{minor}.#{patch + 1}"
-    UI.important("Version #{current} already in production. Bumping to #{new_version}")
-
-    content = File.read(changelog_path)
-    content.sub!(
-      /^## Next:?\s+#{Regexp.escape(current)}/,
-      "## Next: #{new_version}\n\n- Bug fixes and improvements.\n\n## #{current}"
-    )
-    File.write(changelog_path, content)
-    UI.success("CHANGELOG.md updated: #{current} -> #{new_version}")
-  end
+  ::Changelog.store_notes(changelog_path, store_yml_path)
+rescue ::Changelog::Error => e
+  UI.user_error!(e.message)
 end
 
 # --- Release notes ---
@@ -120,13 +73,26 @@ def write_release_notes
   version = changelog_version
   notes = changelog_notes
   if notes.empty?
-    UI.important("No release notes found under '## Next: #{version}' in CHANGELOG.md")
+    UI.important("No release notes for ## Next in CHANGELOG.md")
     return version
   end
 
   metadata_dir = File.expand_path("metadata/android", __dir__)
-  en_path = File.join(metadata_dir, "en-US", "changelogs", "default.txt")
-  File.write(en_path, notes[0, 500])
+  notes_config = store_info["release_notes"] || {}
+  locale = notes_config["locale"].to_s.strip
+  locale = "en-US" if locale.empty?
+
+  # The changelog's language: whole lines within 500 characters, like CI
+  en_path = File.join(metadata_dir, locale, "changelogs", "default.txt")
+  File.write(en_path, ::Changelog.fit(notes))
+  UI.message("Wrote release notes to #{en_path}")
+
+  # Every other language: its fixed line from store.yml (release_notes.play)
+  fallbacks = notes_config["play"] || {}
+  fallbacks.each do |other, text|
+    path = File.join(metadata_dir, other, "changelogs", "default.txt")
+    File.write(path, text) if File.exist?(File.dirname(path))
+  end
 
   version
 end
@@ -154,7 +120,6 @@ end
 platform :android do
   desc "Build and upload to Google Play internal testing"
   lane :beta do
-    auto_bump_version
     version = write_release_notes
     clean_old_release(version, "aab")
 

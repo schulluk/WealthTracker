@@ -1,0 +1,26 @@
+# What the stores need to know about WealthTracker that is not a secret.
+# Read by the release pipeline (.github/workflows/release.yml) and by the
+# Fastfiles. Credentials never go here: they are GitHub secrets and app/.env.
+
+# The App Review contact. Apple wants it on every new App Store version, does
+# not copy it from the previous one, and refuses a submission without it.
+app_review:
+  first_name: Lukas
+  last_name: Schulze
+  # This repository is public, so email and phone stay empty here: they come
+  # from the APP_REVIEW_EMAIL and APP_REVIEW_PHONE secrets (an empty value is
+  # taken from the secret of the same name). Never commit them.
+  email: ""
+  phone: ""
+
+release_notes:
+  # The language the changelog's "### Public" is written in, as the store
+  # spells it (App Store and Play both say en-US, de-DE, ...).
+  locale: en-US
+  # What the stores get when "### Public" is empty: a release with internal
+  # changes only.
+  default: Bug fixes and improvements.
+  # Every other language of the listing gets a fixed line instead of the
+  # notes. English is the only listing language, so there are none.
+  app_store: {}
+  play: {}
