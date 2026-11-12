@@ -7,11 +7,10 @@
 app_review:
   first_name: Lukas
   last_name: Schulze
-  # This repository is public, so email and phone stay empty here: they come
-  # from the APP_REVIEW_EMAIL and APP_REVIEW_PHONE secrets (an empty value is
-  # taken from the secret of the same name). Never commit them.
-  email: ""
-  phone: ""
+  # Public repository, published on purpose (Lukas, 2026-11-12).
+  email: "apple-review1@a.schulze.uno"
+  # In quotes: unquoted, YAML reads +41... as a number and drops the +.
+  phone: "+41795355764"
 
 release_notes:
   # The language the changelog's "### Public" is written in, as the store

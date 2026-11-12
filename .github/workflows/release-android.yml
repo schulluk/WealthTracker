@@ -163,6 +163,12 @@ on:
       # --dart-define-from-file. tools/set-store-secrets.sh --dart-defines sets it.
       DART_DEFINES_JSON:
         required: false
+      # The app's own secret files, for values the platform reads rather than
+      # Dart (a Maps SDK key in an xcconfig or android/local.properties): one
+      # JSON object of path (relative to app_dir) to contents. Written before
+      # the build, removed after it. actions/secret-files/secret_files.py.
+      APP_SECRET_FILES_JSON:
+        required: false
 
 jobs:
   android:
@@ -323,6 +329,17 @@ jobs:
         if: steps.gate.outputs.proceed == 'true' && inputs.stack == 'flutter'
         working-directory: ${{ inputs.app_dir }}
         run: flutter pub get
+
+      - name: App secret files
+        # Secrets the platform reads rather than Dart (a Maps SDK key in an
+        # xcconfig or local.properties), from APP_SECRET_FILES_JSON; never
+        # through an input, which would put them in a process listing.
+        if: steps.gate.outputs.proceed == 'true'
+        uses: ./.github/actions/secret-files
+        with:
+          command: write
+          dir: ${{ inputs.app_dir }}
+          files: ${{ secrets.APP_SECRET_FILES_JSON }}
 
       - name: Pre-build command
         if: steps.gate.outputs.proceed == 'true' && inputs.pre_build_command != ''
@@ -563,6 +580,13 @@ jobs:
         with:
           platform: android
           log: ${{ runner.temp }}/supply.log
+
+      - name: Remove the app secret files
+        if: always()
+        uses: ./.github/actions/secret-files
+        with:
+          command: clean
+          dir: ${{ inputs.app_dir }}
 
       - name: Summary
         if: always()

@@ -111,6 +111,6 @@ Never use emoji in `app/CHANGELOG.md` (App Store Connect rejects What's New
 with one, and the release fails), and no long dashes in Public.
 
 What the stores need that is not secret (the App Review contact, the release
-note for an empty Public) lives in `app/store.yml`. This repository is public:
-never put an email address or phone number there; they are the
-`APP_REVIEW_EMAIL` and `APP_REVIEW_PHONE` secrets.
+note for an empty Public) lives in `app/store.yml`. The review contact there,
+email and phone included, is public on purpose (Lukas, 2026-11-12); change it
+there, not in a secret.
