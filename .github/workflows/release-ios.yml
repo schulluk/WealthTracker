@@ -6,9 +6,12 @@ name: Release build (iOS)
 # `secrets: inherit`.
 #
 # Deliberate choices, each one a release that stopped once:
-#   * preflight asks Apple first. A review in flight, an outstanding agreement
-#     or an expiring certificate costs seconds here instead of 40 minutes of
-#     macOS runner time.
+#   * preflight asks Apple first, in a Linux job of its own. A review in
+#     flight, an outstanding agreement or an expiring certificate then costs
+#     seconds of Linux time, and a held-back iOS never starts a Mac at all.
+#   * the Mac does only what needs a Mac: archive, sign, export, upload. Its
+#     timeout is 45 minutes (a release takes about 8), so a hang costs at most
+#     that, not two hours of macOS minutes.
 #   * signing happens in a throwaway keychain that is deleted even when the
 #     job fails.
 #   * `flutter build ipa --no-codesign` plus `xcodebuild -exportArchive` signs
@@ -157,14 +160,17 @@ on:
         type: string
         default: production
       timeout_minutes:
+        description: >
+          For the macOS job. A release takes about 8 minutes there; anything
+          near this limit is a hang, billed at ten times the Linux rate.
         type: number
-        default: 120
+        default: 45
     outputs:
       build_number:
         value: ${{ jobs.ios.outputs.build_number }}
       review:
-        description: 'uploaded | dry-run | skipped'
-        value: ${{ jobs.ios.outputs.review }}
+        description: 'uploaded | skipped | held (preflight held iOS back, nothing was built)'
+        value: ${{ jobs.ios.outputs.review || (jobs.preflight.outputs.ok == 'false' && 'held') || 'skipped' }}
     secrets:
       APPLE_DISTRIBUTION_P12_B64:
         required: false
@@ -200,8 +206,63 @@ on:
         required: false
 
 jobs:
+  # Asking Apple is API calls, so it runs on Linux, before any Mac starts. A
+  # held-back iOS (a review in flight, say) then costs no macOS minutes.
+  preflight:
+    name: iOS preflight ${{ inputs.version }}
+    if: inputs.preflight && !inputs.dry_run
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: ${{ inputs.environment }}
+    outputs:
+      ok: ${{ steps.preflight.outputs.ios_ok }}
+      reason: ${{ steps.preflight.outputs.ios_reason }}
+    steps:
+      # Once vendored, the action below is a local path, which only resolves
+      # after a checkout. The runner's own Ruby, jq and python3 are all the
+      # preflight needs for iOS.
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Preflight
+        id: preflight
+        uses: ./.github/actions/preflight
+        with:
+          platforms: ios
+          version: ${{ inputs.version }}
+          ios-bundle-id: ${{ inputs.bundle_id }}
+          ios-track: ${{ inputs.track }}
+          asc-key-id: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          asc-issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          asc-key-p8-base64: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8_B64 }}
+
+      - name: Held back
+        if: steps.preflight.outputs.ios_ok == 'false'
+        env:
+          VERSION: ${{ inputs.version }}
+          TRACK: ${{ inputs.track }}
+          REASON: ${{ steps.preflight.outputs.ios_reason }}
+        run: |
+          echo "::warning::iOS is held back this run, so no Mac starts and nothing is built: $REASON"
+          {
+            echo "### iOS $VERSION"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| track | \`$TRACK\` |"
+            echo "| result | held back: $REASON |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   ios:
     name: iOS ${{ inputs.version }}
+    needs: preflight
+    # Runs when preflight let iOS through, and when there was no preflight
+    # (a dry run, or preflight: false). A failed preflight stops it.
+    if: >-
+      !cancelled()
+      && (needs.preflight.result == 'skipped'
+          || (needs.preflight.result == 'success' && needs.preflight.outputs.ok != 'false'))
     runs-on: ${{ inputs.runner }}
     timeout-minutes: ${{ inputs.timeout_minutes }}
     environment: ${{ inputs.environment }}
@@ -240,36 +301,8 @@ jobs:
           # Always: sigh fetches the App Store profiles, even for a dry run.
           install-fastlane: 'true'
 
-      - name: Preflight
-        id: preflight
-        if: inputs.preflight && !inputs.dry_run
-        uses: ./.github/actions/preflight
-        with:
-          platforms: ios
-          version: ${{ inputs.version }}
-          ios-bundle-id: ${{ inputs.bundle_id }}
-          ios-track: ${{ inputs.track }}
-          asc-key-id: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          asc-issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          asc-key-p8-base64: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8_B64 }}
-
-      - name: Held back
-        id: gate
-        env:
-          OK: ${{ steps.preflight.outcome == 'skipped' && 'true' || steps.preflight.outputs.ios_ok }}
-          REASON: ${{ steps.preflight.outputs.ios_reason }}
-        run: |
-          set -euo pipefail
-          if [ "$OK" = false ]; then
-            echo "::warning::iOS is held back this run, so nothing is built: $REASON"
-            echo "proceed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "proceed=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Resolve build number
         id: resolve
-        if: steps.gate.outputs.proceed == 'true'
         env:
           GIVEN: ${{ inputs.build_number }}
         run: |
@@ -282,7 +315,6 @@ jobs:
           echo "::notice title=iOS::${{ inputs.version }} ($NUMBER)"
 
       - name: Write the App Store Connect key
-        if: steps.gate.outputs.proceed == 'true'
         env:
           P8_B64: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8_B64 }}
           KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
@@ -299,7 +331,6 @@ jobs:
           chmod 600 "$RUNNER_TEMP/asc-key.json"
 
       - name: Setup signing
-        if: steps.gate.outputs.proceed == 'true'
         env:
           P12_BASE64: ${{ secrets.APPLE_DISTRIBUTION_P12_B64 }}
           P12_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_P12_PASSWORD }}
@@ -332,7 +363,7 @@ jobs:
           echo "::notice::Signing as $IDENTITY"
 
       - name: Dependencies
-        if: steps.gate.outputs.proceed == 'true' && inputs.stack == 'flutter'
+        if: inputs.stack == 'flutter'
         working-directory: ${{ inputs.app_dir }}
         run: flutter pub get
 
@@ -340,7 +371,6 @@ jobs:
         # Secrets the platform reads rather than Dart (a Maps SDK key in an
         # xcconfig or local.properties), from APP_SECRET_FILES_JSON; never
         # through an input, which would put them in a process listing.
-        if: steps.gate.outputs.proceed == 'true'
         uses: ./.github/actions/secret-files
         with:
           command: write
@@ -348,7 +378,7 @@ jobs:
           files: ${{ secrets.APP_SECRET_FILES_JSON }}
 
       - name: Pre-build command
-        if: steps.gate.outputs.proceed == 'true' && inputs.pre_build_command != ''
+        if: inputs.pre_build_command != ''
         working-directory: ${{ inputs.app_dir }}
         env:
           COMMAND: ${{ inputs.pre_build_command }}
@@ -357,7 +387,6 @@ jobs:
           bash -c "$COMMAND"
 
       - name: Archive
-        if: steps.gate.outputs.proceed == 'true'
         working-directory: ${{ inputs.app_dir }}
         env:
           VERSION: ${{ inputs.version }}
@@ -406,7 +435,6 @@ jobs:
         # every extension in the archive, for the certificate in our keychain,
         # and the export signs manually with those.
         id: profiles
-        if: steps.gate.outputs.proceed == 'true'
         working-directory: ${{ inputs.app_dir }}
         env:
           ARCHIVE: ${{ inputs.archive_path }}
@@ -441,7 +469,6 @@ jobs:
           done
 
       - name: Export IPA
-        if: steps.gate.outputs.proceed == 'true'
         working-directory: ${{ inputs.app_dir }}
         env:
           ARCHIVE: ${{ inputs.archive_path }}
@@ -475,9 +502,7 @@ jobs:
           echo "IPA_PATH=$IPA" >> "$GITHUB_ENV"
 
       - name: Repair the entitlements
-        if: >-
-          steps.gate.outputs.proceed == 'true'
-          && (inputs.entitlements_path != '' || inputs.extension_entitlements != '')
+        if: inputs.entitlements_path != '' || inputs.extension_entitlements != ''
         working-directory: ${{ inputs.app_dir }}
         env:
           SOURCE_REL: ${{ inputs.entitlements_path }}
@@ -615,7 +640,7 @@ jobs:
 
       - name: Upload to App Store Connect
         id: upload
-        if: steps.gate.outputs.proceed == 'true' && !inputs.dry_run
+        if: ${{ !inputs.dry_run }}
         working-directory: ${{ inputs.app_dir }}
         env:
           TRACK: ${{ inputs.track }}
@@ -656,7 +681,7 @@ jobs:
           echo "review=uploaded" >> "$GITHUB_OUTPUT"
 
       - name: Dry run
-        if: steps.gate.outputs.proceed == 'true' && inputs.dry_run
+        if: inputs.dry_run
         run: |
           echo "::notice::Dry run: archived, signed and exported $IPA_PATH, uploaded nothing."
 
@@ -687,14 +712,10 @@ jobs:
           NUMBER: ${{ steps.resolve.outputs.build_number }}
           TRACK: ${{ inputs.track }}
           REVIEW: ${{ steps.upload.outputs.review }}
-          PROCEED: ${{ steps.gate.outputs.proceed }}
-          REASON: ${{ steps.preflight.outputs.ios_reason }}
           DRY: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
-          if [ "$PROCEED" != true ]; then
-            TEXT="held back: $REASON"
-          elif [ "$DRY" = true ]; then
+          if [ "$DRY" = true ]; then
             TEXT="dry run: archived, signed and exported, uploaded nothing"
           elif [ "${REVIEW:-}" = uploaded ] && [ "$TRACK" = testflight ]; then
             TEXT="in TestFlight; submitting for review is a separate step"

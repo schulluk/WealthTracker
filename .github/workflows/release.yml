@@ -206,6 +206,7 @@ jobs:
       inputs.submit && !inputs.dry_run
       && needs.prepare.outputs.ios == 'true'
       && needs.ios.result == 'success'
+      && needs.ios.outputs.review == 'uploaded'
       && inputs.ios_track == 'appstore'
     runs-on: ubuntu-24.04
     timeout-minutes: 150
