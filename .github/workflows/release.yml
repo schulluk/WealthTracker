@@ -183,6 +183,10 @@ jobs:
       apple_team_id: ${{ vars.APPLE_TEAM_ID }}
       # No Runner.entitlements: no push, no app groups, nothing to repair.
       entitlements_path: ''
+      # The Xcode project has a Crashlytics symbol-upload build phase that
+      # shells out to flutterfire, which is on the Mac and on no runner.
+      # Without it the archive fails with `flutterfire: command not found`.
+      pre_build_command: dart pub global activate flutterfire_cli
       version: ${{ needs.prepare.outputs.version }}
       track: ${{ inputs.ios_track }}
       release_notes: ${{ inputs.release_notes || needs.prepare.outputs.notes }}
