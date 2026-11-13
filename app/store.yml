@@ -31,12 +31,9 @@ android:
 # The store listing: listing/<language>.md, sent by ./release.sh listing.
 listing:
   copyright: Lukas Schulze
-  # As App Store Connect has them (2026-11-13). The GitHub account was renamed
-  # from lsgd to schulluk; GitHub forwards the old URLs while nobody takes
-  # the name.
-  support_url: https://github.com/lsgd/WealthTracker/issues
+  support_url: https://github.com/schulluk/WealthTracker/issues
   privacy_url: https://miniapps.ch/wealth-tracker/privacy-policy.html
-  marketing_url: https://github.com/lsgd/WealthTracker/
+  marketing_url: https://github.com/schulluk/WealthTracker
 
 # The App Review contact. Apple wants it on every new App Store version, does
 # not copy it from the previous one, and refuses a submission without it.
