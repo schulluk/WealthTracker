@@ -224,7 +224,6 @@ jobs:
           stack: ${{ inputs.stack }}
           flutter-version: ${{ inputs.flutter_version }}
           java-version: ${{ inputs.java_version }}
-          gradle: 'true'
           install-fastlane: ${{ inputs.dry_run == false }}
 
       - name: Preflight
