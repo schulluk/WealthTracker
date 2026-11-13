@@ -27,6 +27,11 @@ on:
         description: "Also replace the screenshots, from store.yml's listing.screenshots folders."
         type: boolean
         default: false
+      play_track:
+        description: "The Play track whose newest build the listing attaches to. auto takes the first of production, beta, alpha, internal that has one."
+        type: choice
+        options: [auto, production, beta, alpha, internal]
+        default: auto
       dry_run:
         description: 'Check every field (Play validates too), change nothing.'
         type: boolean
@@ -75,6 +80,7 @@ jobs:
         if: ${{ !cancelled() && steps.config.outputs.android == 'true' && inputs.platforms != 'ios' }}
         env:
           GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          PLAY_TRACK: ${{ inputs.play_track != 'auto' && inputs.play_track || '' }}
         run: .github/store-release/listing.sh android
 
       - name: Summary

@@ -21,6 +21,9 @@
 #   --env FILE             --local: the credentials file (default: store.yml's app.env, .env)
 #   --yes                  --local: skip the confirmation before a real release
 #   --screenshots          listing: replace the screenshots too
+#                          (--play-track there: the track whose newest build the
+#                          Play listing attaches to; default the first of
+#                          production, beta, alpha, internal that has one)
 #
 # Both read store.yml, so they build the same thing. --local takes its
 # credentials from the gitignored .env: ASC_KEY_ID, ASC_ISSUER_ID and
@@ -34,7 +37,7 @@ SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
 
-LISTING=false SCREENSHOTS=false
+LISTING=false SCREENSHOTS=false PLAY_TRACK_SET=false
 PLATFORMS=both IOS_TRACK=appstore PLAY_TRACK=internal SUBMIT=false DRY_RUN=false BUMP=minor
 NOTES_GIVEN="" NOTES_SET=false REF="" LOCAL=false ENV_FILE="" YES=false
 while [ $# -gt 0 ]; do
@@ -43,7 +46,7 @@ while [ $# -gt 0 ]; do
     --screenshots) SCREENSHOTS=true; shift ;;
     both | ios | android) PLATFORMS="$1"; shift ;;
     --testflight) IOS_TRACK=testflight; shift ;;
-    --play-track) PLAY_TRACK="${2:?}"; shift 2 ;;
+    --play-track) PLAY_TRACK="${2:?}"; PLAY_TRACK_SET=true; shift 2 ;;
     --submit) SUBMIT=true; shift ;;
     --dry-run) DRY_RUN=true; shift ;;
     --bump) BUMP="${2:?}"; shift 2 ;;
@@ -74,8 +77,10 @@ if [ "$LOCAL" = false ]; then
   ref="${REF:-main}"
   if [ "$LISTING" = true ]; then
     workflow=listing.yml
-    args=(-f "platforms=$PLATFORMS" -f "screenshots=$SCREENSHOTS" -f "dry_run=$DRY_RUN")
-    what="listing $PLATFORMS, screenshots $SCREENSHOTS, dry run $DRY_RUN"
+    anchor=auto
+    [ "$PLAY_TRACK_SET" = true ] && anchor="$PLAY_TRACK"
+    args=(-f "platforms=$PLATFORMS" -f "screenshots=$SCREENSHOTS" -f "dry_run=$DRY_RUN" -f "play_track=$anchor")
+    what="listing $PLATFORMS, screenshots $SCREENSHOTS, Play track $anchor, dry run $DRY_RUN"
   else
     workflow=release.yml
     args=(-f "platforms=$PLATFORMS" -f "ios_track=$IOS_TRACK" -f "play_track=$PLAY_TRACK"
@@ -235,6 +240,8 @@ fi
 if [ "$LISTING" = true ]; then
   command -v fastlane > /dev/null || { echo "fastlane is not installed." >&2; exit 1; }
   export DRY_RUN SCREENSHOTS
+  # listing.sh picks the Play track itself unless one was asked for.
+  if [ "$PLAY_TRACK_SET" = true ]; then export PLAY_TRACK; else unset PLAY_TRACK; fi
   stores=""
   [ "$want_ios" = true ] && stores="App Store"
   [ "$want_android" = true ] && stores="${stores:+$stores and }Google Play"

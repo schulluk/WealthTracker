@@ -14,15 +14,15 @@
 #
 # Run: DRY_RUN (verify / validate only, nothing changes), SCREENSHOTS,
 # VERSION (the App Store version to edit; empty takes the one ## Next counts
-# to), PLAY_TRACK (a track that has a build: Play looks one up even for a
-# listing; default internal). Credentials as in ios.sh and android.sh.
+# to), PLAY_TRACK (the track whose newest build the Play listing attaches to;
+# empty takes the first of production, beta, alpha and internal that has one). Credentials as in ios.sh and android.sh.
 set -euo pipefail
 # shellcheck source=lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 sr_config
 DRY_RUN="${DRY_RUN:-false}"
 SCREENSHOTS="${SCREENSHOTS:-false}"
-PLAY_TRACK="${PLAY_TRACK:-internal}"
+PLAY_TRACK="${PLAY_TRACK:-}"
 APP_DIR="$SR_ROOT"
 [ "$SR_APP_DIR" = . ] || APP_DIR="$SR_ROOT/$SR_APP_DIR"
 WORK="$RUNNER_TEMP/listing"
@@ -109,20 +109,25 @@ cmd_android() {
   fi
   # Play looks up a release on the track even for a listing, and refuses to
   # guess when the track holds several, so name the newest build there.
-  local code
-  code=$(FASTLANE_DISABLE_COLORS=1 FASTLANE_SKIP_UPDATE_CHECK=1 fastlane run google_play_track_version_codes \
-      package_name:"$SR_ANDROID_PACKAGE" track:"$PLAY_TRACK" json_key:"$key" 2>&1 \
-    | sed -e 's/\x1b\[[0-9;]*m//g' -n -e 's/.*Result: \[\(.*\)\].*/\1/p' | tail -1 \
-    | tr -s ', ' '\n\n' | grep -E '^[0-9]+$' | sort -n | tail -1 || true)
-  [ -n "$code" ] || sr_die "Play has no build on the $PLAY_TRACK track, and a listing upload needs one to attach to: upload a build there first, or set PLAY_TRACK to a track that has one."
-  echo "Attaching to versionCode $code on the $PLAY_TRACK track."
+  # Production first: the live release is complete, while a test track can
+  # hold a stale build or a draft.
+  local code="" track
+  for track in ${PLAY_TRACK:-production beta alpha internal}; do
+    code=$(FASTLANE_DISABLE_COLORS=1 FASTLANE_SKIP_UPDATE_CHECK=1 fastlane run google_play_track_version_codes \
+        package_name:"$SR_ANDROID_PACKAGE" track:"$track" json_key:"$key" 2>&1 \
+      | sed -e 's/\x1b\[[0-9;]*m//g' -n -e 's/.*Result: \[\(.*\)\].*/\1/p' | tail -1 \
+      | tr -s ', ' '\n\n' | grep -E '^[0-9]+$' | sort -n | tail -1 || true)
+    [ -n "$code" ] && break
+  done
+  [ -n "$code" ] || sr_die "Play has no build on ${PLAY_TRACK:-any track}, and a listing upload needs one to attach to: upload a build first."
+  echo "Attaching to versionCode $code on the $track track."
   supply() {
     # Images (icon, feature graphic) are left alone.
     fastlane supply \
       --package_name "$SR_ANDROID_PACKAGE" \
       --json_key "$key" \
       --metadata_path "$tree" \
-      --track "$PLAY_TRACK" \
+      --track "$track" \
       --version_code "$code" \
       --skip_upload_aab true \
       --skip_upload_apk true \
