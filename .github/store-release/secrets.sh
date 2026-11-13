@@ -284,6 +284,9 @@ for pair in "APP_STORE_CONNECT_API_KEY_P8:$ASC_P8" "APPLE_DISTRIBUTION_P12:$P12"
 done
 
 # ─────────────────────────────── derive ───────────────────────────────
+# OpenSSL 3 reads a Keychain Access export (RC2) only with -legacy, which
+# LibreSSL does not know; try both.
+p12() { openssl pkcs12 "$@" 2> /dev/null || openssl pkcs12 -legacy "$@" 2> /dev/null; }
 # The bare private key instead of a .p12: what ~/.private_keys keeps, because
 # a .p12 only bundles it with a certificate the keychain already has. Pair it
 # with that certificate (the one whose public key matches) and build the .p12
@@ -307,7 +310,10 @@ if [ -n "$P12" ] && grep -q -- "-----BEGIN .*PRIVATE KEY-----" "$P12" 2> /dev/nu
   [ -n "$CERT" ] || die "No valid Apple Distribution certificate in the login keychain belongs to the key $P12. Download the certificate from developer.apple.com (Certificates) and open it, or export a .p12 from the Mac that has it (references/secrets.md)."
   note "certificate from the login keychain: $(openssl x509 -in "$CERT" -noout -subject 2> /dev/null | sed -n 's/.*CN[ ]*=[ ]*\([^,/]*\).*/\1/p'), until $(openssl x509 -in "$CERT" -noout -enddate | cut -d= -f2)"
   P12_PASSWORD=$(openssl rand -hex 24)
+  # 3DES and a SHA-1 MAC, spelled out: the one encryption that LibreSSL,
+  # OpenSSL 3 and macOS's security import all read without -legacy.
   ( umask 077; SR_P12_PASS="$P12_PASSWORD" openssl pkcs12 -export -inkey "$P12" -in "$CERT" \
+      -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1 \
       -name "$(openssl x509 -in "$CERT" -noout -subject | sed -n 's/.*CN[ ]*=[ ]*\([^,/]*\).*/\1/p')" \
       -out "$WORK/apple-distribution.p12" -passout env:SR_P12_PASS ) \
     || die "openssl could not build a .p12 from $P12 and its certificate."
@@ -321,13 +327,13 @@ fi
 
 if [ -n "$P12" ] && [ -z "$TEAM_ID" ]; then
   # The team id is the OU of an Apple Distribution certificate.
-  TEAM_ID=$(openssl pkcs12 -in "$P12" -nokeys -passin "pass:$P12_PASSWORD" 2> /dev/null \
+  TEAM_ID=$(p12 -in "$P12" -nokeys -passin "pass:$P12_PASSWORD" \
     | openssl x509 -noout -subject 2> /dev/null \
     | tr ',/' '\n\n' | sed -n 's/.*OU[ ]*=[ ]*//p' | head -1 || true)
   if [ -n "$TEAM_ID" ]; then
     note "team id from the certificate: $TEAM_ID"
   else
-    note "could not read the team id from the certificate (OpenSSL 3 needs -legacy for some exports); set APPLE_TEAM_ID by hand"
+    note "could not read the team id from the certificate; store.yml ios.team_id has it anyway"
   fi
 fi
 
@@ -340,9 +346,9 @@ fi
 if [ -n "$P12" ]; then
   # Catch the mistake that costs a whole iOS release: a .p12 exported without
   # its private key signs nothing, and the error comes much later.
-  if ! openssl pkcs12 -in "$P12" -nocerts -passin "pass:$P12_PASSWORD" -passout pass:x > /dev/null 2>&1; then
-    if ! openssl pkcs12 -in "$P12" -info -noout -passin "pass:$P12_PASSWORD" > /dev/null 2>&1 \
-      && ! openssl pkcs12 -in "$P12" -info -noout -passin pass:x > /dev/null 2>&1 \
+  if ! p12 -in "$P12" -nocerts -passin "pass:$P12_PASSWORD" -passout pass:x > /dev/null; then
+    if ! p12 -in "$P12" -info -noout -passin "pass:$P12_PASSWORD" > /dev/null \
+      && ! p12 -in "$P12" -info -noout -passin pass:x > /dev/null \
       && [ "$(file -b "$P12" | cut -d' ' -f1)" != data ]; then
       die "$P12 is no .p12 ($(file -b "$P12")). Give the .p12, or the bare private key it was built from (references/secrets.md)."
     fi
