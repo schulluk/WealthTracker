@@ -40,7 +40,7 @@ module StoreConfig
     end
     found = [File.join(root, "store.yml")] + Dir.glob(File.join(root, "*", "store.yml"))
     found = found.select { |p| File.file?(p) }.reject { |p| p.include?("/.github/") }
-    raise Error, "No store.yml at the repository root or one directory below it. The store-release skill's templates/store.yml is the starting point." if found.empty?
+    raise Error, "No store.yml at the repository root or one directory below it. ./release.sh setup writes one." if found.empty?
     raise Error, "More than one store.yml (#{found.map { |p| rel(p) }.join(', ')}); set STORE_FILE to the one to use." if found.size > 1
     found.first
   end
