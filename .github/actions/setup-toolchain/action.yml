@@ -111,14 +111,16 @@ runs:
     # Without it every release downloads the Gradle distribution and every
     # dependency again, and re-transforms (dexes) each one: about five of the
     # fifteen minutes CakeDay's Flutter AAB took (2026-11-12). Only the
-    # dependency caches; the build cache stays off, because a release build
-    # should never reuse a task output. Runs on main write the cache, every
-    # other branch only reads it.
+    # dependency caches: the local build cache is left out even for a project
+    # that turns org.gradle.caching on, because a release build should never
+    # reuse a task output. Runs on main write the cache, every other branch
+    # only reads it.
     - name: Gradle
       if: inputs.stack == 'android-gradle' || inputs.gradle == 'true'
       uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
       with:
         add-job-summary: on-failure
+        gradle-home-cache-excludes: caches/build-cache-1
 
     - name: Cap Gradle memory
       if: inputs.cap-gradle-memory == 'true' && runner.os == 'Linux'
