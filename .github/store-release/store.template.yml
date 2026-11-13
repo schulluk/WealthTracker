@@ -64,7 +64,9 @@ dart_defines: []
 # Google Play section. Never What's New: the release writes that.
 listing:
   copyright: ""            # the holder; the year is the current one at upload
-  support_url: ""          # App Store, every language
+  # App Store, every language; a language with a URL of its own has it in its
+  # listing file (**Privacy URL** in the App Store section).
+  support_url: ""
   privacy_url: ""
   marketing_url: ""
   # dir: listing

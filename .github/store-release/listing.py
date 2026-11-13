@@ -26,7 +26,10 @@ store.yml (`en.md`, `de.md`, `it.md`, `pt-BR.md`):
 A heading naming the App Store (or Apple) or Google Play starts that store's
 fields; each field is a **Label** followed by a fenced block. What's New /
 Release Notes are ignored on purpose: the release writes those, from the
-changelog. A README.md in the folder is ignored too.
+changelog. A README.md in the folder is ignored too. The support, privacy
+and marketing URLs come from store.yml for every language; a language whose
+URL differs (a privacy policy in German) gets a **Support URL**, **Privacy
+URL** or **Marketing URL** field in its App Store section, which wins there.
 
 Writes OUT_DIR/ios/fastlane/metadata (deliver's layout, with store.yml's
 copyright holder and the current year at the root) and OUT_DIR/android/metadata
@@ -86,6 +89,14 @@ APPLE = {
     "promotional text": ("promotional_text.txt", 170),
     "description": ("description.txt", 4000),
 }
+# A language whose URL differs from store.yml's (a privacy policy in German)
+# carries its own in the App Store section; store.yml's covers the rest.
+URLS = {
+    "support url": "support_url",
+    "privacy url": "privacy_url",
+    "privacy policy url": "privacy_url",
+    "marketing url": "marketing_url",
+}
 GOOGLE = {
     "app name": ("title.txt", 30),
     "short description": ("short_description.txt", 80),
@@ -105,6 +116,9 @@ NAMES = {
 IMPORT = {
     "apple": [("App Name", "name"), ("Subtitle", "subtitle"), ("Keywords", "keywords"),
               ("Promotional Text", "promotional_text"), ("Description", "description")],
+    # Written only where the language's URL is not store.yml's.
+    "apple_urls": [("Support URL", "support_url"), ("Privacy URL", "privacy_url"),
+                   ("Marketing URL", "marketing_url")],
     "google": [("App Name", "title"), ("Short Description", "short_description"),
                ("Full Description", "full_description")],
 }
@@ -184,6 +198,12 @@ def from_json(src, folder):
             for label, field in IMPORT[store]:
                 value = (files[code][store].get(field) or "").strip()
                 lines += [f"**{label}** ({limits[label.lower()][1]} characters):", "```", value, "```", ""]
+            if store == "apple":
+                # Only a URL that is not store.yml's: the rest stays there.
+                for label, field in IMPORT["apple_urls"]:
+                    value = (files[code][store].get(field) or "").strip()
+                    if value and value != os.environ.get(f"SR_LISTING_{field.upper()}", "").strip():
+                        lines += [f"**{label}** (this language only; store.yml has the others):", "```", value, "```", ""]
         with open(path, "w", encoding="utf-8") as f:
             f.write("\n".join(lines).rstrip() + "\n")
         stores = " and ".join(h for s, h in (("apple", "App Store"), ("google", "Google Play")) if s in files[code])
@@ -237,9 +257,17 @@ def main():
             fields_table = APPLE if store == "apple" else GOOGLE
             locale = locales[0] if store == "apple" else locales[1]
             title = "App Store" if store == "apple" else "Play"
-            empty = []
+            empty, own_urls = [], set()
             for label, value in fields.items():
                 if label in IGNORED:
+                    continue
+                if store == "apple" and label in URLS:
+                    if value and not re.match(r"https?://\S+$", value):
+                        errors.append(f"{folder}/{name}, {title} {label}: '{value}' is not a URL.")
+                    elif value:
+                        write(f"ios/fastlane/metadata/{locale}/{URLS[label]}.txt", value)
+                        own_urls.add(URLS[label])
+                        wrote[key].setdefault(locale, []).append(URLS[label])
                     continue
                 if label not in fields_table:
                     warnings.append(f"{folder}/{name}, {title}: '{label}' is not a listing field, left out.")
@@ -265,7 +293,7 @@ def main():
             if store == "apple":
                 for field in ("support_url", "privacy_url", "marketing_url"):
                     url = env.get(f"SR_LISTING_{field.upper()}", "").strip()
-                    if url:
+                    if url and field not in own_urls:
                         write(f"ios/fastlane/metadata/{locale}/{field}.txt", url)
                         wrote["ios"].setdefault(locale, []).append(field)
 

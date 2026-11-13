@@ -1380,7 +1380,9 @@ module Setup
         return report("no listing yet: ./release.sh listing sends listing/<language>.md once it exists")
       end
       return report("would write #{rel(dir)}/") if @ask.plan?
-      out = Setup.run("python3", File.join(DIR, "listing.py"), "--from-json", source, dir).to_s
+      # store.yml's URLs, so a language whose URL differs keeps its own.
+      urls = %w[support_url privacy_url marketing_url].map { |k| ["SR_LISTING_#{k.upcase}", cfg["listing_#{k}"].to_s] }.to_h
+      out, = Open3.capture2e(urls, "python3", File.join(DIR, "listing.py"), "--from-json", source, dir)
       unknown = []
       out.each_line do |line|
         if line.start_with?("language\t")
