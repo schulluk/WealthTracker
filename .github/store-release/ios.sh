@@ -483,18 +483,37 @@ PY
       --force true )
 }
 
-# Attaches the uploaded build to the version and sends it to review. deliver
-# waits until Apple has processed the build (up to two hours), which is why
-# the workflow runs this on Linux.
+# Attaches the uploaded build to the version and sends it to review. Given
+# --build_number, deliver attaches that build at once and does not wait, but
+# Apple lists a build only minutes after the upload and refuses to attach one
+# it has not finished processing. So this first waits for exactly that build
+# to be processed (up to two hours) with fastlane's own build watcher, the one
+# deliver uses after an IPA upload, which is why the workflow runs this on
+# Linux.
 cmd_submit() {
   : "${BUILD_NUMBER:?BUILD_NUMBER is not set}"
   sr_asc_key
   local work="$RUNNER_TEMP/submit" log="$RUNNER_TEMP/submit.log" rc
   # An empty fastlane/metadata keeps deliver from asking its setup question;
-  # with --skip_metadata nothing in it is sent.
+  # with --skip_metadata nothing in it is sent. The Fastfile is the wait, and
+  # only that: a lane runs Ruby inside fastlane's own gems, wherever they are.
   mkdir -p "$work/fastlane/metadata"
+  cat > "$work/fastlane/Fastfile" <<'RUBY'
+lane :wait_for_build do
+  Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.from_json_file(ENV.fetch("SR_ASC_KEY_JSON"))
+  bundle_id = ENV.fetch("SR_IOS_BUNDLE_ID")
+  app = Spaceship::ConnectAPI::App.find(bundle_id) or UI.user_error!("App Store Connect has no app #{bundle_id}.")
+  build = FastlaneCore::BuildWatcher.wait_for_build_processing_to_be_complete(
+    app_id: app.id, platform: "IOS", app_version: ENV.fetch("VERSION"), build_version: ENV.fetch("BUILD_NUMBER"),
+    poll_interval: 30, timeout_duration: 7200, return_spaceship_testflight_build: false
+  )
+  UI.success("#{build.app_version} (#{build.version}) is processed: #{build.processing_state}")
+end
+RUBY
   set +e
-  ( cd "$work" && fastlane deliver \
+  ( cd "$work" \
+    && SR_ASC_KEY_JSON="$RUNNER_TEMP/asc-key.json" SR_IOS_BUNDLE_ID="$SR_IOS_BUNDLE_ID" fastlane wait_for_build \
+    && fastlane deliver \
       --api_key_path "$RUNNER_TEMP/asc-key.json" \
       --app_identifier "$SR_IOS_BUNDLE_ID" \
       --app_version "$VERSION" \

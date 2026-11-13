@@ -164,6 +164,26 @@ if want ios; then
       fi
     fi
 
+    # An app's first in-app purchases and subscriptions go to review only
+    # together with a version, ticked on its page in App Store Connect; a
+    # submission through the API sends the version without them, and App
+    # Review then sees an app whose purchases do not load. Later ones go on
+    # their own. Not a hold: the upload is fine, only --submit is wrong.
+    if [ "$IOS_TRACK" = appstore ] && [ -n "$APP_ID" ]; then
+      ITEMS=""
+      if IAPS=$(asc_api GET "/v1/apps/$APP_ID/inAppPurchasesV2?limit=200" 2>/dev/null); then
+        ITEMS=$(echo "$IAPS" | jq -r '.data[] | "\(.attributes.state)\t\(.attributes.name)"')
+      fi
+      if SUBS=$(asc_api GET "/v1/apps/$APP_ID/subscriptionGroups?include=subscriptions&limit=50" 2>/dev/null); then
+        ITEMS="$ITEMS"$'\n'$(echo "$SUBS" | jq -r '(.included // [])[] | select(.type == "subscriptions")
+          | "\(.attributes.state)\t\(.attributes.name)"')
+      fi
+      READY=$(printf '%s\n' "$ITEMS" | grep $'^READY_TO_SUBMIT\t' | cut -f2 | paste -sd ',' - | sed 's/,/, /g' || true)
+      if [ -n "$READY" ] && ! printf '%s\n' "$ITEMS" | grep -qE $'^(APPROVED|DEVELOPER_REMOVED_FROM_SALE|REMOVED_FROM_SALE)\t'; then
+        echo "::warning::This app's first in-app purchases or subscriptions ($READY) are ready to submit, and Apple takes first ones only with a version submitted from the App Store Connect website. Release with submit off, then on the version's page add them under In-App Purchases and Subscriptions and press Add for Review."
+      fi
+    fi
+
     # The agreements canary. Apple exposes no agreements endpoint, and an
     # outstanding one surfaces only as a 403 on a *write* — at upload or
     # submit time, after the build. So do a write that changes nothing: PATCH
