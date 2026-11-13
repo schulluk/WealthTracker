@@ -5,6 +5,10 @@
 # available or to try a pipeline change without a round trip.
 #
 #   ./release.sh [both|ios|android] [options]
+#   ./release.sh listing [both|ios|android] [--screenshots] [--dry-run] [--local]
+#
+# listing sends the store listing from listing/<language>.md (and, with --screenshots,
+# the screenshots store.yml names) instead of a build. Options:
 #
 #   --testflight           iOS to TestFlight only; default: the App Store version
 #   --play-track TRACK     internal (default) | alpha | beta | production
@@ -16,6 +20,10 @@
 #   --local                on this Mac instead of GitHub
 #   --env FILE             --local: the credentials file (default: store.yml's app.env, .env)
 #   --yes                  --local: skip the confirmation before a real release
+#   --screenshots          listing: replace the screenshots too
+#                          (--play-track there: the track whose newest build the
+#                          Play listing attaches to; default the first of
+#                          production, beta, alpha, internal that has one)
 #
 # Both read store.yml, so they build the same thing. --local takes its
 # credentials from the gitignored .env: ASC_KEY_ID, ASC_ISSUER_ID and
@@ -29,13 +37,16 @@ SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
 
+LISTING=false SCREENSHOTS=false PLAY_TRACK_SET=false
 PLATFORMS=both IOS_TRACK=appstore PLAY_TRACK=internal SUBMIT=false DRY_RUN=false BUMP=minor
 NOTES_GIVEN="" NOTES_SET=false REF="" LOCAL=false ENV_FILE="" YES=false
 while [ $# -gt 0 ]; do
   case "$1" in
+    listing) LISTING=true; shift ;;
+    --screenshots) SCREENSHOTS=true; shift ;;
     both | ios | android) PLATFORMS="$1"; shift ;;
     --testflight) IOS_TRACK=testflight; shift ;;
-    --play-track) PLAY_TRACK="${2:?}"; shift 2 ;;
+    --play-track) PLAY_TRACK="${2:?}"; PLAY_TRACK_SET=true; shift 2 ;;
     --submit) SUBMIT=true; shift ;;
     --dry-run) DRY_RUN=true; shift ;;
     --bump) BUMP="${2:?}"; shift 2 ;;
@@ -64,15 +75,25 @@ if [ "$LOCAL" = false ]; then
   slug=$(printf '%s' "$origin" | sed -E 's#^(git@github\.com:|https://github\.com/)##; s#\.git$##')
   [[ "$slug" =~ ^[^/]+/[^/]+$ ]] || { echo "origin ($origin) is not a GitHub repository." >&2; exit 1; }
   ref="${REF:-main}"
-  args=(-f "platforms=$PLATFORMS" -f "ios_track=$IOS_TRACK" -f "play_track=$PLAY_TRACK"
-        -f "submit=$SUBMIT" -f "dry_run=$DRY_RUN" -f "bump=$BUMP")
-  [ "$NOTES_SET" = true ] && args+=(-f "release_notes=$NOTES_GIVEN")
+  if [ "$LISTING" = true ]; then
+    workflow=listing.yml
+    anchor=auto
+    [ "$PLAY_TRACK_SET" = true ] && anchor="$PLAY_TRACK"
+    args=(-f "platforms=$PLATFORMS" -f "screenshots=$SCREENSHOTS" -f "dry_run=$DRY_RUN" -f "play_track=$anchor")
+    what="listing $PLATFORMS, screenshots $SCREENSHOTS, Play track $anchor, dry run $DRY_RUN"
+  else
+    workflow=release.yml
+    args=(-f "platforms=$PLATFORMS" -f "ios_track=$IOS_TRACK" -f "play_track=$PLAY_TRACK"
+          -f "submit=$SUBMIT" -f "dry_run=$DRY_RUN" -f "bump=$BUMP")
+    [ "$NOTES_SET" = true ] && args+=(-f "release_notes=$NOTES_GIVEN")
+    what="$PLATFORMS, iOS $IOS_TRACK, Play $PLAY_TRACK, submit $SUBMIT, dry run $DRY_RUN"
+  fi
   started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-  echo "Dispatching release.yml on $slug@$ref: $PLATFORMS, iOS $IOS_TRACK, Play $PLAY_TRACK, submit $SUBMIT, dry run $DRY_RUN"
-  gh workflow run release.yml --repo "$slug" --ref "$ref" "${args[@]}" < /dev/null > /dev/null
+  echo "Dispatching $workflow on $slug@$ref: $what"
+  gh workflow run "$workflow" --repo "$slug" --ref "$ref" "${args[@]}" < /dev/null > /dev/null
   id=""
   for _ in $(seq 1 30); do
-    id=$(gh run list --repo "$slug" --workflow release.yml --event workflow_dispatch --limit 10 \
+    id=$(gh run list --repo "$slug" --workflow "$workflow" --event workflow_dispatch --limit 10 \
       --json databaseId,createdAt --jq "[.[] | select(.createdAt >= \"$started\")] | last | .databaseId // empty")
     [ -n "$id" ] && break
     sleep 4
@@ -89,6 +110,8 @@ fi
 # ─────────────────────────────── on this Mac ─────────────────────────────
 WORK=$(mktemp -d)
 cleanup_all() {
+  rm -f "$WORK/tmp/asc-key.p8" "$WORK/tmp/asc-key.json" "$WORK/tmp/play-service-account.json" 2> /dev/null || true
+  [ "$LISTING" = true ] && { rm -rf "$WORK"; return 0; }
   [ "$want_ios" = true ] && step ios-cleanup "$SELF_DIR/ios.sh" cleanup > /dev/null 2>&1 || true
   [ "$want_android" = true ] && step android-cleanup "$SELF_DIR/android.sh" cleanup > /dev/null 2>&1 || true
   rm -rf "$WORK"
@@ -204,13 +227,44 @@ if [ "$want_android" = true ]; then
   export GOOGLE_PLAY_JSON_KEY_PATH
   for k in ANDROID_UPLOAD_KEY_SHA1 KEYSTORE_PATH KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do take "$k"; done
 fi
-if [ -n "$SR_DART_DEFINES" ] && [ -z "${DART_DEFINES_JSON:-}" ]; then
+if [ "$LISTING" = false ] && [ -n "$SR_DART_DEFINES" ] && [ -z "${DART_DEFINES_JSON:-}" ]; then
   missing=""
   for k in $SR_DART_DEFINES; do take "$k"; [ -n "${!k:-}" ] || missing="$missing $k"; done
   [ -z "$missing" ] || { echo "store.yml's dart_defines are missing from $env_file:$missing" >&2; exit 1; }
   # shellcheck disable=SC2086
   DART_DEFINES_JSON=$(python3 -c 'import json, os, sys; print(json.dumps({k: os.environ[k] for k in sys.argv[1:]}))' $SR_DART_DEFINES)
   export DART_DEFINES_JSON
+fi
+
+# The listing: listing/<language>.md to both stores, nothing built.
+if [ "$LISTING" = true ]; then
+  command -v fastlane > /dev/null || { echo "fastlane is not installed." >&2; exit 1; }
+  export DRY_RUN SCREENSHOTS
+  # listing.sh picks the Play track itself unless one was asked for.
+  if [ "$PLAY_TRACK_SET" = true ]; then export PLAY_TRACK; else unset PLAY_TRACK; fi
+  stores=""
+  [ "$want_ios" = true ] && stores="App Store"
+  [ "$want_android" = true ] && stores="${stores:+$stores and }Google Play"
+  if [ "$DRY_RUN" = true ]; then
+    echo "Dry run of the listing for $stores."
+  elif [ "$YES" = false ]; then
+    printf 'Send the listing from %s/%s to %s? [y/N] ' "$SR_LISTING_DIR" "$([ "$SCREENSHOTS" = true ] && echo " and the screenshots")" "$stores"
+    read -r answer
+    [ "$answer" = y ] || [ "$answer" = Y ] || { echo "Nothing sent."; exit 1; }
+  fi
+  failed=false
+  if [ "$want_ios" = true ]; then
+    step listing-ios "$SELF_DIR/listing.sh" ios || failed=true
+  fi
+  if [ "$want_android" = true ]; then
+    step listing-android "$SELF_DIR/listing.sh" android || failed=true
+  fi
+  LISTING_IOS=$(out listing-ios ios 2> /dev/null || true) LISTING_ANDROID=$(out listing-android android 2> /dev/null || true) \
+    step listing-summary "$SELF_DIR/listing.sh" summary || true
+  printf '\n'
+  cat "$GITHUB_STEP_SUMMARY"
+  [ "$failed" = false ]
+  exit
 fi
 
 # What a runner gets from its pinned image, checked here instead.

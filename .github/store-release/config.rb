@@ -130,6 +130,23 @@ module StoreConfig
       errors << "android.build_command is required for android-gradle: every project names its version properties differently." if stack == "android-gradle" && cfg["android_build_command"].empty?
     end
 
+    listing = data["listing"] || {}
+    shots = listing["screenshots"] || {}
+    cfg.update(
+      "listing_dir" => str(listing["dir"]).empty? ? "listing" : str(listing["dir"]),
+      "listing_copyright" => str(listing["copyright"]),
+      "listing_support_url" => str(listing["support_url"]),
+      "listing_privacy_url" => str(listing["privacy_url"]),
+      "listing_marketing_url" => str(listing["marketing_url"]),
+      "listing_screenshots_ios" => str(shots["ios"]),
+      "listing_screenshots_android" => str(shots["android"]),
+      "listing_languages" => (listing["languages"] || {}).map do |section, loc|
+        loc = {} unless loc.is_a?(Hash)
+        errors << "listing.languages.#{section} needs app_store and play." if str(loc["app_store"]).empty? || str(loc["play"]).empty?
+        [str(section), str(loc["app_store"]), str(loc["play"])].join("\t")
+      end.join("\n")
+    )
+
     uses_flutter = cfg["ios_stack"] == "flutter" || cfg["android_stack"] == "flutter"
     errors << "app.flutter is missing: the exact Flutter version the app builds with (flutter --version)." if uses_flutter && cfg["flutter"].empty?
     raise Error, "#{rel(path)}:\n  " + errors.join("\n  ") unless errors.empty?

@@ -422,7 +422,18 @@ def clean(text):
     print(f"::warning::What's New is {len(text)} characters; kept {len(kept) + 1} of {len(lines)} lines to fit {limit}.")
     return "\n".join(kept + [lines[-1]])
 
-notes = clean(env.get("NOTES", ""))
+def for_app_store(text):
+    # App Review rejects metadata that names other platforms, so a changelog
+    # line about the Android build stays out of What's New.
+    lines = text.strip().splitlines()
+    kept = [l for l in lines if not re.search(r"\b(android|google play|play store)\b", l, re.I)]
+    if len(kept) < len(lines):
+        print(f"::notice::Left {len(lines) - len(kept)} line(s) naming Android or Google Play out of What's New.")
+        if not "\n".join(kept).strip():
+            return str(notes_cfg.get("default") or "Bug fixes and improvements.")
+    return "\n".join(kept)
+
+notes = clean(for_app_store(env.get("NOTES", "")))
 if notes:
     write(f"{locale}/release_notes.txt", notes)
     wrote.append(f"What's New ({locale}, {len(notes)} characters)")

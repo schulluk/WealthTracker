@@ -13,6 +13,7 @@ line first. No emoji anywhere, no long dashes in Public. -->
 ### Internal
 - Releases count the version from this changelog instead of a typed one, read the App Review contact from store.yml, and publish every App Store version as soon as Apple approves it.
 - Releases run through one set of steps, started on GitHub or on the Mac with ./release.sh (--local); the Fastfiles and deploy.sh are gone, and how the app is built lives in store.yml.
+- The store listing lives in app/listing/<language>.md (METADATA.md and sync_store_listings.sh are gone) and is sent with ./release.sh listing; App Store What's New leaves out lines that name Android.
 
 ## 1.5.0
 - Morgan Stanley syncs again after a server restart; if the server's browser cannot start, the sync error now says so instead of asking for a JWT token
