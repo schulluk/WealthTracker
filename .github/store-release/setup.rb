@@ -51,7 +51,13 @@ module Setup
 
   PARTS = %w[repo store env listing secrets].freeze
   DIR = __dir__
-  KEY_DIRS = %w[~/.private_keys ~/.appstoreconnect/private_keys ~/Downloads/_keys ~/Downloads].freeze
+  # Where every release credential on this Mac lives, one file each, mode 600:
+  # AuthKey_<id>.p8 (App Store Connect), apple-distribution-<team>.key (the
+  # distribution certificate's private key; the certificate is in the login
+  # keychain), google-play-service-account.json, upload-keystore.jks. It is
+  # also where Apple's tools look for AuthKey_<id>.p8.
+  KEYS_DIR = File.expand_path(ENV["SR_KEYS_DIR"] || "~/.private_keys")
+  KEY_DIRS = [KEYS_DIR, *%w[~/.appstoreconnect/private_keys ~/Downloads/_keys ~/Downloads]].freeze
   # Each pattern with a path it must cover.
   IGNORES = {
     ".env" => ".env", "*.p8" => "AuthKey_X.p8", "*.p12" => "x.p12", "*.jks" => "x.jks",
@@ -768,6 +774,8 @@ module Setup
       return fastlane if File.file?(fastlane)
       # The service account belongs to the developer account, so another
       # app's key reads this app too.
+      shared = File.join(KEYS_DIR, "google-play-service-account.json")
+      return shared if File.file?(shared)
       Setup.most_common(@others.env_values("GOOGLE_PLAY_JSON_KEY_PATH", path: true) +
                         @others.glob("android/fastlane/play-store-key.json").map { |p| [p, @others.label(p)] }).first
     end
@@ -1240,8 +1248,20 @@ module Setup
       report "WARNING: #{rel(path)} is not gitignored" if File.file?(path) && !@project.ignored?(rel(path))
     end
 
+    # :key for a bare private key (PEM), :p12 for a PKCS#12 bundle, nil for
+    # anything else, whatever the file is called.
+    def distribution_file(path)
+      return nil unless File.file?(path)
+      head = File.binread(path, 4096).to_s
+      return :key if head.lstrip.start_with?("-----BEGIN") && head.include?("PRIVATE KEY-----")
+      return :p12 if head.start_with?("\x30".b) && path.downcase.end_with?(".p12", ".pfx")
+      nil
+    end
+
     def find_p8(key_id)
       return [nil, nil] if Setup.blank?(key_id)
+      shared = File.join(KEYS_DIR, "AuthKey_#{key_id}.p8")
+      return [shared, "~/.private_keys"] if File.file?(shared)
       own = @others.envs.find { |_, e| e["ASC_KEY_ID"] == key_id && !Setup.blank?(e["ASC_KEY_PATH"]) }
       if own
         p = File.expand_path(own[1]["ASC_KEY_PATH"], File.dirname(own[0]))
@@ -1284,7 +1304,8 @@ module Setup
         store && File.file?(store) ? [store, @others.label(p), kp] : nil
       end.compact
       path, from = Setup.most_common(found.map { |s, l, _| [s, l] })
-      path ||= File.expand_path("~/upload-keystore.jks") if File.file?(File.expand_path("~/upload-keystore.jks"))
+      shared = File.join(KEYS_DIR, "upload-keystore.jks")
+      path, from = [shared, "~/.private_keys"] if path.nil? && File.file?(shared)
       donor = found.find { |s, _, kp| s == path && kp["keyAlias"].to_s == alias_name && !Setup.blank?(kp["storePassword"]) }
       [path, from, donor]
     end
@@ -1476,17 +1497,26 @@ module Setup
         lines["APP_STORE_CONNECT_API_KEY_P8"] = @ask.file("APP_STORE_CONNECT_API_KEY_P8", "Its .p8 file", p8, from: from)
       end
       unless (missing & %w[APPLE_DISTRIBUTION_P12_B64 APPLE_DISTRIBUTION_P12_PASSWORD]).empty?
-        candidates = (KEY_DIRS.map { |d| "#{d}/*.p12" } + ["~/git/*/keys/*.p12", "~/git/*/*/keys/*.p12"])
-                     .flat_map { |g| Dir.glob(File.expand_path(g)) }
-        p12 = candidates.max_by { |f| File.mtime(f) }
-        lines["APPLE_DISTRIBUTION_P12"] = @ask.file("APPLE_DISTRIBUTION_P12", "The Apple Distribution certificate with its private key (.p12)",
-                                                    p12, from: p12 && "newest .p12 found")
-        lines["APPLE_DISTRIBUTION_P12_PASSWORD"] = @ask.secret("APPLE_DISTRIBUTION_P12_PASSWORD", "Its password")
+        # The private key in ~/.private_keys is enough: secrets.sh takes the
+        # certificate from the login keychain and builds the .p12 itself.
+        team = cfg["ios_team_id"].to_s
+        key = ["apple-distribution-#{team}.key", "apple-distribution*.key", "*.p12"]
+              .flat_map { |g| Dir.glob(File.join(KEYS_DIR, g)) }.find { |f| distribution_file(f) }
+        identity = @ask.file("APPLE_DISTRIBUTION_P12", "The Apple Distribution private key, or a .p12 with certificate and key",
+                             key, from: key && "~/.private_keys")
+        lines["APPLE_DISTRIBUTION_P12"] = identity
+        kind = identity.empty? ? nil : distribution_file(identity)
+        if kind.nil? && !identity.empty?
+          report "#{identity} is neither a private key nor a .p12, so the distribution identity is left out"
+          lines.delete("APPLE_DISTRIBUTION_P12")
+        elsif kind == :p12 || (identity.empty? && @ask.plan?)
+          lines["APPLE_DISTRIBUTION_P12_PASSWORD"] = @ask.secret("APPLE_DISTRIBUTION_P12_PASSWORD", "The .p12's password")
+        end
       end
       if missing.include?("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON")
         key = play_key
         lines["GOOGLE_PLAY_SERVICE_ACCOUNT_JSON"] = @ask.file("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON", "Google Play service-account JSON",
-                                                              key, from: key && "this app's .env")
+                                                              key, from: key && (key.start_with?(KEYS_DIR) ? "~/.private_keys" : "this app"))
       end
       unless (missing & %w[ANDROID_KEYSTORE_B64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_PASSWORD]).empty?
         kp = cfg["android_key_properties"].empty? ? nil : File.join(app_dir_abs, cfg["android_key_properties"])
@@ -1497,10 +1527,17 @@ module Setup
           lines["ANDROID_KEYSTORE_PASSWORD"] = have["KEYSTORE_PASSWORD"]
           lines["ANDROID_KEY_PASSWORD"] = have["KEY_PASSWORD"]
         else
-          default, from = keystore_default(cfg["android_key_alias"])
-          lines["ANDROID_KEYSTORE"] = @ask.file("ANDROID_KEYSTORE", "The upload keystore (.jks)", default, from: from)
-          lines["ANDROID_KEYSTORE_PASSWORD"] = @ask.secret("ANDROID_KEYSTORE_PASSWORD", "Keystore password")
-          lines["ANDROID_KEY_PASSWORD"] = @ask.secret("ANDROID_KEY_PASSWORD", "Key password")
+          default, from, donor = keystore_default(cfg["android_key_alias"])
+          store = @ask.file("ANDROID_KEYSTORE", "The upload keystore (.jks)", default, from: from)
+          lines["ANDROID_KEYSTORE"] = store
+          if donor && donor[0] == store &&
+             @ask.yes?("passwords", "Take the keystore's passwords from #{donor[1]} (same keystore)", true)
+            lines["ANDROID_KEYSTORE_PASSWORD"] = donor[2]["storePassword"]
+            lines["ANDROID_KEY_PASSWORD"] = donor[2]["keyPassword"]
+          else
+            lines["ANDROID_KEYSTORE_PASSWORD"] = @ask.secret("ANDROID_KEYSTORE_PASSWORD", "Keystore password")
+            lines["ANDROID_KEY_PASSWORD"] = @ask.secret("ANDROID_KEY_PASSWORD", "Key password")
+          end
         end
       end
       if missing.include?("DART_DEFINES_JSON")

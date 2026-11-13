@@ -25,7 +25,13 @@
 #   --from-key-properties      Flutter's key.properties: storeFile,
 #                              storePassword, keyPassword, keyAlias
 #   --file                     the rest, usually only the two values no repo
-#                              has: the Apple .p12 and the Play JSON key
+#                              has: the Apple distribution identity and the
+#                              Play JSON key. APPLE_DISTRIBUTION_P12 may name
+#                              a .p12 (with APPLE_DISTRIBUTION_P12_PASSWORD) or
+#                              the bare private key (PEM, as kept in
+#                              ~/.private_keys): then its certificate comes from
+#                              the login keychain and the .p12 is built here,
+#                              with a random password nobody needs to know
 #   --dart-defines K1,K2       build-time values the app reads with
 #                              String.fromEnvironment, taken by name from --file
 #                              or --from-env and set as one DART_DEFINES_JSON
@@ -259,7 +265,7 @@ fi
 # An ASC key that is not where the .env claims: Apple names the file after the
 # key id, so it can be found wherever it was left.
 if [ -n "$ASC_KEY_ID" ] && { [ -z "$ASC_P8" ] || [ ! -f "$ASC_P8" ]; }; then
-  for dir in "$HOME/Downloads/_keys" "$HOME/Downloads" "$HOME/.appstoreconnect/private_keys" \
+  for dir in "$HOME/.private_keys" "$HOME/Downloads/_keys" "$HOME/Downloads" "$HOME/.appstoreconnect/private_keys" \
     "$([ -n "$FROM_ENV" ] && dirname "$FROM_ENV" || echo .)"; do
     if [ -f "$dir/AuthKey_$ASC_KEY_ID.p8" ]; then
       ASC_P8="$dir/AuthKey_$ASC_KEY_ID.p8"
@@ -278,6 +284,41 @@ for pair in "APP_STORE_CONNECT_API_KEY_P8:$ASC_P8" "APPLE_DISTRIBUTION_P12:$P12"
 done
 
 # ─────────────────────────────── derive ───────────────────────────────
+# The bare private key instead of a .p12: what ~/.private_keys keeps, because
+# a .p12 only bundles it with a certificate the keychain already has. Pair it
+# with that certificate (the one whose public key matches) and build the .p12
+# here, protected by a random password that goes straight into its secret.
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT
+if [ -n "$P12" ] && grep -q -- "-----BEGIN .*PRIVATE KEY-----" "$P12" 2> /dev/null; then
+  KEY_PUB=$(openssl pkey -in "$P12" -pubout 2> /dev/null | openssl sha256) \
+    || die "$P12 looks like a private key, but openssl cannot read it (an encrypted key needs its passphrase removed first)."
+  security find-certificate -a -c "Apple Distribution" -p > "$WORK/all.pem" 2> /dev/null || true
+  awk -v dir="$WORK" '/-----BEGIN CERTIFICATE-----/ { n++ } n { print > (dir "/cert" n ".pem") }' "$WORK/all.pem"
+  CERT=""
+  for c in "$WORK"/cert*.pem; do
+    [ -f "$c" ] || continue
+    if [ "$(openssl x509 -in "$c" -noout -pubkey 2> /dev/null | openssl sha256)" = "$KEY_PUB" ] \
+      && openssl x509 -in "$c" -noout -checkend 0 > /dev/null 2>&1; then
+      CERT="$c"
+      break
+    fi
+  done
+  [ -n "$CERT" ] || die "No valid Apple Distribution certificate in the login keychain belongs to the key $P12. Download the certificate from developer.apple.com (Certificates) and open it, or export a .p12 from the Mac that has it (references/secrets.md)."
+  note "certificate from the login keychain: $(openssl x509 -in "$CERT" -noout -subject 2> /dev/null | sed -n 's/.*CN[ ]*=[ ]*\([^,/]*\).*/\1/p'), until $(openssl x509 -in "$CERT" -noout -enddate | cut -d= -f2)"
+  P12_PASSWORD=$(openssl rand -hex 24)
+  ( umask 077; SR_P12_PASS="$P12_PASSWORD" openssl pkcs12 -export -inkey "$P12" -in "$CERT" \
+      -name "$(openssl x509 -in "$CERT" -noout -subject | sed -n 's/.*CN[ ]*=[ ]*\([^,/]*\).*/\1/p')" \
+      -out "$WORK/apple-distribution.p12" -passout env:SR_P12_PASS ) \
+    || die "openssl could not build a .p12 from $P12 and its certificate."
+  P12="$WORK/apple-distribution.p12"
+  note "the .p12 was built from that certificate and the key, with a random password"
+fi
+# The .p12 and its password only work as a pair: a new one replaces both.
+if [ -n "$P12" ]; then
+  EXISTING=$(printf '%s\n' "$EXISTING" | grep -vxE 'APPLE_DISTRIBUTION_P12_B64|APPLE_DISTRIBUTION_P12_PASSWORD' || true)
+fi
+
 if [ -n "$P12" ] && [ -z "$TEAM_ID" ]; then
   # The team id is the OU of an Apple Distribution certificate.
   TEAM_ID=$(openssl pkcs12 -in "$P12" -nokeys -passin "pass:$P12_PASSWORD" 2> /dev/null \
@@ -300,7 +341,12 @@ if [ -n "$P12" ]; then
   # Catch the mistake that costs a whole iOS release: a .p12 exported without
   # its private key signs nothing, and the error comes much later.
   if ! openssl pkcs12 -in "$P12" -nocerts -passin "pass:$P12_PASSWORD" -passout pass:x > /dev/null 2>&1; then
-    die "$P12 has no private key, or the password is wrong. Export the certificate AND its key from Keychain Access (references/secrets.md)."
+    if ! openssl pkcs12 -in "$P12" -info -noout -passin "pass:$P12_PASSWORD" > /dev/null 2>&1 \
+      && ! openssl pkcs12 -in "$P12" -info -noout -passin pass:x > /dev/null 2>&1 \
+      && [ "$(file -b "$P12" | cut -d' ' -f1)" != data ]; then
+      die "$P12 is no .p12 ($(file -b "$P12")). Give the .p12, or the bare private key it was built from (references/secrets.md)."
+    fi
+    die "$P12 has no private key, or the password is wrong. Export the certificate AND its key from Keychain Access, or give the bare private key instead (references/secrets.md)."
   fi
   note "the certificate carries its private key"
 fi
