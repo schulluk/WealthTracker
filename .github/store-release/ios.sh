@@ -40,7 +40,9 @@ sr_config
 VERSION="${VERSION:?VERSION is not set}"
 TRACK="${TRACK:-appstore}"
 DRY_RUN="${DRY_RUN:-false}"
-APP_DIR="$SR_ROOT/$SR_APP_DIR"
+# No "/./" in the paths: actions/upload-artifact refuses them.
+APP_DIR="$SR_ROOT"
+[ "$SR_APP_DIR" = . ] || APP_DIR="$SR_ROOT/$SR_APP_DIR"
 # prepare sets IOS_BUILD_NUMBER; a given BUILD_NUMBER overrides the scheme.
 BUILD_NUMBER="${IOS_BUILD_NUMBER:-${BUILD_NUMBER:-}}"
 

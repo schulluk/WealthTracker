@@ -69,7 +69,7 @@ if [ "$LOCAL" = false ]; then
   [ "$NOTES_SET" = true ] && args+=(-f "release_notes=$NOTES_GIVEN")
   started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   echo "Dispatching release.yml on $slug@$ref: $PLATFORMS, iOS $IOS_TRACK, Play $PLAY_TRACK, submit $SUBMIT, dry run $DRY_RUN"
-  gh workflow run release.yml --repo "$slug" --ref "$ref" "${args[@]}" < /dev/null
+  gh workflow run release.yml --repo "$slug" --ref "$ref" "${args[@]}" < /dev/null > /dev/null
   id=""
   for _ in $(seq 1 30); do
     id=$(gh run list --repo "$slug" --workflow release.yml --event workflow_dispatch --limit 10 \
@@ -95,6 +95,8 @@ cleanup_all() {
 }
 trap cleanup_all EXIT
 unset GITHUB_ACTIONS GITHUB_REF_TYPE GITHUB_REF_NAME
+# fastlane wants a UTF-8 locale and misreads files without one.
+export LC_ALL="${LC_ALL:-en_US.UTF-8}" LANG="${LANG:-en_US.UTF-8}"
 export RUNNER_TEMP="$WORK/tmp" GITHUB_ENV="$WORK/env" GITHUB_STEP_SUMMARY="$WORK/summary.md"
 mkdir -p "$RUNNER_TEMP"
 : > "$GITHUB_ENV"
@@ -329,5 +331,5 @@ if [ "$SUBMIT" = true ] && [ "$DRY_RUN" = false ] && [ "$MODE" = new ]; then
 fi
 
 printf '\n'
-cat "$GITHUB_STEP_SUMMARY"
+awk '/^### / && NR > 1 { print "" } { print }' "$GITHUB_STEP_SUMMARY"
 [ "$failed" = false ]
