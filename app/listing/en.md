@@ -1,24 +1,23 @@
-**Copyright** (year is added dynamically, always uses the current year):
-```
-Lukas Schulze
-```
+# English
 
-## English
+## App Store
 
-### Apple App Store
-**App Name** (30 chars max):
+**App Name** (30 characters):
 ```
 My Wealth Tracker
 ```
-**Subtitle** (30 chars max):
+
+**Subtitle** (30 characters):
 ```
 Simple Self-Hosted Net Worth
 ```
-**Keywords** (100 chars):
+
+**Keywords** (100 characters):
 ```
 net worth,self-hosted,portfolio,finance,wealth,tracker,privacy,balance,assets,savings,open source
 ```
-**Description** (4000 chars):
+
+**Description** (4000 characters):
 ```
 Ever wondered "how much do I actually have?" Wealth Tracker is a simple app that answers that question. Add your bank accounts, savings, investments, and retirement funds, and see your total net worth on a single screen. No spreadsheets, no complexity - just a clear number and a chart showing how it changes over time.
 
@@ -73,16 +72,19 @@ PERFECT FOR
 Download it, point it at your server, and start tracking.
 ```
 
-### Google Play Store
-**App Name** (30 chars max):
+## Google Play
+
+**App Name** (30 characters):
 ```
 My Wealth Tracker
 ```
-**Short Description** (80 chars):
+
+**Short Description** (80 characters):
 ```
 Simple Self-Hosted Net Worth
 ```
-**Full Description** (4000 chars):
+
+**Full Description** (4000 characters):
 ```
 Ever wondered "how much do I actually have?" Wealth Tracker is a simple app that answers that question. Add your bank accounts, savings, investments, and retirement funds, and see your total net worth on a single screen. No spreadsheets, no complexity - just a clear number and a chart showing how it changes over time.
 

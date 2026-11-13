@@ -28,6 +28,10 @@ android:
   java: '17'
   key_alias: upload
 
+# The store listing: listing/<language>.md, sent by ./release.sh listing.
+listing:
+  copyright: Lukas Schulze
+
 # The App Review contact. Apple wants it on every new App Store version, does
 # not copy it from the previous one, and refuses a submission without it.
 app_review:

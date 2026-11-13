@@ -1,0 +1,89 @@
+name: Store listing
+
+# The same file in every app repo: copied by tools/vendor-store-release.sh,
+# never edited by hand. Sends the store listing from listing/<language>.md
+# (name, subtitle, keywords, promotional text, descriptions, URLs, copyright)
+# and, when asked, the screenshots store.yml names, to App Store Connect and
+# Google Play. Never What's New, the review contact or the release type: the
+# release writes those.
+#
+# Start it with ./release.sh listing (which follows the run), or here;
+# ./release.sh listing --local does the same from a Mac. A dry run checks
+# every field against the stores' limits and lets Play validate the listing;
+# nothing changes in either store.
+
+run-name: >-
+  Listing ${{ inputs.platforms }}${{ inputs.screenshots && ' with screenshots' || '' }}${{ inputs.dry_run && ' (dry run)' || '' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: 'Which stores (of those store.yml has)'
+        type: choice
+        options: [both, ios, android]
+        default: both
+      screenshots:
+        description: "Also replace the screenshots, from store.yml's listing.screenshots folders."
+        type: boolean
+        default: false
+      dry_run:
+        description: 'Check every field (Play validates too), change nothing.'
+        type: boolean
+        default: false
+
+concurrency:
+  group: listing
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  listing:
+    name: Store listing
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: production
+    env:
+      DRY_RUN: ${{ inputs.dry_run }}
+      SCREENSHOTS: ${{ inputs.screenshots }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: store.yml
+        id: config
+        run: ruby .github/store-release/config.rb github
+
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          stack: none
+
+      - name: App Store Connect
+        id: ios
+        if: steps.config.outputs.ios == 'true' && inputs.platforms != 'android'
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_P8_B64: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8_B64 }}
+        run: .github/store-release/listing.sh ios
+
+      - name: Google Play
+        id: android
+        if: ${{ !cancelled() && steps.config.outputs.android == 'true' && inputs.platforms != 'ios' }}
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: .github/store-release/listing.sh android
+
+      - name: Summary
+        if: always()
+        env:
+          LISTING_IOS: ${{ steps.ios.outputs.ios }}
+          LISTING_ANDROID: ${{ steps.android.outputs.android }}
+        run: .github/store-release/listing.sh summary
+
+      - name: Shred the keys
+        if: always()
+        run: rm -f "$RUNNER_TEMP/asc-key.p8" "$RUNNER_TEMP/asc-key.json" "$RUNNER_TEMP/play-service-account.json"
