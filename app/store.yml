@@ -1,6 +1,32 @@
-# What the stores need to know about WealthTracker that is not a secret.
-# Read by the release pipeline (.github/workflows/release.yml) and by the
-# Fastfiles. Credentials never go here: they are GitHub secrets and app/.env.
+# Everything about WealthTracker that a release needs and that is not a
+# secret: how it is built, and what the stores need to know. The release
+# workflow on GitHub and `./release.sh --local` both read this file, so they
+# build the same thing. Credentials never go here: they are GitHub secrets,
+# and on a Mac the gitignored app/.env.
+
+app:
+  flutter: '3.47.4'
+
+ios:
+  stack: flutter
+  bundle_id: ch.miniapps.wealthtracker
+  team_id: 7PSHT7LSVZ
+  xcode: '27.2'
+  # macos-26 tops out at Xcode 26.6; xcode-27 is GitHub's preview image with
+  # 27.0 to 27.2.
+  runner: xcode-27
+  # No Runner.entitlements: no push, no app groups, nothing to repair.
+  entitlements: ''
+  # The Xcode project has a Crashlytics symbol-upload build phase that shells
+  # out to flutterfire, which is on the Mac and on no runner. Without it the
+  # archive fails with `flutterfire: command not found`.
+  pre_build_command: dart pub global activate flutterfire_cli
+
+android:
+  stack: flutter
+  package: ch.miniapps.wealthtracker
+  java: '17'
+  key_alias: upload
 
 # The App Review contact. Apple wants it on every new App Store version, does
 # not copy it from the previous one, and refuses a submission without it.

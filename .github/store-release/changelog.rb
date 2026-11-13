@@ -1,9 +1,9 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# The changelog and the store facts behind a release. CI runs this through
-# action.yml next to it; a release from a laptop uses the same file (a Fastfile
-# requires it, deploy.sh runs it), so both count versions the same way.
+# The changelog and the store facts behind a release. changelog.sh and the
+# steps next to it run this, on GitHub and through release.sh --local alike,
+# so both count versions the same way.
 #
 # The changelog:
 #

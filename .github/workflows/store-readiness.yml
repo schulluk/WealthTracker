@@ -3,6 +3,7 @@ name: Store readiness
 # The canary. Once a week it asks Apple and Google everything a release
 # depends on and nothing else: the keys are accepted, write access is real,
 # the app is visible, the distribution certificate is not about to expire.
+# The same file in every app repo; the ids come from store.yml.
 #
 # It exists for the failures that have nothing to do with the code and show up
 # only when you are trying to ship: an agreement Apple quietly updated, a
@@ -28,16 +29,23 @@ jobs:
     timeout-minutes: 20
     environment: production
     steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: store.yml
+        id: config
+        run: ruby .github/store-release/config.rb github
+
       - name: Preflight
         uses: ./.github/actions/preflight
         with:
-          platforms: both
+          platforms: ${{ steps.config.outputs.ios == 'true' && steps.config.outputs.android == 'true' && 'both' || (steps.config.outputs.ios == 'true' && 'ios' || 'android') }}
           # A version that cannot exist, so the version-state checks stay
           # quiet and only the credentials and the certificate are examined.
           version: 0.0.0
-          # CONFIGURE: the app's ids.
-          ios-bundle-id: ch.miniapps.wealthtracker
-          android-package: ch.miniapps.wealthtracker
+          ios-bundle-id: ${{ steps.config.outputs.ios_bundle_id }}
+          android-package: ${{ steps.config.outputs.android_package }}
           play-track: production
           probe-write: 'true'
           cert-warn-days: '45'
