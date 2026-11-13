@@ -180,7 +180,7 @@ if want ios; then
       fi
       READY=$(printf '%s\n' "$ITEMS" | grep $'^READY_TO_SUBMIT\t' | cut -f2 | paste -sd ',' - | sed 's/,/, /g' || true)
       if [ -n "$READY" ] && ! printf '%s\n' "$ITEMS" | grep -qE $'^(APPROVED|DEVELOPER_REMOVED_FROM_SALE|REMOVED_FROM_SALE)\t'; then
-        echo "::warning::This app's first in-app purchases or subscriptions ($READY) are ready to submit, and Apple takes first ones only with a version submitted from the App Store Connect website. Release with submit off, then on the version's page add them under In-App Purchases and Subscriptions and press Add for Review."
+        echo "::warning::This app's first in-app purchases or subscriptions ($READY) are ready to submit, and Apple takes first ones only with a version submitted from the App Store Connect website. Release with submit off, then on the website press Add for Review on the version page (it creates the review draft) and on each purchase's own page (it joins the draft), and Submit."
       fi
     fi
 
