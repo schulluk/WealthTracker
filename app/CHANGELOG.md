@@ -12,6 +12,7 @@ line first. No emoji anywhere, no long dashes in Public. -->
 
 ### Internal
 - Releases count the version from this changelog instead of a typed one, read the App Review contact from store.yml, and publish every App Store version as soon as Apple approves it.
+- CI caches Gradle's distribution and dependencies for the Android build.
 
 ## 1.5.0
 - Morgan Stanley syncs again after a server restart; if the server's browser cannot start, the sync error now says so instead of asking for a JWT token

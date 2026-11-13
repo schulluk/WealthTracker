@@ -32,6 +32,13 @@ inputs:
   ruby-version:
     description: "Ruby for fastlane. The runners' system Ruby is older than fastlane supports."
     default: '3.3'
+  gradle:
+    description: >
+      Set up Gradle with a cache of its distribution and dependencies. Always
+      on for stack=android-gradle. The Android workflow turns it on for a
+      Flutter app too, whose Android half is just as much a Gradle build; the
+      iOS job leaves it off, because restoring it on a Mac only costs time.
+    default: 'false'
   cap-gradle-memory:
     description: >
       Write a user-level gradle.properties capping the heap. Projects often ask
@@ -101,9 +108,17 @@ runs:
         echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
         echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
 
+    # Without it every release downloads the Gradle distribution and every
+    # dependency again, and re-transforms (dexes) each one: about five of the
+    # fifteen minutes CakeDay's Flutter AAB took (2026-11-12). Only the
+    # dependency caches; the build cache stays off, because a release build
+    # should never reuse a task output. Runs on main write the cache, every
+    # other branch only reads it.
     - name: Gradle
-      if: inputs.stack == 'android-gradle'
+      if: inputs.stack == 'android-gradle' || inputs.gradle == 'true'
       uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+      with:
+        add-job-summary: on-failure
 
     - name: Cap Gradle memory
       if: inputs.cap-gradle-memory == 'true' && runner.os == 'Linux'
