@@ -1,8 +1,18 @@
 # Changelog
 
-## Next: 1.6.0
+<!-- "## Next" has no version: a release counts it from the newest "## X.Y.Z"
+(next minor) and turns it into "## X.Y.Z (date)" once it went to review.
+"### Internal" gets everything that matters. "### Public" gets a user-friendly
+line when users notice the change; it is what the stores show, most important
+line first. No emoji anywhere, no long dashes in Public. -->
 
-- Bug fixes and improvements.
+## Next
+
+### Public
+
+### Internal
+- Releases count the version from this changelog instead of a typed one, read the App Review contact from store.yml, and publish every App Store version as soon as Apple approves it.
+- Releases run through one set of steps, started on GitHub or on the Mac with ./release.sh (--local); the Fastfiles and deploy.sh are gone, and how the app is built lives in store.yml.
 
 ## 1.5.0
 - Morgan Stanley syncs again after a server restart; if the server's browser cannot start, the sync error now says so instead of asking for a JWT token

@@ -13,7 +13,8 @@
 #   ./release.sh ios build     # Build iOS IPA locally
 #   ./release.sh android build # Build Android APK/AAB locally
 #
-# Version is read from CHANGELOG.md (## Next: X.Y.Z heading).
+# Version is counted from CHANGELOG.md: "## Next" ships as the newest
+# "## X.Y.Z" plus one minor (../.github/actions/changelog/changelog.rb).
 # Build numbers are auto-generated:
 #   Android: seconds since 2026-03-01 UTC
 #   iOS: latest TestFlight build number + 1

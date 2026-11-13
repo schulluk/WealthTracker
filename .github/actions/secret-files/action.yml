@@ -1,0 +1,29 @@
+name: App secret files
+description: >
+  Writes the app's own secret files (APP_SECRET_FILES_JSON) into the app
+  directory before the build, for values the platform reads rather than
+  Dart, and removes them again afterwards. See secret_files.py.
+
+inputs:
+  command:
+    description: 'write (before the build) | clean (in an always() step)'
+    required: true
+  dir:
+    description: 'The app directory the paths are relative to.'
+    default: '.'
+  files:
+    description: 'The APP_SECRET_FILES_JSON secret: {"relative/path": "contents"}. Empty writes nothing.'
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        COMMAND: ${{ inputs.command }}
+        DIR: ${{ inputs.dir }}
+        # Through the environment, never an argument: an argument is in every
+        # process listing.
+        FILES_JSON: ${{ inputs.files }}
+        MANIFEST: ${{ runner.temp }}/secret-files.json
+      run: python3 "$GITHUB_ACTION_PATH/secret_files.py" "$COMMAND"

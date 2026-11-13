@@ -101,6 +101,9 @@ runs:
         echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
         echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
 
+    # A Flutter app's Android build gets no Gradle cache on purpose: it saved
+    # 3.5 of CakeDay's 19 Linux minutes (2026-11-13), a few cents a release,
+    # and Lukas chose the simpler job over it.
     - name: Gradle
       if: inputs.stack == 'android-gradle'
       uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
@@ -137,12 +140,50 @@ runs:
       with:
         ruby-version: ${{ inputs.ruby-version }}
 
-    - name: Fastlane
+    # fastlane is cached: installing its ~80 gems takes half a minute, which on
+    # a Mac is billed at ten times the Linux rate on every release. The key
+    # holds the exact Ruby, because the gems' native extensions and binstubs
+    # belong to it.
+    - name: Fastlane cache key
+      id: fastlane-key
       if: inputs.install-fastlane == 'true'
       shell: bash
       env:
         VERSION: ${{ inputs.fastlane-version }}
       run: |
         set -euo pipefail
-        gem install fastlane -v "$VERSION" --no-document
-        fastlane --version | tail -1
+        echo "key=fastlane-$VERSION-ruby$(ruby -e 'print RUBY_VERSION')-${RUNNER_OS}-${RUNNER_ARCH}" >> "$GITHUB_OUTPUT"
+
+    - name: Restore fastlane
+      id: fastlane-cache
+      if: inputs.install-fastlane == 'true'
+      uses: actions/cache@v6
+      with:
+        path: ~/.store-release-fastlane/gems
+        key: ${{ steps.fastlane-key.outputs.key }}
+
+    - name: Fastlane
+      if: inputs.install-fastlane == 'true'
+      shell: bash
+      env:
+        VERSION: ${{ inputs.fastlane-version }}
+        HIT: ${{ steps.fastlane-cache.outputs.cache-hit }}
+      run: |
+        set -euo pipefail
+        # A gem directory of fastlane's own, so the cache holds exactly it, and
+        # a wrapper that points only fastlane at it. A global GEM_HOME would
+        # hide the runner's CocoaPods from the `pod install` in a Flutter build.
+        DIR="$HOME/.store-release-fastlane"
+        if [ "$HIT" != true ]; then
+          gem install fastlane -v "$VERSION" --no-document \
+            --install-dir "$DIR/gems" --bindir "$DIR/gems/bin"
+        fi
+        mkdir -p "$DIR/bin"
+        {
+          echo '#!/usr/bin/env bash'
+          printf 'export GEM_HOME=%q GEM_PATH=%q\n' "$DIR/gems" "$DIR/gems:$(ruby -e 'print Gem.default_dir')"
+          printf 'exec %q "$@"\n' "$DIR/gems/bin/fastlane"
+        } > "$DIR/bin/fastlane"
+        chmod +x "$DIR/bin/fastlane"
+        echo "$DIR/bin" >> "$GITHUB_PATH"
+        "$DIR/bin/fastlane" --version | tail -1

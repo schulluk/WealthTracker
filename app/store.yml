@@ -1,0 +1,51 @@
+# Everything about WealthTracker that a release needs and that is not a
+# secret: how it is built, and what the stores need to know. The release
+# workflow on GitHub and `./release.sh --local` both read this file, so they
+# build the same thing. Credentials never go here: they are GitHub secrets,
+# and on a Mac the gitignored app/.env.
+
+app:
+  flutter: '3.47.4'
+
+ios:
+  stack: flutter
+  bundle_id: ch.miniapps.wealthtracker
+  team_id: 7PSHT7LSVZ
+  xcode: '27.2'
+  # macos-26 tops out at Xcode 26.6; xcode-27 is GitHub's preview image with
+  # 27.0 to 27.2.
+  runner: xcode-27
+  # No Runner.entitlements: no push, no app groups, nothing to repair.
+  entitlements: ''
+  # The Xcode project has a Crashlytics symbol-upload build phase that shells
+  # out to flutterfire, which is on the Mac and on no runner. Without it the
+  # archive fails with `flutterfire: command not found`.
+  pre_build_command: dart pub global activate flutterfire_cli
+
+android:
+  stack: flutter
+  package: ch.miniapps.wealthtracker
+  java: '17'
+  key_alias: upload
+
+# The App Review contact. Apple wants it on every new App Store version, does
+# not copy it from the previous one, and refuses a submission without it.
+app_review:
+  first_name: Lukas
+  last_name: Schulze
+  # Public repository, published on purpose (Lukas, 2026-11-12).
+  email: "apple-review1@a.schulze.uno"
+  # In quotes: unquoted, YAML reads +41... as a number and drops the +.
+  phone: "+41795355764"
+
+release_notes:
+  # The language the changelog's "### Public" is written in, as the store
+  # spells it (App Store and Play both say en-US, de-DE, ...).
+  locale: en-US
+  # What the stores get when "### Public" is empty: a release with internal
+  # changes only.
+  default: Bug fixes and improvements.
+  # Every other language of the listing gets a fixed line instead of the
+  # notes. English is the only listing language, so there are none.
+  app_store: {}
+  play: {}

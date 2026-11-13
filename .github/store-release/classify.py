@@ -261,13 +261,13 @@ def main() -> int:
             "notice",
             "Unrecognised store error",
             f"No entry in the {store} table matches this failure. Read the step's log, then add the "
-            f"pattern to shared/store-release/actions/explain-store-error/scripts/classify.py so the "
+            f"pattern to shared/store-release/scripts/classify.py so the "
             f"next person does not "
             f"have to: that table is the institutional memory.",
         )
         lines += [
             "No known pattern matched. Read the failing step's log and add the case to "
-            "`shared/store-release/actions/explain-store-error/scripts/classify.py`.",
+            "`shared/store-release/scripts/classify.py`.",
             "",
         ]
     for slug, severity, cause, fix in hits:
