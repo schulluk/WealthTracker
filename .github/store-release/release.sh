@@ -6,6 +6,12 @@
 #
 #   ./release.sh [both|ios|android] [options]
 #   ./release.sh listing [both|ios|android] [--screenshots] [--dry-run] [--local]
+#   ./release.sh setup [--plan] [--only repo,store,env,listing,secrets]
+#
+# setup asks for whatever the app still lacks (store.yml, .env, the listing,
+# the GitHub secrets), each with a default found in the project, the other
+# apps on this Mac or the stores; see setup.rb. A release that finds
+# something missing offers it too, when it runs in a terminal.
 #
 # listing sends the store listing from listing/<language>.md (and, with --screenshots,
 # the screenshots store.yml names) instead of a build. Options:
@@ -37,6 +43,28 @@ SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
 
+# Onboarding first: it works while store.yml does not exist yet.
+if [ "${1:-}" = setup ]; then
+  shift
+  exec ruby "$SELF_DIR/setup.rb" "$@"
+fi
+ORIG_ARGS=("$@")
+
+# Something a release needs is missing. In a terminal, ask for it now and
+# start over; otherwise say how.
+offer_setup() { # PART
+  if [ -t 0 ] && [ -t 1 ]; then
+    printf 'Fill in what is missing now (./release.sh setup --only %s)? [Y/n] ' "$1"
+    read -r answer
+    case "$answer" in n | N | no) return 1 ;; esac
+    ruby "$SELF_DIR/setup.rb" --only "$1" || return 1
+    # bash 3.2 calls an empty "${ORIG_ARGS[@]}" unbound under set -u.
+    exec "$SELF_DIR/release.sh" ${ORIG_ARGS[@]+"${ORIG_ARGS[@]}"}
+  fi
+  echo "./release.sh setup asks for each missing value, with a default where it finds one." >&2
+  return 1
+}
+
 LISTING=false SCREENSHOTS=false PLAY_TRACK_SET=false
 PLATFORMS=both IOS_TRACK=appstore PLAY_TRACK=internal SUBMIT=false DRY_RUN=false BUMP=minor
 NOTES_GIVEN="" NOTES_SET=false REF="" LOCAL=false ENV_FILE="" YES=false
@@ -62,7 +90,11 @@ done
 case "$PLAY_TRACK" in internal | alpha | beta | production) ;; *) echo "--play-track is internal, alpha, beta or production" >&2; exit 2 ;; esac
 case "$BUMP" in minor | patch | major) ;; *) echo "--bump is minor, patch or major" >&2; exit 2 ;; esac
 
-cfg=$(ruby "$SELF_DIR/config.rb" shell) || { echo "$cfg" >&2; exit 1; }
+if ! cfg=$(ruby "$SELF_DIR/config.rb" shell); then
+  echo "$cfg" >&2
+  offer_setup store
+  exit 1
+fi
 eval "$cfg"
 want_ios=false want_android=false
 [ "$SR_IOS" = true ] && [ "$PLATFORMS" != android ] && want_ios=true
@@ -74,6 +106,17 @@ if [ "$LOCAL" = false ]; then
   origin=$(git remote get-url origin)
   slug=$(printf '%s' "$origin" | sed -E 's#^(git@github\.com:|https://github\.com/)##; s#\.git$##')
   [[ "$slug" =~ ^[^/]+/[^/]+$ ]] || { echo "origin ($origin) is not a GitHub repository." >&2; exit 1; }
+  # A secret the run needs and the repo lacks fails it minutes in; in a
+  # terminal, catch that here.
+  if [ -t 0 ] && [ -t 1 ]; then
+    rc=0
+    plan=$(ruby "$SELF_DIR/setup.rb" --plan --only secrets 2>&1) || rc=$?
+    if [ "$rc" = 10 ]; then
+      printf '%s\n' "$plan" | sed -n 's/^secrets: //p' >&2
+      offer_setup secrets
+      exit 1
+    fi
+  fi
   ref="${REF:-main}"
   if [ "$LISTING" = true ]; then
     workflow=listing.yml
@@ -182,7 +225,11 @@ out() { kv "$WORK/out-$1" "$2"; } # STEP NAME
 # Credentials from the .env, never sourced (it is data, not a script).
 # Values already in the environment win.
 env_file="${ENV_FILE:-$SR_APP_DIR/${SR_ENV:-.env}}"
-[ -f "$env_file" ] || { echo "No credentials file $env_file (--env FILE)." >&2; exit 1; }
+if [ ! -f "$env_file" ]; then
+  echo "No credentials file $env_file (--env FILE)." >&2
+  offer_setup env
+  exit 1
+fi
 env_dir=$(cd "$(dirname "$env_file")" && pwd)
 dotenv() { # NAME: its value in the .env, empty when absent
   python3 - "$env_file" "$1" <<'PY'
@@ -230,7 +277,11 @@ fi
 if [ "$LISTING" = false ] && [ -n "$SR_DART_DEFINES" ] && [ -z "${DART_DEFINES_JSON:-}" ]; then
   missing=""
   for k in $SR_DART_DEFINES; do take "$k"; [ -n "${!k:-}" ] || missing="$missing $k"; done
-  [ -z "$missing" ] || { echo "store.yml's dart_defines are missing from $env_file:$missing" >&2; exit 1; }
+  if [ -n "$missing" ]; then
+    echo "store.yml's dart_defines are missing from $env_file:$missing" >&2
+    offer_setup env
+    exit 1
+  fi
   # shellcheck disable=SC2086
   DART_DEFINES_JSON=$(python3 -c 'import json, os, sys; print(json.dumps({k: os.environ[k] for k in sys.argv[1:]}))' $SR_DART_DEFINES)
   export DART_DEFINES_JSON

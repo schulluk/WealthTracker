@@ -31,13 +31,23 @@ changelog. A README.md in the folder is ignored too.
 Writes OUT_DIR/ios/fastlane/metadata (deliver's layout, with store.yml's
 copyright holder and the current year at the root) and OUT_DIR/android/metadata
 (supply's layout), checks every field against the store's limits, and prints
-what it wrote. Settings come from the environment, which config.rb fills from
-store.yml: SR_LISTING_DIR, SR_LISTING_COPYRIGHT, SR_LISTING_SUPPORT_URL,
+what it wrote. An empty field is left out, so the store keeps what it has.
+Settings come from the environment, which config.rb fills from store.yml:
+SR_LISTING_DIR, SR_LISTING_COPYRIGHT, SR_LISTING_SUPPORT_URL,
 SR_LISTING_PRIVACY_URL, SR_LISTING_MARKETING_URL, SR_LISTING_LANGUAGES (lines
 "code<TAB>app store locale<TAB>play locale", for what the table below lacks).
+
+    listing.py --from-json LISTING_JSON OUT_DIR
+
+goes the other way, for ./release.sh setup: the listing as the stores have it
+now (store-lookup.sh's SD_LISTING_JSON) becomes OUT_DIR/<code>.md, one file
+per language, never replacing a file that is there. A locale the table lacks
+is printed as "language<TAB>code<TAB>app store locale<TAB>play locale", for
+store.yml's listing.languages.
 """
 
 import datetime
+import json
 import os
 import re
 import sys
@@ -83,6 +93,22 @@ GOOGLE = {
 }
 IGNORED = {"what's new", "whats new", "release notes"}
 
+# For the heading of a file --from-json writes.
+NAMES = {
+    "en": "English", "en-GB": "English (UK)", "de": "German", "fr": "French", "it": "Italian",
+    "es": "Spanish", "pt": "Portuguese", "pt-BR": "Portuguese, Brazil", "nl": "Dutch",
+    "ru": "Russian", "pl": "Polish", "tr": "Turkish", "sv": "Swedish", "da": "Danish",
+    "no": "Norwegian", "fi": "Finnish", "cs": "Czech", "ja": "Japanese", "ko": "Korean",
+    "zh-Hans": "Chinese, Simplified", "hi": "Hindi",
+}
+# The store's field name, in the order a listing file shows them.
+IMPORT = {
+    "apple": [("App Name", "name"), ("Subtitle", "subtitle"), ("Keywords", "keywords"),
+              ("Promotional Text", "promotional_text"), ("Description", "description")],
+    "google": [("App Name", "title"), ("Short Description", "short_description"),
+               ("Full Description", "full_description")],
+}
+
 EMOJI = re.compile("[\U0001F000-\U0001FFFF☀-➿]")
 OTHER_PLATFORM = re.compile(r"\b(android|google play|play store)\b", re.I)
 
@@ -118,20 +144,71 @@ def parse(text):
     return stores
 
 
+def language_table():
+    """LOCALES with store.yml's listing.languages on top."""
+    table = dict(LOCALES)
+    for raw in os.environ.get("SR_LISTING_LANGUAGES", "").splitlines():
+        if raw.strip():
+            code, ios_locale, play_locale = (part.strip() for part in raw.split("\t"))
+            table[code] = (ios_locale, play_locale)
+    return table
+
+
+def from_json(src, folder):
+    data = json.load(open(src, encoding="utf-8"))
+    table = language_table()
+    by_store = {
+        "apple": {apple: code for code, (apple, _) in table.items()},
+        "google": {play: code for code, (_, play) in table.items()},
+    }
+    files, unknown = {}, {}
+    for store, key in (("apple", "app_store"), ("google", "play")):
+        for locale, fields in sorted((data.get(key) or {}).items()):
+            code = by_store[store].get(locale, locale)
+            if code not in table:
+                pair = unknown.setdefault(code, [locale, locale])
+                pair[0 if store == "apple" else 1] = locale
+            files.setdefault(code, {})[store] = fields or {}
+    os.makedirs(folder, exist_ok=True)
+    for code in sorted(files):
+        path = os.path.join(folder, f"{code}.md")
+        if os.path.exists(path):
+            print(f"  {path}: there already, left as it is")
+            continue
+        lines = [f"# {NAMES.get(code, code)}", ""]
+        for store, heading in (("apple", "App Store"), ("google", "Google Play")):
+            if store not in files[code]:
+                continue
+            limits = APPLE if store == "apple" else GOOGLE
+            lines += [f"## {heading}", ""]
+            for label, field in IMPORT[store]:
+                value = (files[code][store].get(field) or "").strip()
+                lines += [f"**{label}** ({limits[label.lower()][1]} characters):", "```", value, "```", ""]
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines).rstrip() + "\n")
+        stores = " and ".join(h for s, h in (("apple", "App Store"), ("google", "Google Play")) if s in files[code])
+        print(f"  {path}: {stores}")
+    for code, (apple, play) in sorted(unknown.items()):
+        print(f"language\t{code}\t{apple}\t{play}")
+
+
 def main():
+    if len(sys.argv) == 4 and sys.argv[1] == "--from-json":
+        from_json(sys.argv[2], sys.argv[3])
+        return
+    if sys.argv[1:] == ["--locales"]:
+        # For setup.rb: language code -> [App Store locale, Play locale].
+        print(json.dumps(language_table()))
+        return
     if len(sys.argv) < 2:
-        sys.exit("usage: listing.py OUT_DIR [ios] [android]")
+        sys.exit("usage: listing.py OUT_DIR [ios] [android] | listing.py --from-json LISTING_JSON OUT_DIR")
     out = sys.argv[1]
     wanted = set(sys.argv[2:]) or {"ios", "android"}
     env = os.environ
     folder = env.get("SR_LISTING_DIR") or "listing"
     if not os.path.isdir(folder):
         sys.exit(f"::error::No {folder}/: the store listing lives there, one file per language (store.yml listing.dir).")
-    overrides = {}
-    for raw in env.get("SR_LISTING_LANGUAGES", "").splitlines():
-        if raw.strip():
-            code, ios_locale, play_locale = (part.strip() for part in raw.split("\t"))
-            overrides[code] = (ios_locale, play_locale)
+    table = language_table()
 
     errors, warnings, wrote = [], [], {"ios": {}, "android": {}}
 
@@ -146,7 +223,7 @@ def main():
         errors.append(f"{folder}/ has no <language>.md file.")
     for name in files:
         code = name[:-3]
-        locales = overrides.get(code) or LOCALES.get(code)
+        locales = table.get(code)
         if not locales:
             errors.append(f"{folder}/{name}: '{code}' is no language code the listing knows. Add it to store.yml listing.languages with its App Store and Play locale.")
             continue
@@ -157,16 +234,20 @@ def main():
             key = "ios" if store == "apple" else "android"
             if key not in wanted:
                 continue
-            table = APPLE if store == "apple" else GOOGLE
+            fields_table = APPLE if store == "apple" else GOOGLE
             locale = locales[0] if store == "apple" else locales[1]
             title = "App Store" if store == "apple" else "Play"
+            empty = []
             for label, value in fields.items():
                 if label in IGNORED:
                     continue
-                if label not in table:
+                if label not in fields_table:
                     warnings.append(f"{folder}/{name}, {title}: '{label}' is not a listing field, left out.")
                     continue
-                file, limit = table[label]
+                if not value:
+                    empty.append(label)
+                    continue
+                file, limit = fields_table[label]
                 where = f"{folder}/{name}, {title} {label}"
                 if len(value) > limit:
                     errors.append(f"{where} has {len(value)} characters, the store takes {limit}.")
@@ -179,6 +260,8 @@ def main():
                 else:
                     write(f"android/metadata/{locale}/{file}", value)
                 wrote[key].setdefault(locale, []).append(file[:-4])
+            if empty:
+                warnings.append(f"{folder}/{name}, {title}: {', '.join(empty)} empty, so the store keeps what it has.")
             if store == "apple":
                 for field in ("support_url", "privacy_url", "marketing_url"):
                     url = env.get(f"SR_LISTING_{field.upper()}", "").strip()

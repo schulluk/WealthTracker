@@ -1,0 +1,107 @@
+# Everything about this app that a release needs and that is not a secret:
+# how it is built, and what the stores need to know.
+#
+# The release workflow on GitHub and `./release.sh --local` on a Mac both
+# read this file and nothing else, so they build the same thing. Put it next
+# to CHANGELOG.md, at the repository root or one directory below it. Paths are
+# relative to this file's directory. Credentials never go here: they are
+# GitHub secrets, and on a Mac the gitignored .env.
+
+app:
+  # The exact Flutter version (flutter --version). Only for stack: flutter.
+  flutter: '3.47.4'
+  # dir: .                 # the app project, if not this directory
+  # changelog: CHANGELOG.md
+  # env: .env              # release.sh --local: the credentials file
+
+# Leave out a platform the app does not have.
+ios:
+  stack: flutter           # flutter | ios-xcode
+  bundle_id: ch.example.app
+  team_id: ABCDE12345      # the 10-character Apple team id
+  xcode: '27.2'            # the Xcode it builds with locally
+  runner: macos-26         # GitHub's image with that Xcode (xcode-27 for 27.x)
+  # build_number: clock    # clock (seconds since 2026-01-01) | commits (commit count)
+  # pre_build_command: dart pub global activate flutterfire_cli
+  #   (tooling an Xcode build phase shells out to: without flutterfire_cli the
+  #   Crashlytics symbol upload fails the archive)
+  # extra_build_args: ''   # appended to `flutter build ipa`
+  # An app extension's entitlements, so an export that drops its app group
+  # is caught and repaired (a widget that shows nothing otherwise):
+  # extension_entitlements:
+  #   Widgets.appex: ios/Widgets/Widgets.entitlements
+  # stack: ios-xcode needs these three; Flutter has defaults:
+  # build_command: tools/archive.sh "$TRACK"
+  #   (VERSION, BUILD_NUMBER, TRACK and SIGN_IDENTITY are in its environment;
+  #   it leaves an xcarchive at archive_path)
+  # archive_path: build/ios/archive/Runner.xcarchive
+  # app_name: Runner.app
+  # entitlements: ios/Runner/Runner.entitlements   # empty: no check
+
+android:
+  stack: flutter           # flutter | android-gradle
+  package: ch.example.app
+  java: '21'
+  # key_alias: upload
+  # build_number: clock
+  # pre_build_command: ''
+  # extra_build_args: ''   # appended to `flutter build appbundle`
+  # stack: android-gradle needs a build_command (VERSION and BUILD_NUMBER are
+  # in its environment, and KEYSTORE_PATH, KEYSTORE_PASSWORD, KEY_ALIAS,
+  # KEY_PASSWORD for the signingConfig); Flutter has defaults:
+  # build_command: ./gradlew bundleRelease -PversionName=$VERSION -PversionCode=$BUILD_NUMBER
+  # artifact_path: build/app/outputs/bundle/release/app-release.aab
+  # key_properties: android/key.properties
+  # keystore_path: ''      # where the build expects the keystore, if fixed
+
+# Names of build-time values passed as --dart-define (a RevenueCat key). The
+# values come from the DART_DEFINES_JSON secret on GitHub and from .env on a
+# Mac.
+dart_defines: []
+
+# The store listing, sent by ./release.sh listing: one file per language in
+# listing/ (en.md, de.md, it.md, pt-BR.md), each with an App Store and a
+# Google Play section. Never What's New: the release writes that.
+listing:
+  copyright: ""            # the holder; the year is the current one at upload
+  support_url: ""          # App Store, every language
+  privacy_url: ""
+  marketing_url: ""
+  # dir: listing
+  # Screenshots for ./release.sh listing --screenshots, in the stores' own
+  # layouts: ios as <locale>/*.png, android as <locale>/images/phoneScreenshots/.
+  # screenshots:
+  #   ios: listing/screenshots/ios
+  #   android: listing/screenshots/android
+  # A language code the built-in table lacks (en, de, fr, it, es, pt, pt-BR,
+  # nl, ru, pl, tr, sv, da, no, fi, cs, ja, ko, zh-Hans, hi), with each store's
+  # locale:
+  # languages:
+  #   ta: {app_store: ta, play: ta-IN}
+
+# The App Review contact. Apple wants it on every new App Store version, does
+# not copy it from the previous one, and refuses a submission without it.
+# In a PUBLIC repository leave email and phone empty and set them as the
+# APP_REVIEW_EMAIL and APP_REVIEW_PHONE secrets instead (ASC_REVIEW_* in .env
+# on a Mac); an empty value here is taken from there.
+app_review:
+  first_name: ""
+  last_name: ""
+  email: ""
+  # In quotes: unquoted, YAML reads +41... as a number and drops the +.
+  phone: ""
+
+release_notes:
+  # The language the changelog's "### Public" is written in, as the store
+  # spells it (App Store and Play both say en-US, de-DE, ...).
+  locale: en-US
+  # What the stores get when "### Public" is empty: a release with internal
+  # changes only.
+  default: Bug fixes and improvements.
+  # Every other language of the listing gets a fixed line instead of the
+  # notes. Apple refuses a submission while any localization has no What's
+  # New. The two stores spell some locales differently (it vs it-IT).
+  app_store: {}
+  #   de-DE: Fehlerbehebungen und Verbesserungen.
+  play: {}
+  #   de-DE: Fehlerbehebungen und Verbesserungen.
