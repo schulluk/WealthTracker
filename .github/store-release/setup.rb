@@ -176,9 +176,9 @@ module Setup
       end
     end
 
-    def yes?(key, question, default = true)
+    def yes?(key, question, default = true, from: nil)
       if @plan
-        @pending << [part, key, default ? "yes" : "no", nil]
+        @pending << [part, key, default ? "yes" : "no", from]
         return default
       end
       loop do
@@ -1106,9 +1106,14 @@ module Setup
                     .split(/[\s,]+/).reject(&:empty?)
         set.call(%w[dart_defines], names)
       else
+        reads = @project.dart_define_reads
         added = (found - current).select do |name|
-          @ask.yes?("dart_defines.#{name}", "The code also reads #{name}#{needed.include?(name) ? ' without a default' : ', with a default'}: " \
-                                            "must the release pass it as --dart-define", needed.include?(name))
+          why = if reads[name] then "read with a default"
+                elsif needed.include?(name) then "read without a default"
+                else "a development switch, read without a default"
+                end
+          @ask.yes?("dart_defines.#{name}", "The code also reads #{name} (#{why}): must the release pass it as --dart-define",
+                    needed.include?(name), from: why)
         end
         set.call(%w[dart_defines], current + added) unless added.empty?
       end
