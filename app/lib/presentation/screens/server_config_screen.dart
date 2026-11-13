@@ -170,7 +170,7 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
                   const SizedBox(height: 16),
                   TextButton(
                     onPressed: () => launchUrl(
-                      Uri.parse('https://github.com/lsgd/wealth'),
+                      Uri.parse('https://github.com/schulluk/WealthTracker'),
                       mode: LaunchMode.externalApplication,
                     ),
                     child: const Text("Don't have a server yet? Set one up"),

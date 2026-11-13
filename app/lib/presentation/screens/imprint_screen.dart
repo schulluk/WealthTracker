@@ -67,9 +67,10 @@ class ImprintScreen extends StatelessWidget {
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.code),
                     title: const Text('Source Code'),
-                    subtitle: const Text('github.com/lsgd/wealth'),
+                    subtitle: const Text('github.com/schulluk/WealthTracker'),
                     trailing: const Icon(Icons.open_in_new),
-                    onTap: () => _launchUrl('https://github.com/lsgd/wealth'),
+                    onTap: () =>
+                        _launchUrl('https://github.com/schulluk/WealthTracker'),
                   ),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
@@ -77,8 +78,8 @@ class ImprintScreen extends StatelessWidget {
                     title: const Text('Report Issues'),
                     subtitle: const Text('Found a bug? Let us know!'),
                     trailing: const Icon(Icons.open_in_new),
-                    onTap: () =>
-                        _launchUrl('https://github.com/lsgd/wealth/issues'),
+                    onTap: () => _launchUrl(
+                        'https://github.com/schulluk/WealthTracker/issues'),
                   ),
                 ],
               ),

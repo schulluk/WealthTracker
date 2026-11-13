@@ -16,6 +16,7 @@ line first. No emoji anywhere, no long dashes in Public. -->
 - The store listing lives in app/listing/<language>.md (METADATA.md and sync_store_listings.sh are gone) and is sent with ./release.sh listing; App Store What's New leaves out lines that name Android.
 - ./release.sh setup asks for whatever a release still lacks (store.yml, .env, the listing, the GitHub secrets), each with a default from the project, the other apps or the stores; --plan lists it.
 - ./release.sh --submit waits until Apple has processed the uploaded build before attaching it (it failed before); preflight warns while first in-app purchases wait for a website submission; a listing language can carry its own URLs.
+- The source code and issue links (imprint, server setup) and the App Store support and marketing URLs point at github.com/schulluk/WealthTracker instead of the old lsgd account name.
 
 ## 1.5.0
 - Morgan Stanley syncs again after a server restart; if the server's browser cannot start, the sync error now says so instead of asking for a JWT token
