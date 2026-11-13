@@ -308,6 +308,10 @@ if [ -n "$P12" ] && grep -q -- "-----BEGIN .*PRIVATE KEY-----" "$P12" 2> /dev/nu
     fi
   done
   [ -n "$CERT" ] || die "No valid Apple Distribution certificate in the login keychain belongs to the key $P12. Download the certificate from developer.apple.com (Certificates) and open it, or export a .p12 from the Mac that has it (references/secrets.md)."
+  # The account is the app's decision (store.yml ios.team_id), never the key's.
+  CERT_TEAM=$(openssl x509 -in "$CERT" -noout -subject 2> /dev/null | tr ',/' '\n\n' | sed -n 's/.*OU[ ]*=[ ]*//p' | head -1)
+  [ -z "$TEAM_ID" ] || [ "$CERT_TEAM" = "$TEAM_ID" ] \
+    || die "$P12 is team $CERT_TEAM's distribution key, but this app releases under team $TEAM_ID (store.yml ios.team_id)."
   note "certificate from the login keychain: $(openssl x509 -in "$CERT" -noout -subject 2> /dev/null | sed -n 's/.*CN[ ]*=[ ]*\([^,/]*\).*/\1/p'), until $(openssl x509 -in "$CERT" -noout -enddate | cut -d= -f2)"
   P12_PASSWORD=$(openssl rand -hex 24)
   # 3DES and a SHA-1 MAC, spelled out: the one encryption that LibreSSL,

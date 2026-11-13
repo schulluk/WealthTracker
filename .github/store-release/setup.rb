@@ -546,12 +546,29 @@ module Setup
 
     # Names the Dart code reads with String/bool/int.fromEnvironment.
     def dart_defines
-      return [] unless flutter?
-      names = []
-      Dir.glob(File.join(flutter_dir, "lib", "**", "*.dart")).each do |f|
-        File.read(f).scan(/(?:String|bool|int)\.fromEnvironment\(\s*['"]([A-Za-z][A-Za-z0-9_]*)['"]/) { |m| names << m[0] }
+      dart_define_reads.keys.sort
+    end
+
+    # The names the release must inject: read without a compiled-in default,
+    # and no development switch (a dev token, a debug URL).
+    def dart_defines_needed
+      dart_define_reads.reject { |name, has_default| has_default || name =~ /DEV|DEBUG|LOCAL|MOCK|FAKE/ }.keys.sort
+    end
+
+    # name -> whether any read gives it a defaultValue.
+    def dart_define_reads
+      memo(:dart_define_reads) do
+        reads = {}
+        if flutter?
+          Dir.glob(File.join(flutter_dir, "lib", "**", "*.dart")).each do |f|
+            File.read(f).scan(/(?:String|bool|int)\.fromEnvironment\(\s*['"]([A-Za-z][A-Za-z0-9_]*)['"]\s*(,\s*defaultValue\s*:)?/m) do |name, default|
+              next if name.start_with?("FLUTTER_")
+              reads[name] = reads[name] || !default.nil?
+            end
+          end
+        end
+        reads
       end
-      names.uniq.reject { |n| n.start_with?("FLUTTER_") }.sort
     end
 
     def flutter_version
@@ -748,8 +765,19 @@ module Setup
       Setup.properties(env_path)
     end
 
+    # Language code -> [App Store locale, Play locale]: listing.py's table with
+    # store.yml's listing.languages on top, as the listing step sees it.
     def locales
-      @locales ||= JSON.parse(Setup.run("python3", File.join(DIR, "listing.py"), "--locales").to_s) rescue {}
+      @locales ||= begin
+        own = Setup.dig(store_data, %w[listing languages])
+        lines = (own.is_a?(Hash) ? own : {}).map do |code, l|
+          l.is_a?(Hash) ? [code, l["app_store"], l["play"]].join("\t") : nil
+        end.compact.join("\n")
+        out, = Open3.capture2({ "SR_LISTING_LANGUAGES" => lines }, "python3", File.join(DIR, "listing.py"), "--locales")
+        JSON.parse(out)
+      rescue JSON::ParserError, SystemCallError
+        {}
+      end
     end
 
     # ─────────────────────────── the stores, read only ───────────────────────────
@@ -1063,16 +1091,24 @@ module Setup
     end
 
     def store_dart_defines(data, set, creating)
+      # "The code reads it" is not "the release must inject it": a name with a
+      # compiled-in default, or a development switch, is offered but not
+      # proposed, since every listed name becomes part of a required secret.
       found = @project.dart_defines
+      needed = @project.dart_defines_needed
       current = Array(data["dart_defines"]).map(&:to_s)
       if creating || !data.key?("dart_defines")
         return if found.empty?
-        names = @ask.ask("dart_defines", "Build-time values the code reads (fromEnvironment), passed as --dart-define",
-                         found.join(" "), from: "lib/", optional: true).split(/[\s,]+/).reject(&:empty?)
+        optional = found - needed
+        hint = optional.empty? ? "" : " (also read, with a default or for development: #{optional.join(' ')})"
+        names = @ask.ask("dart_defines", "Build-time values the release must pass as --dart-define#{hint}",
+                         needed.join(" "), from: needed.empty? ? nil : "lib/, read without a default", optional: true)
+                    .split(/[\s,]+/).reject(&:empty?)
         set.call(%w[dart_defines], names)
       else
         added = (found - current).select do |name|
-          @ask.yes?("dart_defines", "The code also reads #{name}: pass it as --dart-define too", true)
+          @ask.yes?("dart_defines.#{name}", "The code also reads #{name}#{needed.include?(name) ? ' without a default' : ', with a default'}: " \
+                                            "must the release pass it as --dart-define", needed.include?(name))
         end
         set.call(%w[dart_defines], current + added) unless added.empty?
       end
@@ -1215,9 +1251,7 @@ module Setup
         own = own && File.expand_path(own, File.dirname(path))
         own = File.join(@project.app_dir, "android", "fastlane", "play-store-key.json") unless own && File.file?(own)
         unless File.file?(own)
-          default = play_key
-          key = @ask.file("GOOGLE_PLAY_JSON_KEY_PATH", "Google Play service-account JSON (the account's, so another app's works)",
-                          default, from: default && "another app", optional: true)
+          key = ask_play_key("GOOGLE_PLAY_JSON_KEY_PATH", play_key)
           add["GOOGLE_PLAY_JSON_KEY_PATH"] = key unless key.empty?
         end
         cfg["android_key_properties"].empty? ? env_gradle_signing(have, add, cfg) : env_key_properties(cfg)
@@ -1246,6 +1280,48 @@ module Setup
         report "#{rel(path)}: #{did('added', 'would add')} #{add.keys.join(', ')}"
       end
       report "WARNING: #{rel(path)} is not gitignored" if File.file?(path) && !@project.ignored?(rel(path))
+    end
+
+    # Which accounts an app uses is Lukas's decision, always asked: the Apple
+    # team (store.yml), the App Store Connect key, the Play service account
+    # (it decides the developer account), the upload keystore, the GitHub
+    # repository. What follows mechanically from those answers is never asked
+    # ("if you can build it yourself anyways, don't ever ask for it"): the .p12
+    # built from the chosen team's key, the .p8 of the chosen key id, the
+    # passwords known to open the chosen keystore. Those are taken and said.
+    def known(label, value, note = nil)
+      report "#{label}: #{value.to_s.sub(Dir.home, '~')}#{note ? " (#{note})" : ''}"
+      value
+    end
+
+    def shared?(path)
+      !path.nil? && path.start_with?(KEYS_DIR + "/") && File.file?(path)
+    end
+
+    # The account a Play service-account JSON belongs to, for the question.
+    def play_account(path)
+      email = (JSON.parse(File.read(path))["client_email"] rescue nil)
+      email && email.split("@").last.split(".").first
+    end
+
+    def ask_play_key(key_name, default)
+      account = default && play_account(default)
+      @ask.file(key_name, "Google Play service account (it decides the developer account the app is released from)",
+                default, from: default && "#{shared?(default) ? '~/.private_keys' : 'another app'}, project #{account}",
+                optional: true)
+    end
+
+    # Passwords another app's key.properties has for this very keystore, if
+    # they open it: the keystore was chosen, so they are not asked.
+    def keystore_passwords(store, alias_name)
+      @others.key_properties.each do |p, kp|
+        next unless kp["storeFile"] && File.expand_path(kp["storeFile"]) == File.expand_path(store)
+        name = Setup.blank?(kp["keyAlias"]) ? alias_name : kp["keyAlias"]
+        next unless !Setup.blank?(kp["storePassword"]) && keystore_opens?(store, kp["storePassword"], name)
+        key_pw = Setup.blank?(kp["keyPassword"]) ? kp["storePassword"] : kp["keyPassword"]
+        return { alias: name, store_pw: kp["storePassword"], key_pw: key_pw, from: @others.label(p) }
+      end
+      nil
     end
 
     # :key for a bare private key (PEM), :p12 for a PKCS#12 bundle, nil for
@@ -1292,7 +1368,11 @@ module Setup
       now = have["ASC_KEY_PATH"] && File.expand_path(have["ASC_KEY_PATH"], File.dirname(env_path))
       return if now && File.file?(now)
       default, from = find_p8(key_id)
-      add["ASC_KEY_PATH"] = @ask.file("ASC_KEY_PATH", "The .p8 file of key #{key_id}", default, from: from)
+      add["ASC_KEY_PATH"] = if shared?(default)
+                              known("ASC_KEY_PATH", default)
+                            else
+                              @ask.file("ASC_KEY_PATH", "The .p8 file of key #{key_id}", default, from: from)
+                            end
     end
 
     # The upload keystore another app on this Mac signs with: path, alias and
@@ -1315,13 +1395,16 @@ module Setup
       kp = Setup.properties(path)
       return if %w[storeFile storePassword keyPassword keyAlias].all? { |k| !Setup.blank?(kp[k]) }
       alias_name = cfg["android_key_alias"]
-      default, from, donor = keystore_default(alias_name)
+      default, from, = keystore_default(alias_name)
       store = @ask.file("storeFile", "The upload keystore (.jks) the Android app signs with", default, from: from)
       return report("skipped #{rel(path)}: no keystore, so Android cannot sign here") if store.empty?
-      alias_name = @ask.ask("keyAlias", "Its key alias", alias_name)
-      if donor && donor[0] == store && @ask.yes?("passwords", "Take the keystore's passwords from #{donor[1]} (same keystore)", true)
-        store_pw, key_pw = donor[2]["storePassword"], donor[2]["keyPassword"]
+      known_pw = keystore_passwords(store, alias_name)
+      if known_pw
+        alias_name = known_pw[:alias]
+        store_pw, key_pw = known_pw[:store_pw], known_pw[:key_pw]
+        report "keystore alias #{alias_name} and passwords: from #{known_pw[:from]}, where they open it"
       else
+        alias_name = @ask.ask("keyAlias", "Its key alias", alias_name)
         store_pw = @ask.secret("storePassword", "Keystore password")
         key_pw = @ask.secret("keyPassword", "Key password (Enter: the same)")
         key_pw = store_pw if key_pw.empty?
@@ -1338,13 +1421,16 @@ module Setup
 
     def env_gradle_signing(have, add, cfg)
       return if %w[KEYSTORE_PATH KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD].all? { |k| !Setup.blank?(have[k]) }
-      default, from, donor = keystore_default(cfg["android_key_alias"])
+      default, from, = keystore_default(cfg["android_key_alias"])
       store = @ask.file("KEYSTORE_PATH", "The upload keystore (.jks) the Android app signs with", default, from: from)
       return if store.empty?
-      alias_name = @ask.ask("KEY_ALIAS", "Its key alias", cfg["android_key_alias"])
-      if donor && donor[0] == store && @ask.yes?("passwords", "Take the keystore's passwords from #{donor[1]} (same keystore)", true)
-        store_pw, key_pw = donor[2]["storePassword"], donor[2]["keyPassword"]
+      known_pw = keystore_passwords(store, cfg["android_key_alias"])
+      if known_pw
+        alias_name = known_pw[:alias]
+        store_pw, key_pw = known_pw[:store_pw], known_pw[:key_pw]
+        report "keystore alias #{alias_name} and passwords: from #{known_pw[:from]}, where they open it"
       else
+        alias_name = @ask.ask("KEY_ALIAS", "Its key alias", cfg["android_key_alias"])
         store_pw = @ask.secret("KEYSTORE_PASSWORD", "Keystore password")
         key_pw = @ask.secret("KEY_PASSWORD", "Key password (Enter: the same)")
         key_pw = store_pw if key_pw.empty?
@@ -1494,16 +1580,27 @@ module Setup
         lines["APP_STORE_CONNECT_API_KEY_ID"] = id
         lines["APP_STORE_CONNECT_ISSUER_ID"] = @ask.ask("APP_STORE_CONNECT_ISSUER_ID", "Its issuer id", issuer, from: from)
         p8, from = find_p8(id)
-        lines["APP_STORE_CONNECT_API_KEY_P8"] = @ask.file("APP_STORE_CONNECT_API_KEY_P8", "Its .p8 file", p8, from: from)
+        lines["APP_STORE_CONNECT_API_KEY_P8"] = if shared?(p8)
+                                                   known("APP_STORE_CONNECT_API_KEY_P8", p8)
+                                                 else
+                                                   @ask.file("APP_STORE_CONNECT_API_KEY_P8", "Its .p8 file", p8, from: from)
+                                                 end
       end
       unless (missing & %w[APPLE_DISTRIBUTION_P12_B64 APPLE_DISTRIBUTION_P12_PASSWORD]).empty?
-        # The private key in ~/.private_keys is enough: secrets.sh takes the
-        # certificate from the login keychain and builds the .p12 itself.
+        # The team was chosen in store.yml. With that team's private key in
+        # ~/.private_keys the .p12 follows: secrets.sh takes the certificate
+        # from the login keychain, builds it, and refuses a certificate of any
+        # other team (APPLE_TEAM_ID). Anything else is asked.
         team = cfg["ios_team_id"].to_s
-        key = ["apple-distribution-#{team}.key", "apple-distribution*.key", "*.p12"]
-              .flat_map { |g| Dir.glob(File.join(KEYS_DIR, g)) }.find { |f| distribution_file(f) }
-        identity = @ask.file("APPLE_DISTRIBUTION_P12", "The Apple Distribution private key, or a .p12 with certificate and key",
-                             key, from: key && "~/.private_keys")
+        own = File.join(KEYS_DIR, "apple-distribution-#{team}.key")
+        key = ([own] + Dir.glob(File.join(KEYS_DIR, "*.p12"))).find { |f| distribution_file(f) }
+        lines["APPLE_TEAM_ID"] = team
+        identity = if key == own && distribution_file(own) == :key
+                     known("APPLE_DISTRIBUTION_P12", own, "team #{team}'s key; the .p12 is built from it and the keychain's certificate")
+                   else
+                     @ask.file("APPLE_DISTRIBUTION_P12", "The Apple Distribution private key, or a .p12 with certificate and key",
+                               key, from: key && "~/.private_keys")
+                   end
         lines["APPLE_DISTRIBUTION_P12"] = identity
         kind = identity.empty? ? nil : distribution_file(identity)
         if kind.nil? && !identity.empty?
@@ -1514,9 +1611,7 @@ module Setup
         end
       end
       if missing.include?("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON")
-        key = play_key
-        lines["GOOGLE_PLAY_SERVICE_ACCOUNT_JSON"] = @ask.file("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON", "Google Play service-account JSON",
-                                                              key, from: key && (key.start_with?(KEYS_DIR) ? "~/.private_keys" : "this app"))
+        lines["GOOGLE_PLAY_SERVICE_ACCOUNT_JSON"] = ask_play_key("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON", play_key)
       end
       unless (missing & %w[ANDROID_KEYSTORE_B64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_PASSWORD]).empty?
         kp = cfg["android_key_properties"].empty? ? nil : File.join(app_dir_abs, cfg["android_key_properties"])
@@ -1527,13 +1622,14 @@ module Setup
           lines["ANDROID_KEYSTORE_PASSWORD"] = have["KEYSTORE_PASSWORD"]
           lines["ANDROID_KEY_PASSWORD"] = have["KEY_PASSWORD"]
         else
-          default, from, donor = keystore_default(cfg["android_key_alias"])
+          default, from, = keystore_default(cfg["android_key_alias"])
           store = @ask.file("ANDROID_KEYSTORE", "The upload keystore (.jks)", default, from: from)
           lines["ANDROID_KEYSTORE"] = store
-          if donor && donor[0] == store &&
-             @ask.yes?("passwords", "Take the keystore's passwords from #{donor[1]} (same keystore)", true)
-            lines["ANDROID_KEYSTORE_PASSWORD"] = donor[2]["storePassword"]
-            lines["ANDROID_KEY_PASSWORD"] = donor[2]["keyPassword"]
+          known_pw = store.empty? ? nil : keystore_passwords(store, cfg["android_key_alias"])
+          if known_pw
+            report "keystore passwords: from #{known_pw[:from]}, where they open it"
+            lines["ANDROID_KEYSTORE_PASSWORD"] = known_pw[:store_pw]
+            lines["ANDROID_KEY_PASSWORD"] = known_pw[:key_pw]
           else
             lines["ANDROID_KEYSTORE_PASSWORD"] = @ask.secret("ANDROID_KEYSTORE_PASSWORD", "Keystore password")
             lines["ANDROID_KEY_PASSWORD"] = @ask.secret("ANDROID_KEY_PASSWORD", "Key password")
