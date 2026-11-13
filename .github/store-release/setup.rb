@@ -1106,14 +1106,12 @@ module Setup
                     .split(/[\s,]+/).reject(&:empty?)
         set.call(%w[dart_defines], names)
       else
-        reads = @project.dart_define_reads
-        added = (found - current).select do |name|
-          why = if reads[name] then "read with a default"
-                elsif needed.include?(name) then "read without a default"
-                else "a development switch, read without a default"
-                end
-          @ask.yes?("dart_defines.#{name}", "The code also reads #{name} (#{why}): must the release pass it as --dart-define",
-                    needed.include?(name), from: why)
+        # Only a name the release must inject is missing from an existing
+        # list. One with a compiled-in default or a development switch is
+        # left alone, so it is not asked again on every run.
+        added = (needed - current).select do |name|
+          @ask.yes?("dart_defines.#{name}", "The code also reads #{name}, without a default: must the release pass it as --dart-define",
+                    true, from: "read without a default")
         end
         set.call(%w[dart_defines], current + added) unless added.empty?
       end

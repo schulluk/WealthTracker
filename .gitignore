@@ -75,3 +75,6 @@ app/_releases/
 # Morgan Stanley headless-login device-trust state (contains session cookies)
 ms_browser_state/
 backend/ms_browser_state/
+
+# Release credentials (store-release)
+secrets.local.env
