@@ -133,11 +133,27 @@ if [ "$LOCAL" = false ]; then
   fi
   started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   echo "Dispatching $workflow on $slug@$ref: $what"
-  gh workflow run "$workflow" --repo "$slug" --ref "$ref" "${args[@]}" < /dev/null > /dev/null
+  new_run() {
+    gh run list --repo "$slug" --workflow "$workflow" --event workflow_dispatch --limit 10 \
+      --json databaseId,createdAt --jq "[.[] | select(.createdAt >= \"$started\")] | last | .databaseId // empty"
+  }
+  # GitHub sometimes answers a dispatch with a 5xx. Retry, but only after
+  # making sure no run started anyway: a release must never go out twice.
   id=""
+  for attempt in 1 2 3; do
+    err=$(gh workflow run "$workflow" --repo "$slug" --ref "$ref" "${args[@]}" 2>&1 < /dev/null > /dev/null) && break
+    echo "$err" >&2
+    # Only GitHub's own trouble is worth another try; a wrong ref is not.
+    case "$err" in *"HTTP 5"*) ;; *) exit 1 ;; esac
+    [ "$attempt" = 3 ] && { echo "GitHub refused the dispatch three times; nothing started." >&2; exit 1; }
+    sleep 15
+    id=$(new_run)
+    [ -n "$id" ] && break
+    echo "No run started; dispatching again." >&2
+  done
   for _ in $(seq 1 30); do
-    id=$(gh run list --repo "$slug" --workflow "$workflow" --event workflow_dispatch --limit 10 \
-      --json databaseId,createdAt --jq "[.[] | select(.createdAt >= \"$started\")] | last | .databaseId // empty")
+    [ -n "$id" ] && break
+    id=$(new_run)
     [ -n "$id" ] && break
     sleep 4
   done
