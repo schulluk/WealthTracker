@@ -119,8 +119,14 @@ this table and the questionnaire in the same release.
 Where: App Store Connect → app → General → App Compliance → "Add Info".
 Can be answered at any time, even with no version in preparation. After "No"
 there are no follow-up questions: click Save and both rows show "Active".
-Due: Jan 31, 2027 for existing apps, if the app is available in China mainland
-(see Pricing and Availability).
+Due: Jan 31, 2027 for existing apps that are available in China mainland.
+Wealth Tracker is not: China mainland, Hong Kong, Macau and Taiwan were
+removed from its App Store availability on 2026-11-23 (Pricing and
+Availability → App Availability → Manage Availability; 171 of 175 territories
+remain, and "automatically available in all future territories" stays on), so
+the deadline does not apply. The two answers below are No regardless. Territory
+availability is a manual setting too; nothing in the repo or the release
+tooling sets it.
 
 | Question | Answer | Reason |
 |----------|--------|--------|
