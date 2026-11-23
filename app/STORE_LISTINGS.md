@@ -104,6 +104,44 @@ None
 
 ---
 
+## App Store Connect Compliance Questions (manual)
+
+Apple added these four questions in 2026. No release tooling sets them (not
+store.yml, not ./release.sh, not the preflight): each is a manual step in
+App Store Connect. The answers below are for Wealth Tracker
+(ch.miniapps.wealthtracker, the only iOS app in this repository), checked
+against the code on 2026-11-23. Re-check them whenever a feature adds
+messaging, location, social features or user-facing generative AI, and update
+this table and the questionnaire in the same release.
+
+### App Compliance (China mainland)
+
+Where: App Store Connect → app → General → App Compliance → "Add Info".
+Can be answered at any time, even with no version in preparation. After "No"
+there are no follow-up questions: click Save and both rows show "Active".
+Due: Jan 31, 2027 for existing apps, if the app is available in China mainland
+(see Pricing and Availability).
+
+| Question | Answer | Reason |
+|----------|--------|--------|
+| Does your app include features that require a security assessment in China mainland? (Yes only for end-to-end encrypted instant messaging or distributing AI-generated content) | No | No messaging between people at all: Firebase push and the Morgan Stanley phone relay are server-to-device plumbing. Nothing AI-generated is distributed; see the next row. |
+| Does your app offer AIGC services in China mainland? (Yes only for AI chatbots, AI image/video generation or processing, AI voice/face generation or alteration) | No | The only AI feature is Gemini-assisted transaction categorization (backend/portfolio/ai_categorization.py, app/lib/presentation/screens/ai_suggestions_screen.dart): it classifies the user's own transactions into the user's own categories, with the user's own Gemini API key on their own server, and returns suggestions the user must confirm. No chatbot, no free-text prompt, no image, video, voice or face generation. |
+
+### Age Ratings
+
+Where: App Store Connect → app → General → App Information → Age Ratings → Edit.
+The questionnaire can only be edited while a version is in "Prepare for
+Submission"; otherwise every option is greyed out, so answer with the next
+version. Due: Jan 15, 2027, or earlier if a new app is submitted or other
+age-rating answers change.
+
+| Step | Question | Answer | Reason |
+|------|----------|--------|--------|
+| 1, Features | Shared Location: sharing of real-world location with another person or group | No | The app never reads device location (no location usage description in app/ios/Runner/Info.plist, no location permission in the Android manifest, no location package in pubspec.yaml) and has no feature that shows anything to another user. |
+| 2, Mature Themes | Dating and Relationships: dating or relationship connections between real people and/or a virtual companion with sexual or romantic content | No | Single-user net worth tracker with no social features, no other users' profiles and no companion or chat of any kind. |
+
+---
+
 ## Google Play Store
 
 ### App Name
